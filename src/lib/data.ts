@@ -1,3 +1,4 @@
+
 import type { Zone, Site, Technician, Ticket, Notification, User } from '@/lib/types';
 
 export const users: User[] = [
@@ -80,11 +81,15 @@ export const tickets: Ticket[] = [
     zone: 'Zonas Comunes',
     site: 'Cafetería',
     priority: 'Baja',
-    status: 'Resuelto',
+    status: 'Requiere Aprobación',
     createdAt: '2024-05-19T15:00:00Z',
     dueDate: '2024-05-22T15:00:00Z',
     assignedTo: 'Lucia Fernandez',
     requester: 'Admin Cafetería',
+    attachments: [
+      { url: 'https://placehold.co/400x300.png', description: 'Puerta ajustada y lubricada.' },
+      { url: 'https://placehold.co/400x300.png', description: 'Cerradura funcionando OK.' },
+    ]
   },
     {
     id: '5',
@@ -99,6 +104,9 @@ export const tickets: Ticket[] = [
     dueDate: '2024-05-21T08:00:00Z',
     assignedTo: 'Carlos Gomez',
     requester: 'Coordinador Académico',
+    attachments: [
+        { url: 'https://placehold.co/400x300.png', description: 'Nueva bombilla LED instalada.' },
+    ]
   },
 ];
 
@@ -108,3 +116,5 @@ export const notifications: Notification[] = [
     { id: '3', title: 'Turno próximo', description: 'Tu turno de mantenimiento comienza en 60 minutos.', createdAt: 'Hace 1 día', read: true, type: 'schedule' },
     { id: '4', title: 'Ticket Resuelto', description: 'El ticket GEMMAN-ZONAD-SITED1-0004 ha sido resuelto.', createdAt: 'Hace 2 días', read: true, type: 'ticket' },
 ];
+
+    

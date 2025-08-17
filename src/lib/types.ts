@@ -1,3 +1,4 @@
+
 export type User = {
   id: string;
   name: string;
@@ -17,6 +18,11 @@ export type Site = {
   zoneId: string;
 };
 
+export type Attachment = {
+    url: string;
+    description: string;
+}
+
 export type Ticket = {
   id: string;
   code: string;
@@ -25,11 +31,12 @@ export type Ticket = {
   zone: string;
   site: string;
   priority: 'Baja' | 'Media' | 'Alta' | 'Urgente';
-  status: 'Abierto' | 'Asignado' | 'En Progreso' | 'Resuelto' | 'Cerrado';
+  status: 'Abierto' | 'Asignado' | 'En Progreso' | 'Requiere Aprobación' | 'Resuelto' | 'Cerrado';
   createdAt: string;
   dueDate: string;
   assignedTo?: string;
   requester: string;
+  attachments?: Attachment[];
 };
 
 export type Technician = {
@@ -57,3 +64,5 @@ export type ScheduleEvent = {
   technicianId?: string;
   ticketId?: string;
 };
+
+    

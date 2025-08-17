@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -27,6 +28,11 @@ export default function AiSuggestion({ ticket }: { ticket: Ticket }) {
   const { toast } = useToast();
 
   const handleSuggestion = async () => {
+    // Need to open the dialog first, then load the suggestion
+    if (!isOpen) {
+        setIsOpen(true);
+    }
+    
     setIsLoading(true);
     setSuggestion(null);
 
@@ -94,3 +100,5 @@ export default function AiSuggestion({ ticket }: { ticket: Ticket }) {
     </Dialog>
   );
 }
+
+    

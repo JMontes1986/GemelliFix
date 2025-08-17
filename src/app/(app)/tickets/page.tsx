@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import Link from 'next/link';
 import {
@@ -56,7 +57,8 @@ const getStatusBadgeVariant = (status: Ticket['status']) => {
     case 'Abierto': return 'destructive';
     case 'Asignado': return 'default';
     case 'En Progreso': return 'default';
-    case 'Resuelto': return 'default'; // Should be green, handled with className
+    case 'Requiere Aprobación': return 'default';
+    case 'Resuelto': return 'default'; 
     case 'Cerrado': return 'secondary';
     default: return 'default';
   }
@@ -66,6 +68,7 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
     switch (status) {
       case 'Asignado': return 'bg-blue-500 text-white';
       case 'En Progreso': return 'bg-yellow-500 text-black';
+      case 'Requiere Aprobación': return 'bg-purple-500 text-white';
       case 'Resuelto': return 'bg-green-600 text-white';
       default: return '';
     }
@@ -219,3 +222,5 @@ export default function TicketsPage() {
     </Tabs>
   );
 }
+
+    
