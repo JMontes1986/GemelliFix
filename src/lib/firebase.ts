@@ -3,9 +3,6 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { connectAuthEmulator } from "firebase/auth";
-import { connectFirestoreEmulator } from "firebase/firestore";
-import { connectStorageEmulator } from "firebase/storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -18,17 +15,10 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
-
-if (process.env.NODE_ENV === 'development') {
-    //connectAuthEmulator(auth, 'http://127.0.0.1:9099');
-    //connectFirestoreEmulator(db, '127.0.0.1', 8080);
-    //connectStorageEmulator(storage, '127.0.0.1', 9199);
-}
-
 
 export { app, auth, db, storage };
