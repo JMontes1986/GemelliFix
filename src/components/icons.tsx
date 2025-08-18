@@ -9,7 +9,7 @@ export function GemelliFixLogo(props: { className?: string }) {
       alt="GemelliFix Logo" 
       width={180} 
       height={280} 
-      className={props.className}
+      className={cn("h-auto w-full", props.className)}
       priority
       data-ai-hint="logo"
     />

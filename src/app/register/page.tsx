@@ -18,7 +18,9 @@ export default function RegisterPage() {
       <Card className="w-full max-w-sm mx-auto">
         <CardHeader className="text-center space-y-4">
            <div className="flex justify-center">
-              <GemelliFixLogo className="w-48" />
+              <div className="w-48">
+                <GemelliFixLogo />
+              </div>
             </div>
           <CardTitle className="text-2xl font-headline">Crear Cuenta de Administrador</CardTitle>
           <CardDescription>
