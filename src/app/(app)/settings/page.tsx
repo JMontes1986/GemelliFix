@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -148,9 +149,11 @@ export default function SettingsPage() {
                     <SelectValue placeholder="Seleccionar un rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Administrador</SelectItem>
-                    <SelectItem value="tech">Técnico</SelectItem>
-                    <SelectItem value="requester">Solicitante</SelectItem>
+                    <SelectItem value="Docentes">Docente</SelectItem>
+                    <SelectItem value="Coordinadores">Coordinador</SelectItem>
+                    <SelectItem value="Administrativos">Administrativo</SelectItem>
+                    <SelectItem value="servicios generales">Servicios Generales</SelectItem>
+                    <SelectItem value="administrador">Administrador</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
