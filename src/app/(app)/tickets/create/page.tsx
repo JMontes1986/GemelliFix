@@ -34,7 +34,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { zones, sites, categories } from '@/lib/data';
 import { db, storage, auth } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { onAuthStateChanged } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -64,13 +64,6 @@ export default function CreateTicketPage() {
   const [isAuthReady, setIsAuthReady] = React.useState(false);
   const [attachedFiles, setAttachedFiles] = React.useState<File[]>([]);
   
-  React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-        setIsAuthReady(true);
-    });
-    return () => unsubscribe();
-  }, []);
-
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketSchema),
     defaultValues: {
@@ -82,6 +75,14 @@ export default function CreateTicketPage() {
       category: 'General',
     },
   });
+
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        setIsAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
 
   const selectedZoneId = form.watch('zoneId');
   
@@ -97,9 +98,9 @@ export default function CreateTicketPage() {
     }
     setIsLoading(true);
     try {
-      const userDocRef = doc(db, "users", currentUser.uid);
-      const userDocSnap = await getDoc(userDocRef);
-      const requesterName = userDocSnap.exists() ? userDocSnap.data().name : currentUser.email || 'Usuario Desconocido';
+      // NOTE: We are not using user profiles from firestore for the requester name for now.
+      // This can be added later if needed.
+      const requesterName = currentUser.displayName || currentUser.email || 'Usuario Desconocido';
 
       const zoneName = zones.find((z) => z.id === data.zoneId)?.name;
       const siteName = sites.find((s) => s.id === data.siteId)?.name;
@@ -151,7 +152,7 @@ export default function CreateTicketPage() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
      if (e.target.files) {
       const newFiles = Array.from(e.target.files);
       const validFiles: File[] = [];
@@ -171,13 +172,13 @@ export default function CreateTicketPage() {
       setAttachedFiles(updatedFiles);
       form.setValue('attachments', updatedFiles, { shouldValidate: true });
     }
-  };
+  }
 
-  const removeFile = (indexToRemove: number) => {
+  function removeFile(indexToRemove: number) {
     const newFiles = attachedFiles.filter((_, index) => index !== indexToRemove);
     setAttachedFiles(newFiles);
     form.setValue('attachments', newFiles, { shouldValidate: true });
-  };
+  }
 
 
   return (
@@ -420,3 +421,5 @@ export default function CreateTicketPage() {
     </div>
   );
 }
+
+    
