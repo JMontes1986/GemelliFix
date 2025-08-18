@@ -160,7 +160,7 @@ export default function CreateTicketPage() {
     <div className="flex justify-center items-start py-8">
       <Card className="w-full max-w-4xl">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">Crear Nueva Solicitud de Mantenimiento</CardTitle>
+          <CardTitle className="font-headline text-2xl">Crear Nueva Solicitud en GemelliFix</CardTitle>
           <CardDescription>
             Completa el formulario para reportar una incidencia.
           </CardDescription>
@@ -321,7 +321,7 @@ export default function CreateTicketPage() {
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                      <Alert className="mt-4 bg-primary/5 border-primary/20">
+                      <Alert>
                           <span className="text-2xl absolute -top-1.5 left-2">📌</span>
                           <AlertTitle className="font-headline text-primary pl-6">SLA – Tiempos de atención de solicitudes</AlertTitle>
                           <AlertDescription className="pl-6 space-y-3 pt-2">
