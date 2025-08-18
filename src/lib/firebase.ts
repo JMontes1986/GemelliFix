@@ -6,14 +6,14 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
-// Asegúrate de que estas variables de entorno estén configuradas
+// This is a public configuration and is safe to be exposed.
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  "projectId": "gemellifix",
+  "appId": "1:431414897003:web:12ca75d6bd98572a50c42e",
+  "storageBucket": "gemellifix.appspot.com",
+  "apiKey": "AIzaSyD-L4zCQfaMSuPAEL0SxisLXujSiKBJBJE",
+  "authDomain": "gemellifix.firebaseapp.com",
+  "messagingSenderId": "431414897003"
 };
 
 
@@ -31,5 +31,3 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 export { app, auth, db, storage };
-
-    
