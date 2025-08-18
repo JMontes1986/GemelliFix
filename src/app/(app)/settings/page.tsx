@@ -84,7 +84,7 @@ export default function SettingsPage() {
         description: error.message || 'Ocurrió un error inesperado.',
       });
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
