@@ -51,13 +51,10 @@ const ticketSchema = z.object({
   description: z.string().min(1, 'La descripción es requerida.'),
   zoneId: z.string().min(1, 'La zona es requerida.'),
   siteId: z.string().min(1, 'El sitio es requerido.'),
-  priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente'], {
-    required_error: 'La prioridad es requerida.',
-  }),
+  priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
   category: z.string().min(1, 'La categoría es requerida.'),
   attachments: z.any().optional(),
 });
-
 
 type TicketFormValues = z.infer<typeof ticketSchema>
 
@@ -112,10 +109,9 @@ export default function CreateTicketPage() {
       const userDocSnap = await getDoc(userDocRef);
       const requesterName = userDocSnap.exists() ? userDocSnap.data().name : currentUser.email || 'Usuario Desconocido';
 
-
       const zoneName = zones.find((z) => z.id === data.zoneId)?.name;
       const siteName = sites.find((s) => s.id === data.siteId)?.name;
-
+      
       // 1. Upload files to Firebase Storage
       const attachmentUrls: Attachment[] = [];
       if (attachedFiles.length > 0) {
@@ -136,8 +132,8 @@ export default function CreateTicketPage() {
         code: ticketCode,
         title: data.title,
         description: data.description,
-        zone: zoneName,
-        site: siteName,
+        zone: zoneName || 'Desconocida',
+        site: siteName || 'Desconocido',
         priority: data.priority,
         category: data.category,
         status: 'Abierto',
@@ -189,6 +185,7 @@ export default function CreateTicketPage() {
   const removeFile = (indexToRemove: number) => {
     setAttachedFiles(prevFiles => prevFiles.filter((_, index) => index !== indexToRemove));
   };
+
 
   return (
     <div className="flex justify-center items-start py-8">
@@ -430,5 +427,3 @@ export default function CreateTicketPage() {
     </div>
   );
 }
-
-    
