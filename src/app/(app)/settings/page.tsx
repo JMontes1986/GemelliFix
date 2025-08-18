@@ -56,6 +56,57 @@ export default function SettingsPage() {
 
       <Separator />
 
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="md:col-span-1">
+          <h2 className="text-lg font-headline font-semibold">Gestión de Usuarios</h2>
+          <p className="text-sm text-muted-foreground">
+            Añade nuevos usuarios al sistema.
+          </p>
+        </div>
+        <div className="md:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Crear Nuevo Usuario</CardTitle>
+              <CardDescription>
+                Completa los datos para registrar un nuevo usuario en la plataforma.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-user-name">Nombre Completo</Label>
+                <Input id="new-user-name" placeholder="Ej: Juan Pérez" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-user-email">Correo Electrónico</Label>
+                <Input id="new-user-email" type="email" placeholder="usuario@gemelli.edu.co" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-user-role">Rol</Label>
+                <Select>
+                  <SelectTrigger id="new-user-role">
+                    <SelectValue placeholder="Seleccionar un rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="tech">Técnico</SelectItem>
+                    <SelectItem value="requester">Solicitante</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-user-password">Contraseña Temporal</Label>
+                <Input id="new-user-password" type="password" />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button>Crear Usuario</Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
+
+      <Separator />
+
        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className="md:col-span-1">
             <h2 className="text-lg font-headline font-semibold">Notificaciones</h2>
