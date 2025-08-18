@@ -12,52 +12,57 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GemelliFixLogo } from '@/components/icons';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm mx-auto">
         <CardHeader className="text-center space-y-4">
-            <div className="flex justify-center">
+           <div className="flex justify-center">
               <GemelliFixLogo className="w-48" />
             </div>
-          <CardTitle className="text-2xl font-headline">Iniciar Sesión</CardTitle>
+          <CardTitle className="text-2xl font-headline">Crear Cuenta de Administrador</CardTitle>
           <CardDescription>
-            Ingresa tu correo para acceder a tu cuenta
+            Completa el formulario para registrarte.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4">
+          <form className="grid gap-4">
+             <div className="grid gap-2">
+              <Label htmlFor="name">Nombre completo</Label>
+              <Input id="name" placeholder="Ej: Admin User" required />
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Correo electrónico</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="usuario@gemelli.edu.co"
+                placeholder="admin@gemelli.edu.co"
                 required
               />
             </div>
             <div className="grid gap-2">
-              <div className="flex items-center">
                 <Label htmlFor="password">Contraseña</Label>
-                <Link
-                  href="#"
-                  className="ml-auto inline-block text-sm underline"
-                >
-                  ¿Olvidaste tu contraseña?
-                </Link>
-              </div>
-              <Input id="password" type="password" required />
+                <Input 
+                  id="password" 
+                  type="password" 
+                  required 
+                  pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}"
+                  title="Debe contener al menos un número, una mayúscula, una minúscula, y al menos 8 o más caracteres"
+                />
+                 <p className="text-xs text-muted-foreground">
+                    Debe contener mayúsculas, minúsculas y números.
+                </p>
             </div>
             <Link href="/dashboard" className='w-full'>
-              <Button type="submit" className="w-full">
-                Ingresar
-              </Button>
+                <Button type="submit" className="w-full">
+                    Crear Cuenta
+                </Button>
             </Link>
-          </div>
+          </form>
           <div className="mt-4 text-center text-sm">
-            ¿No tienes cuenta?{' '}
-            <Link href="/register" className="underline font-bold">
-              Regístrate
+            ¿Ya tienes una cuenta?{' '}
+            <Link href="/login" className="underline font-bold">
+              Inicia sesión
             </Link>
           </div>
         </CardContent>
