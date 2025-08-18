@@ -36,10 +36,9 @@ import { zones, sites, users, categories } from '@/lib/data';
 import { db, storage, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud, File as FileIcon, X } from 'lucide-react';
-import type { Attachment } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -56,7 +55,7 @@ const ticketSchema = z.object({
   attachments: z.any().optional(),
 });
 
-type TicketFormValues = z.infer<typeof ticketSchema>
+type TicketFormValues = z.infer<typeof ticketSchema>;
 
 export default function CreateTicketPage() {
   const router = useRouter();
@@ -85,13 +84,7 @@ export default function CreateTicketPage() {
   });
 
   const selectedZoneId = form.watch('zoneId');
-  const fileRef = React.useRef<HTMLInputElement>(null);
   
-   React.useEffect(() => {
-    form.setValue('attachments', attachedFiles);
-  }, [attachedFiles, form]);
-
-
   const onSubmit = async (data: TicketFormValues) => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -104,7 +97,6 @@ export default function CreateTicketPage() {
     }
     setIsLoading(true);
     try {
-      // Get user name from 'users' collection
       const userDocRef = doc(db, "users", currentUser.uid);
       const userDocSnap = await getDoc(userDocRef);
       const requesterName = userDocSnap.exists() ? userDocSnap.data().name : currentUser.email || 'Usuario Desconocido';
@@ -112,8 +104,7 @@ export default function CreateTicketPage() {
       const zoneName = zones.find((z) => z.id === data.zoneId)?.name;
       const siteName = sites.find((s) => s.id === data.siteId)?.name;
       
-      // 1. Upload files to Firebase Storage
-      const attachmentUrls: Attachment[] = [];
+      const attachmentUrls: { url: string, description: string }[] = [];
       if (attachedFiles.length > 0) {
         for (const file of attachedFiles) {
           const storageRef = ref(storage, `ticket-attachments/${Date.now()}-${file.name}`);
@@ -123,7 +114,6 @@ export default function CreateTicketPage() {
         }
       }
 
-      // 2. Create ticket in Firestore
       const zoneCode = zoneName?.substring(0,4).toUpperCase() || '????';
       const siteCode = siteName?.substring(0,4).toUpperCase() || '????';
       const ticketCode = `GEMMAN-${zoneCode}-${siteCode}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -140,7 +130,7 @@ export default function CreateTicketPage() {
         requester: requesterName,
         assignedTo: '',
         createdAt: serverTimestamp(),
-        dueDate: new Date(new Date().setDate(new Date().getDate() + 7)), // Placeholder: vence en 7 días
+        dueDate: new Date(new Date().setDate(new Date().getDate() + 7)), 
         attachments: attachmentUrls,
       });
 
@@ -177,13 +167,16 @@ export default function CreateTicketPage() {
         }
         validFiles.push(file);
       }
-      
-      setAttachedFiles(prevFiles => [...prevFiles, ...validFiles]);
+      const updatedFiles = [...attachedFiles, ...validFiles];
+      setAttachedFiles(updatedFiles);
+      form.setValue('attachments', updatedFiles, { shouldValidate: true });
     }
   };
 
   const removeFile = (indexToRemove: number) => {
-    setAttachedFiles(prevFiles => prevFiles.filter((_, index) => index !== indexToRemove));
+    const newFiles = attachedFiles.filter((_, index) => index !== indexToRemove);
+    setAttachedFiles(newFiles);
+    form.setValue('attachments', newFiles, { shouldValidate: true });
   };
 
 
@@ -227,7 +220,7 @@ export default function CreateTicketPage() {
                         <FormControl>
                             <SelectTrigger>
                             <SelectValue placeholder="Selecciona la zona afectada" />
-                            </Trigger>
+                            </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                             {zones.map((zone) => (
@@ -351,7 +344,7 @@ export default function CreateTicketPage() {
                             <div className="flex text-sm text-muted-foreground">
                                 <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-ring">
                                     <span>Sube tus archivos</span>
-                                    <input id="file-upload" type="file" className="sr-only" ref={fileRef} multiple onChange={handleFileChange} accept={ACCEPTED_FILE_TYPES.join(",")} />
+                                    <input id="file-upload" type="file" className="sr-only" multiple onChange={handleFileChange} accept={ACCEPTED_FILE_TYPES.join(",")} />
                                 </label>
                                 <p className="pl-1">o arrastra y suelta</p>
                             </div>
@@ -427,3 +420,5 @@ export default function CreateTicketPage() {
     </div>
   );
 }
+
+    
