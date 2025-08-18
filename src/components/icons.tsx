@@ -7,9 +7,10 @@ export function GemelliFixLogo(props: { className?: string }) {
     <Image 
       src="/logo.png" 
       alt="GemelliFix Logo" 
-      width={160} 
-      height={32} 
+      width={240} 
+      height={48} 
       className={props.className}
+      priority
     />
   );
 }
