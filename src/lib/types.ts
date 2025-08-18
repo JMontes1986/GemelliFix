@@ -5,7 +5,7 @@ export type User = {
   name: string;
   email: string;
   avatar: string;
-  role: 'Docentes' | 'Coordinadores' | 'Administrativos' | 'servicios generales' | 'administrador';
+  role: 'Docentes' | 'Coordinadores' | 'Administrativos' | 'Servicios Generales' | 'Administrador';
 };
 
 export type Zone = {

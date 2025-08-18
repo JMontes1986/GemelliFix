@@ -2,8 +2,8 @@
 import type { Zone, Site, Technician, Ticket, Notification, User, ScheduleEvent, Category } from '@/lib/types';
 
 export const users: User[] = [
-  { id: 'user-1', name: 'Admin User', email: 'admin@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'administrador' },
-  { id: 'user-2', name: 'Tech User', email: 'tech@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'servicios generales' },
+  { id: 'user-1', name: 'Admin User', email: 'admin@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Administrador' },
+  { id: 'user-2', name: 'Tech User', email: 'tech@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Servicios Generales' },
   { id: 'user-3', name: 'Requester User', email: 'requester@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Docentes' },
 ];
 
