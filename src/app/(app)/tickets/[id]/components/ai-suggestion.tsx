@@ -19,16 +19,21 @@ import {
   type SuggestTechnicianAssignmentInput,
   type SuggestTechnicianAssignmentOutput,
 } from '@/ai/flows/suggest-technician-assignment';
-import type { Ticket } from '@/lib/types';
+import type { Ticket, Technician } from '@/lib/types';
+import { technicians } from '@/lib/data';
 
-export default function AiSuggestion({ ticket }: { ticket: Ticket }) {
+interface AiSuggestionProps {
+    ticket: Ticket;
+    onAssign: (technician: Technician) => void;
+}
+
+export default function AiSuggestion({ ticket, onAssign }: AiSuggestionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestTechnicianAssignmentOutput | null>(null);
   const { toast } = useToast();
 
   const handleSuggestion = async () => {
-    // Need to open the dialog first, then load the suggestion
     if (!isOpen) {
         setIsOpen(true);
     }
@@ -37,11 +42,9 @@ export default function AiSuggestion({ ticket }: { ticket: Ticket }) {
     setSuggestion(null);
 
     const input: SuggestTechnicianAssignmentInput = {
+      ticketTitle: ticket.title,
       ticketDescription: ticket.description,
-      // Mock data for demonstration
-      activeTickets: 3, 
-      scheduledShifts: 2,
-      cleaningTasks: 5,
+      ticketCategory: ticket.category,
     };
 
     try {
@@ -59,6 +62,23 @@ export default function AiSuggestion({ ticket }: { ticket: Ticket }) {
       setIsLoading(false);
     }
   };
+  
+  const handleAssignFromSuggestion = () => {
+    if (suggestion) {
+        const suggestedTech = technicians.find(t => t.id === suggestion.technicianId);
+        if (suggestedTech) {
+            onAssign(suggestedTech);
+            setIsOpen(false);
+        } else {
+             toast({
+                variant: 'destructive',
+                title: 'Error al Asignar',
+                description: 'No se pudo encontrar al técnico sugerido.',
+            });
+        }
+    }
+  }
+
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -75,7 +95,7 @@ export default function AiSuggestion({ ticket }: { ticket: Ticket }) {
             Sugerencia de Asignación
           </DialogTitle>
           <DialogDescription>
-            El asistente de IA ha analizado la carga de trabajo y recomienda al siguiente técnico.
+            El asistente de IA ha analizado la carga de trabajo y las habilidades, y recomienda al siguiente técnico.
           </DialogDescription>
         </DialogHeader>
         {isLoading && (
@@ -87,18 +107,16 @@ export default function AiSuggestion({ ticket }: { ticket: Ticket }) {
         )}
         {suggestion && (
           <div className="space-y-4 py-4">
-            <h3 className="text-lg font-semibold text-primary">{suggestion.technicianId || 'Técnico Sugerido'}</h3>
+            <h3 className="text-lg font-semibold text-primary">{suggestion.technicianName || 'Técnico Sugerido'}</h3>
             <p><strong>Carga de trabajo estimada:</strong> {suggestion.workloadPercentage}%</p>
             <div>
               <p className="font-semibold">Razón:</p>
               <p className="text-muted-foreground italic">"{suggestion.reason}"</p>
             </div>
-            <Button className="w-full">Asignar a {suggestion.technicianId || 'este técnico'}</Button>
+            <Button className="w-full" onClick={handleAssignFromSuggestion}>Asignar a {suggestion.technicianName || 'este técnico'}</Button>
           </div>
         )}
       </DialogContent>
     </Dialog>
   );
 }
-
-    

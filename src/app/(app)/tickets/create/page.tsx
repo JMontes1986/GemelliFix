@@ -102,7 +102,9 @@ export default function CreateTicketPage() {
       }
 
       // 2. Create ticket in Firestore
-      const ticketCode = `GEMMAN-${zone?.name.substring(0,4).toUpperCase()}-${site?.name.substring(0,4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const zoneCode = zone?.name.substring(0,4).toUpperCase() || '????';
+      const siteCode = site?.name.substring(0,4).toUpperCase() || '????';
+      const ticketCode = `GEMMAN-${zoneCode}-${siteCode}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       await addDoc(collection(db, 'tickets'), {
         code: ticketCode,
@@ -355,7 +357,7 @@ export default function CreateTicketPage() {
               />
 
               
-              <Alert>
+              <Alert variant="default">
                   <span className="text-2xl absolute -top-1.5 left-2">📌</span>
                   <AlertTitle className="font-headline text-primary pl-6">SLA – Tiempos de atención de solicitudes</AlertTitle>
                   <AlertDescription className="pl-6 space-y-3 pt-2">

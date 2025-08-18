@@ -325,7 +325,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-              <AiSuggestion ticket={currentTicket} />
+              <AiSuggestion ticket={currentTicket} onAssign={handleAssignTechnician} />
             </CardFooter>
           )}
         </Card>
