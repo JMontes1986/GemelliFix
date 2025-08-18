@@ -48,7 +48,8 @@ const currentUser = users[0]; // Admin User
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isActive = (path: string) => pathname === path;
+  const isActive = (path: string) => pathname === path || (path.startsWith(pathname) && pathname !== '/');
+
 
   return (
     <SidebarProvider>
@@ -105,6 +106,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Link href="/notifications">
                   <Bell />
                   <span>Notificaciones</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive('/settings')}
+                tooltip="Configuración"
+              >
+                <Link href="/settings">
+                  <Settings />
+                  <span>Configuración</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -172,6 +185,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Link href="/profile">
                   <UserIcon className="mr-2 h-4 w-4" />
                   <span>Perfil</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Configuración</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
