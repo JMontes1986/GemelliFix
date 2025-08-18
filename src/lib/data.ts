@@ -1,5 +1,5 @@
 
-import type { Zone, Site, Technician, Ticket, Notification, User, ScheduleEvent } from '@/lib/types';
+import type { Zone, Site, Technician, Ticket, Notification, User, ScheduleEvent, Category } from '@/lib/types';
 
 export const users: User[] = [
   { id: 'user-1', name: 'Admin User', email: 'admin@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'administrador' },
@@ -24,6 +24,21 @@ export const sites: Site[] = [
   { id: 'site-d1', name: 'Cafetería', zoneId: 'zona-d' },
   { id: 'site-d2', name: 'Biblioteca', zoneId: 'zona-d' },
 ];
+
+export const categories: Category[] = [
+    { id: 'cat-1', name: 'Electricidad' },
+    { id: 'cat-2', name: 'Sistemas y Tecnología' },
+    { id: 'cat-3', name: 'Infraestructura y Obras Civiles' },
+    { id: 'cat-4', name: 'Fontanería e Hidráulica' },
+    { id: 'cat-5', name: 'Carpintería y Mobiliario' },
+    { id: 'cat-6', name: 'Pintura y Acabados' },
+    { id: 'cat-7', name: 'Aseo y Limpieza' },
+    { id: 'cat-8', name: 'Zonas Verdes y Jardinería' },
+    { id: 'cat-9', name: 'Seguridad y Emergencias' },
+    { id: 'cat-10', name: 'Eventos y Logística' },
+    { id: 'cat-11', name: 'General' },
+];
+
 
 export const technicians: Technician[] = [
   { id: 'tech-1', name: 'Carlos Gomez', avatar: 'https://placehold.co/100x100.png', skills: ['Electricidad', 'Plomería'], workload: 85, color: 'bg-sky-200/80 border-sky-400 text-sky-900' },
@@ -171,5 +186,3 @@ export const scheduleEvents: ScheduleEvent[] = [
         technicianId: 'tech-2'
     }
 ];
-
-    

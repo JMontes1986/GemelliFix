@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { PlusCircle } from 'lucide-react';
-import { users, technicians, zones, sites } from '@/lib/data';
+import { users, technicians, zones, sites, categories } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 
@@ -44,10 +44,11 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="technicians">Servicios Generales</TabsTrigger>
           <TabsTrigger value="locations">Zonas y Sitios</TabsTrigger>
+          <TabsTrigger value="categories">Categorías</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
         </TabsList>
 
@@ -212,6 +213,44 @@ export default function SettingsPage() {
                     </CardContent>
                 </Card>
             </div>
+        </TabsContent>
+
+        <TabsContent value="categories">
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle className="font-headline">Gestión de Categorías</CardTitle>
+                            <CardDescription>
+                                Administra las categorías para las solicitudes de mantenimiento.
+                            </CardDescription>
+                        </div>
+                        <Button>
+                            <PlusCircle className="mr-2" /> Nueva Categoría
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nombre de la Categoría</TableHead>
+                        <TableHead className="w-[100px]">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {categories.map((category) => (
+                        <TableRow key={category.id}>
+                          <TableCell className="font-medium">{category.name}</TableCell>
+                          <TableCell>
+                            <Button variant="outline" size="sm">Editar</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+            </Card>
         </TabsContent>
 
         <TabsContent value="system">
