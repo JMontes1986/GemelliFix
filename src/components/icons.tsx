@@ -1,6 +1,7 @@
 
 import type { SVGProps } from 'react';
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 export function GemelliFixLogo(props: { className?: string }) {
   return (
