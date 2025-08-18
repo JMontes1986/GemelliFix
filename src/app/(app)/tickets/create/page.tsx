@@ -55,17 +55,11 @@ const ticketSchema = z.object({
     required_error: 'La prioridad es requerida.',
   }),
   category: z.string().min(1, 'La categoría es requerida.'),
-  attachments: z.custom<FileList>()
-    .optional()
-    .refine((files) => {
-        if (!files || files.length === 0) return true; // Optional field is valid if empty
-        return Array.from(files).every(file => file.size <= MAX_FILE_SIZE && ACCEPTED_IMAGE_TYPES.includes(file.type));
-    }, {
-        message: "Uno o más archivos no son válidos. Solo se aceptan imágenes y PDF de hasta 5MB.",
-    })
+  attachments: z.any().optional(),
 });
 
-type TicketFormValues = z.infer<typeof ticketSchema>;
+
+type TicketFormValues = z.infer<typeof ticketSchema>
 
 export default function CreateTicketPage() {
   const router = useRouter();
@@ -174,11 +168,22 @@ export default function CreateTicketPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
      if (e.target.files) {
       const newFiles = Array.from(e.target.files);
-      setAttachedFiles((prevFiles) => [...prevFiles, ...newFiles]);
+      const validFiles = newFiles.filter(file => {
+          if (file.size > MAX_FILE_SIZE) {
+              toast({ variant: 'destructive', title: 'Archivo demasiado grande', description: `El archivo ${file.name} supera los 5MB.`});
+              return false;
+          }
+          if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+               toast({ variant: 'destructive', title: 'Tipo de archivo no permitido', description: `El archivo ${file.name} no es una imagen o PDF.`});
+              return false;
+          }
+          return true;
+      });
       
-      const dataTransfer = new DataTransfer();
-      [...attachedFiles, ...newFiles].forEach(file => dataTransfer.items.add(file));
-      form.setValue('attachments', dataTransfer.files);
+      const updatedFiles = [...attachedFiles, ...validFiles];
+      setAttachedFiles(updatedFiles);
+      
+      form.setValue('attachments', updatedFiles, { shouldValidate: true });
     }
   };
 
@@ -186,11 +191,7 @@ export default function CreateTicketPage() {
     const newFiles = [...attachedFiles];
     newFiles.splice(index, 1);
     setAttachedFiles(newFiles);
-    
-    // Create a new FileList and update the form value
-    const dataTransfer = new DataTransfer();
-    newFiles.forEach(file => dataTransfer.items.add(file));
-    form.setValue('attachments', dataTransfer.files, { shouldValidate: true });
+    form.setValue('attachments', newFiles, { shouldValidate: true });
   };
 
   return (
@@ -347,7 +348,7 @@ export default function CreateTicketPage() {
               <FormField
                 control={form.control}
                 name="attachments"
-                render={() => (
+                render={({ field }) => (
                   <FormItem>
                     <FormLabel>Adjuntar Evidencia (Opcional)</FormLabel>
                     <FormControl>
@@ -434,5 +435,4 @@ export default function CreateTicketPage() {
     </div>
   );
 }
-
     
