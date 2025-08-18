@@ -16,6 +16,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { auth, db } from '@/lib/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -35,15 +38,43 @@ export default function SettingsPage() {
     setNewUser((prev) => ({ ...prev, role: value }));
   };
 
-  const handleCreateUser = () => {
-    // Aquí iría la lógica para guardar en Firebase/Firestore
-    console.log('Creating user:', newUser);
-    toast({
-      title: 'Usuario Creado (Simulación)',
-      description: `El usuario ${newUser.name} con el rol ${newUser.role} ha sido creado.`,
-    });
-    // Reset form
-    setNewUser({ name: '', email: '', role: '', password: '' });
+  const handleCreateUser = async () => {
+    if (!newUser.name || !newUser.email || !newUser.password || !newUser.role) {
+      toast({
+        variant: 'destructive',
+        title: 'Error de Validación',
+        description: 'Por favor, completa todos los campos para crear el usuario.',
+      });
+      return;
+    }
+
+    try {
+      // Create user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
+      const user = userCredential.user;
+
+      // Save user details in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+      });
+
+      toast({
+        title: 'Usuario Creado Exitosamente',
+        description: `El usuario ${newUser.name} con el rol ${newUser.role} ha sido creado.`,
+      });
+      // Reset form
+      setNewUser({ name: '', email: '', role: '', password: '' });
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error al Crear Usuario',
+        description: error.message || 'Ocurrió un error inesperado.',
+      });
+    }
   };
 
 
