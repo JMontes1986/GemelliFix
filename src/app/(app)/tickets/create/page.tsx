@@ -51,6 +51,7 @@ const ticketSchema = z.object({
   zoneId: z.string().min(1, 'La zona es requerida.'),
   siteId: z.string().min(1, 'El sitio es requerido.'),
   priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
+  category: z.enum(['Electricidad', 'Plomería', 'HVAC', 'Sistemas', 'Infraestructura', 'General']),
   attachments: z.custom<FileList>().optional()
     .refine((files) => !files || Array.from(files).every((file) => file.size <= MAX_FILE_SIZE), `Cada archivo debe ser de máximo 5MB.`)
     .refine((files) => !files || Array.from(files).every((file) => ACCEPTED_IMAGE_TYPES.includes(file.type)), "Solo se aceptan archivos de imágen y PDF."),
@@ -75,6 +76,7 @@ export default function CreateTicketPage() {
       zoneId: '',
       siteId: '',
       priority: 'Media',
+      category: 'General'
     },
   });
 
@@ -109,6 +111,7 @@ export default function CreateTicketPage() {
         zone: zone?.name,
         site: site?.name,
         priority: data.priority,
+        category: data.category,
         status: 'Abierto',
         requester: currentUser.name,
         assignedTo: '',
@@ -256,6 +259,57 @@ export default function CreateTicketPage() {
                   </FormItem>
                 )}
               />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Categoría</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Selecciona la categoría del problema" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem value="Electricidad">Electricidad</SelectItem>
+                            <SelectItem value="Plomería">Plomería</SelectItem>
+                            <SelectItem value="HVAC">HVAC</SelectItem>
+                            <SelectItem value="Sistemas">Sistemas</SelectItem>
+                            <SelectItem value="Infraestructura">Infraestructura</SelectItem>
+                            <SelectItem value="General">General</SelectItem>
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                  control={form.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prioridad</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona la prioridad de la solicitud" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Baja">Baja</SelectItem>
+                          <SelectItem value="Media">Media</SelectItem>
+                          <SelectItem value="Alta">Alta</SelectItem>
+                          <SelectItem value="Urgente">Urgente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
               <FormField
                 control={form.control}
@@ -301,58 +355,37 @@ export default function CreateTicketPage() {
                 )}
               />
 
-               <FormField
-                  control={form.control}
-                  name="priority"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Prioridad</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona la prioridad de la solicitud" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Baja">Baja</SelectItem>
-                          <SelectItem value="Media">Media</SelectItem>
-                          <SelectItem value="Alta">Alta</SelectItem>
-                          <SelectItem value="Urgente">Urgente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                      <Alert>
-                          <span className="text-2xl absolute -top-1.5 left-2">📌</span>
-                          <AlertTitle className="font-headline text-primary pl-6">SLA – Tiempos de atención de solicitudes</AlertTitle>
-                          <AlertDescription className="pl-6 space-y-3 pt-2">
-                            <p>En la aplicación GemelliFix, toda solicitud de mantenimiento cuenta con una prioridad asignada, que determina los tiempos de atención (SLA).</p>
-                             <div>
-                                <h4 className="font-semibold mb-2">⏱️ Tiempos según prioridad</h4>
-                                <ul className="space-y-2 list-inside">
-                                    <li>
-                                        <p>🔴 <strong className="font-semibold">Urgente (12 horas):</strong> situaciones críticas que afectan la seguridad, el funcionamiento del colegio o impiden el desarrollo normal de las actividades académicas.</p>
-                                    </li>
-                                    <li>
-                                        <p>🟠 <strong className="font-semibold">Alta (24 horas):</strong> problemas importantes que pueden escalar si no se atienden pronto (ej: daños eléctricos, filtraciones, equipos esenciales).</p>
-                                    </li>
-                                    <li>
-                                        <p>🟡 <strong className="font-semibold">Media (36 horas):</strong> mantenimientos necesarios pero no bloqueantes (ej: mobiliario, pintura, luminarias no esenciales).</p>
-                                    </li>
-                                     <li>
-                                        <p>🟢 <strong className="font-semibold">Baja (48 horas):</strong> ajustes menores, mejoras estéticas o preventivos programados.</p>
-                                    </li>
-                                </ul>
-                            </div>
-                             <div>
-                                <h4 className="font-semibold mb-2">⚠️ Nota importante para los usuarios</h4>
-                                 <p>La prioridad inicial puede ser sugerida al registrar la solicitud, pero solo el Líder de Mantenimiento (Administrador) tiene la facultad de confirmarla o cambiarla según el impacto real en la operación del colegio.</p>
-                                 <p className="mt-1">Esto significa que un caso marcado como “Bajo” puede ser elevado a “Urgente” si representa un riesgo, o uno marcado como “Urgente” puede reclasificarse como “Media” si no afecta procesos esenciales.</p>
-                            </div>
-                          </AlertDescription>
-                      </Alert>
-                    </FormItem>
-                  )}
-                />
+              
+              <Alert>
+                  <span className="text-2xl absolute -top-1.5 left-2">📌</span>
+                  <AlertTitle className="font-headline text-primary pl-6">SLA – Tiempos de atención de solicitudes</AlertTitle>
+                  <AlertDescription className="pl-6 space-y-3 pt-2">
+                    <p>En la aplicación GemelliFix, toda solicitud de mantenimiento cuenta con una prioridad asignada, que determina los tiempos de atención (SLA).</p>
+                      <div>
+                        <h4 className="font-semibold mb-2">⏱️ Tiempos según prioridad</h4>
+                        <ul className="space-y-2 list-inside">
+                            <li>
+                                <p>🔴 <strong className="font-semibold">Urgente (12 horas):</strong> situaciones críticas que afectan la seguridad, el funcionamiento del colegio o impiden el desarrollo normal de las actividades académicas.</p>
+                            </li>
+                            <li>
+                                <p>🟠 <strong className="font-semibold">Alta (24 horas):</strong> problemas importantes que pueden escalar si no se atienden pronto (ej: daños eléctricos, filtraciones, equipos esenciales).</p>
+                            </li>
+                            <li>
+                                <p>🟡 <strong className="font-semibold">Media (36 horas):</strong> mantenimientos necesarios pero no bloqueantes (ej: mobiliario, pintura, luminarias no esenciales).</p>
+                            </li>
+                              <li>
+                                <p>🟢 <strong className="font-semibold">Baja (48 horas):</strong> ajustes menores, mejoras estéticas o preventivos programados.</p>
+                            </li>
+                        </ul>
+                    </div>
+                      <div>
+                        <h4 className="font-semibold mb-2">⚠️ Nota importante para los usuarios</h4>
+                          <p>La prioridad inicial puede ser sugerida al registrar la solicitud, pero solo el Líder de Mantenimiento (Administrador) tiene la facultad de confirmarla o cambiarla según el impacto real en la operación del colegio.</p>
+                          <p className="mt-1">Esto significa que un caso marcado como “Bajo” puede ser elevado a “Urgente” si representa un riesgo, o uno marcado como “Urgente” puede reclasificarse como “Media” si no afecta procesos esenciales.</p>
+                    </div>
+                  </AlertDescription>
+              </Alert>
+                    
 
               <div className="flex justify-end pt-4">
                 <Button type="submit" disabled={isLoading}>
