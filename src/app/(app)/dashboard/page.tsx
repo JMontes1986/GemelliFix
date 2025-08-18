@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -6,9 +7,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  PlusCircle,
   CalendarPlus,
-  ArrowUp,
 } from 'lucide-react';
 import {
   Card,
@@ -106,10 +105,6 @@ export default function DashboardPage() {
           Dashboard de Líder
         </h1>
         <div className="flex items-center gap-2">
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Crear Ticket
-          </Button>
           <Link href="/calendar">
             <Button variant="secondary">
               <CalendarPlus className="mr-2 h-4 w-4" />
@@ -271,5 +266,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
