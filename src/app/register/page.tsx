@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, getDocs, query, where, doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,21 +44,6 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // Verificar si ya existe un administrador si se intenta crear uno
-      if (role === 'Administrador') {
-        const adminQuery = query(collection(db, 'users'), where('role', '==', 'Administrador'));
-        const querySnapshot = await getDocs(adminQuery);
-        if (!querySnapshot.empty) {
-          toast({
-            variant: 'destructive',
-            title: 'Error de Registro',
-            description: 'Solo puede existir un usuario Administrador.',
-          });
-          setIsLoading(false);
-          return;
-        }
-      }
-
       // Crear usuario en Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -141,7 +126,6 @@ export default function RegisterPage() {
                         <SelectValue placeholder="Selecciona un rol" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="Administrador">Administrador</SelectItem>
                         <SelectItem value="Servicios Generales">Servicios Generales</SelectItem>
                         <SelectItem value="Docentes">Docentes</SelectItem>
                         <SelectItem value="Coordinadores">Coordinadores</SelectItem>
