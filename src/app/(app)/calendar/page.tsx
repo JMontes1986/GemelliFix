@@ -98,7 +98,7 @@ const UnassignedTicketCard = ({ ticket }: { ticket: Ticket }) => (
 
 
 export default function CalendarPage() {
-    const [currentDate, setCurrentDate] = useState(new Date('2024-05-20'));
+    const [currentDate, setCurrentDate] = useState(new Date('2025-05-19'));
     const [events, setEvents] = useState<ScheduleEvent[]>(scheduleEvents);
     const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>(unassignedTicketsData.filter(t => !t.assignedTo));
 
@@ -135,7 +135,7 @@ export default function CalendarPage() {
             Calendario Operativo
           </h1>
           <p className="text-muted-foreground">
-            Semana del 20 al 26 de Mayo, 2024
+            Semana del 19 al 25 de Mayo, 2025
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -2,7 +2,7 @@
 import type { Zone, Site, Technician, Ticket, Notification, User, ScheduleEvent, Category } from '@/lib/types';
 
 export const users: User[] = [
-  { id: 'user-1', name: 'Admin User', email: 'admin@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Administrador' },
+  { id: 'user-1', name: 'Admin User', email: 'admin@gemelli.edu.co', avatar: 'https://firebasestorage.googleapis.com/v0/b/gemellifix.firebasestorage.app/o/Logo.png?alt=media&token=3c91d664-c1d3-43b0-b81f-2b21a7cf2c05', role: 'Administrador' },
   { id: 'user-2', name: 'Tech User', email: 'tech@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Servicios Generales' },
   { id: 'user-3', name: 'Requester User', email: 'requester@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Docentes' },
 ];
@@ -57,8 +57,8 @@ export const tickets: Ticket[] = [
     category: 'Sistemas y Tecnología',
     priority: 'Alta',
     status: 'Asignado',
-    createdAt: '2024-05-20T10:00:00Z',
-    dueDate: '2024-05-21T10:00:00Z',
+    createdAt: '2025-05-20T10:00:00Z',
+    dueDate: '2025-05-21T10:00:00Z',
     assignedTo: 'Carlos Gomez',
     requester: 'Profesor Martinez',
   },
@@ -72,8 +72,8 @@ export const tickets: Ticket[] = [
     category: 'Fontanería e Hidráulica',
     priority: 'Urgente',
     status: 'Abierto',
-    createdAt: '2024-05-21T09:30:00Z',
-    dueDate: '2024-05-21T21:30:00Z',
+    createdAt: '2025-05-21T09:30:00Z',
+    dueDate: '2025-05-21T21:30:00Z',
     requester: 'Dra. Isabela Rojas',
   },
   {
@@ -86,8 +86,8 @@ export const tickets: Ticket[] = [
     category: 'Sistemas y Tecnología',
     priority: 'Media',
     status: 'En Progreso',
-    createdAt: '2024-05-21T11:00:00Z',
-    dueDate: '2024-05-23T11:00:00Z',
+    createdAt: '2025-05-21T11:00:00Z',
+    dueDate: '2025-05-23T11:00:00Z',
     assignedTo: 'Pedro Ramirez',
     requester: 'Ana María',
   },
@@ -101,8 +101,8 @@ export const tickets: Ticket[] = [
     category: 'Infraestructura y Obras Civiles',
     priority: 'Baja',
     status: 'Requiere Aprobación',
-    createdAt: '2024-05-19T15:00:00Z',
-    dueDate: '2024-05-22T15:00:00Z',
+    createdAt: '2025-05-19T15:00:00Z',
+    dueDate: '2025-05-22T15:00:00Z',
     assignedTo: 'Lucia Fernandez',
     requester: 'Admin Cafetería',
     attachments: [
@@ -120,8 +120,8 @@ export const tickets: Ticket[] = [
     category: 'Electricidad',
     priority: 'Baja',
     status: 'Cerrado',
-    createdAt: '2024-05-18T08:00:00Z',
-    dueDate: '2024-05-21T08:00:00Z',
+    createdAt: '2025-05-18T08:00:00Z',
+    dueDate: '2025-05-21T08:00:00Z',
     assignedTo: 'Carlos Gomez',
     requester: 'Coordinador Académico',
     attachments: [
@@ -142,8 +142,8 @@ export const scheduleEvents: ScheduleEvent[] = [
         id: 'evt-1',
         title: 'Turno Mañana',
         description: 'Ronda de inspección general',
-        start: new Date('2024-05-20T08:00:00'),
-        end: new Date('2024-05-20T12:00:00'),
+        start: new Date('2025-05-19T08:00:00'),
+        end: new Date('2025-05-19T12:00:00'),
         type: 'shift',
         technicianId: 'tech-1'
     },
@@ -151,8 +151,8 @@ export const scheduleEvents: ScheduleEvent[] = [
         id: 'evt-2',
         title: 'Ticket: GEMMAN-ZONAA-SITEA1-0001',
         description: 'Proyector no enciende',
-        start: new Date('2024-05-20T13:00:00'),
-        end: new Date('2024-05-20T15:00:00'),
+        start: new Date('2025-05-20T13:00:00'),
+        end: new Date('2025-05-20T15:00:00'),
         type: 'ticket',
         technicianId: 'tech-1',
         ticketId: '1'
@@ -161,8 +161,8 @@ export const scheduleEvents: ScheduleEvent[] = [
         id: 'evt-3',
         title: 'Cuadrante Aseo: Bloque B',
         description: 'Limpieza profunda de laboratorios',
-        start: new Date('2024-05-21T10:00:00'),
-        end: new Date('2024-05-21T12:00:00'),
+        start: new Date('2025-05-21T10:00:00'),
+        end: new Date('2025-05-21T12:00:00'),
         type: 'task',
         technicianId: 'tech-2'
     },
@@ -170,8 +170,8 @@ export const scheduleEvents: ScheduleEvent[] = [
         id: 'evt-4',
         title: 'Ticket: GEMMAN-ZONAC-SITEC2-0003',
         description: 'Impresora no funciona',
-        start: new Date('2024-05-22T11:00:00'),
-        end: new Date('2024-05-22T13:00:00'),
+        start: new Date('2025-05-22T11:00:00'),
+        end: new Date('2025-05-22T13:00:00'),
         type: 'ticket',
         technicianId: 'tech-3',
         ticketId: '3'
@@ -180,8 +180,8 @@ export const scheduleEvents: ScheduleEvent[] = [
         id: 'evt-5',
         title: 'Capacitación HVAC',
         description: 'Nuevos equipos y protocolos',
-        start: new Date('2024-05-23T09:00:00'),
-        end: new Date('2024-05-23T16:00:00'),
+        start: new Date('2025-05-23T09:00:00'),
+        end: new Date('2025-05-23T16:00:00'),
         type: 'shift',
         technicianId: 'tech-2'
     }

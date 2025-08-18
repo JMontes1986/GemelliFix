@@ -106,7 +106,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   ));
 
 
-  const canEdit = currentUser.role === 'administrador';
+  const canEdit = currentUser.role === 'Administrador';
   const isRequester = currentUser.name === currentTicket.requester;
   
   const handleStatusChange = (newStatus: Ticket['status']) => {
