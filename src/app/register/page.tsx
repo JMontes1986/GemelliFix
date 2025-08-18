@@ -63,7 +63,7 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Guardar información adicional en Firestore
+      // Guardar información adicional en Firestore, usando el UID como ID del documento.
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
         name: name,
