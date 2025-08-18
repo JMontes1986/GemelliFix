@@ -78,10 +78,13 @@ export default function SettingsPage() {
       setNewUser({ name: '', email: '', role: '', password: '' });
     } catch (error: any) {
       console.error('Error creating user:', error);
+      const errorMessage = error.code === 'auth/email-already-in-use' 
+        ? 'El correo electrónico ya está en uso.'
+        : error.message || 'Ocurrió un error inesperado.';
       toast({
         variant: 'destructive',
         title: 'Error al Crear Usuario',
-        description: error.message || 'Ocurrió un error inesperado.',
+        description: errorMessage,
       });
     }
   };
@@ -239,7 +242,6 @@ export default function SettingsPage() {
             </Card>
         </div>
       </div>
-
     </div>
   );
 }
