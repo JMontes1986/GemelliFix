@@ -1,8 +1,7 @@
-
 'use client';
 
 import * as React from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -84,7 +83,7 @@ export default function SettingsPage() {
         description: error.message || 'Ocurrió un error inesperado.',
       });
     }
-  };
+  }
 
   return (
     <div className="space-y-6">
