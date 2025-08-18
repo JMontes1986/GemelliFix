@@ -53,7 +53,7 @@ const ticketSchema = z.object({
   priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
   category: z.string().min(1, 'La categoría es requerida.'),
   attachments: z.any().optional(),
-});
+})
 
 type TicketFormValues = z.infer<typeof ticketSchema>;
 
@@ -420,5 +420,3 @@ export default function CreateTicketPage() {
     </div>
   );
 }
-
-    
