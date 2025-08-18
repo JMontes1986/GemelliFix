@@ -20,10 +20,14 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { PlusCircle } from 'lucide-react';
 import { users, technicians, zones, sites } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -218,9 +222,65 @@ export default function SettingsPage() {
                         Parámetros avanzados como SLAs, notificaciones y más.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground">Próximamente...</p>
+                <CardContent className="space-y-8">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-primary">Tiempos de Respuesta (SLA)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label htmlFor="sla-urgent">Prioridad Urgente (horas)</Label>
+                            <Input id="sla-urgent" type="number" defaultValue={12} />
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="sla-high">Prioridad Alta (horas)</Label>
+                            <Input id="sla-high" type="number" defaultValue={24} />
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="sla-medium">Prioridad Media (días)</Label>
+                            <Input id="sla-medium" type="number" defaultValue={3} />
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="sla-low">Prioridad Baja (días)</Label>
+                            <Input id="sla-low" type="number" defaultValue={7} />
+                        </div>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-primary">Preferencias de Notificación</h3>
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between p-4 border rounded-md">
+                            <div>
+                                <Label htmlFor="notif-new-ticket" className="font-semibold">Nuevo Ticket Creado</Label>
+                                <p className="text-sm text-muted-foreground">Notificar a los líderes de mantenimiento cuando un usuario crea un ticket.</p>
+                            </div>
+                            <Switch id="notif-new-ticket" defaultChecked />
+                        </div>
+                        <div className="flex items-center justify-between p-4 border rounded-md">
+                            <div>
+                                <Label htmlFor="notif-assigned" className="font-semibold">Ticket Asignado</Label>
+                                <p className="text-sm text-muted-foreground">Notificar al técnico cuando se le asigna un nuevo ticket.</p>
+                            </div>
+                            <Switch id="notif-assigned" defaultChecked />
+                        </div>
+                         <div className="flex items-center justify-between p-4 border rounded-md">
+                            <div>
+                                <Label htmlFor="notif-sla-risk" className="font-semibold">SLA en Riesgo</Label>
+                                <p className="text-sm text-muted-foreground">Enviar una alerta cuando un ticket esté a punto de incumplir su SLA.</p>
+                            </div>
+                             <Switch id="notif-sla-risk" defaultChecked />
+                        </div>
+                         <div className="flex items-center justify-between p-4 border rounded-md">
+                            <div>
+                                <Label htmlFor="notif-resolved" className="font-semibold">Ticket Resuelto</Label>
+                                <p className="text-sm text-muted-foreground">Notificar al solicitante cuando su ticket ha sido marcado como resuelto.</p>
+                            </div>
+                            <Switch id="notif-resolved" />
+                        </div>
+                    </div>
+                  </div>
                 </CardContent>
+                <CardFooter>
+                  <Button>Guardar Cambios</Button>
+                </CardFooter>
             </Card>
         </TabsContent>
 
