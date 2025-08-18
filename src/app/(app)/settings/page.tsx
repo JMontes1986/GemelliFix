@@ -15,8 +15,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
+  const { toast } = useToast();
+  const [newUser, setNewUser] = React.useState({
+    name: '',
+    email: '',
+    role: '',
+    password: '',
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setNewUser((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleRoleChange = (value: string) => {
+    setNewUser((prev) => ({ ...prev, role: value }));
+  };
+
+  const handleCreateUser = () => {
+    // Aquí iría la lógica para guardar en Firebase/Firestore
+    console.log('Creating user:', newUser);
+    toast({
+      title: 'Usuario Creado (Simulación)',
+      description: `El usuario ${newUser.name} con el rol ${newUser.role} ha sido creado.`,
+    });
+    // Reset form
+    setNewUser({ name: '', email: '', role: '', password: '' });
+  };
+
+
   return (
     <div className="space-y-6">
       <div>
@@ -73,16 +103,16 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="new-user-name">Nombre Completo</Label>
-                <Input id="new-user-name" placeholder="Ej: Juan Pérez" />
+                <Label htmlFor="name">Nombre Completo</Label>
+                <Input id="name" placeholder="Ej: Juan Pérez" value={newUser.name} onChange={handleInputChange} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-user-email">Correo Electrónico</Label>
-                <Input id="new-user-email" type="email" placeholder="usuario@gemelli.edu.co" />
+                <Label htmlFor="email">Correo Electrónico</Label>
+                <Input id="email" type="email" placeholder="usuario@gemelli.edu.co" value={newUser.email} onChange={handleInputChange}/>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-user-role">Rol</Label>
-                <Select>
+                <Select onValueChange={handleRoleChange} value={newUser.role}>
                   <SelectTrigger id="new-user-role">
                     <SelectValue placeholder="Seleccionar un rol" />
                   </SelectTrigger>
@@ -94,12 +124,12 @@ export default function SettingsPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-user-password">Contraseña Temporal</Label>
-                <Input id="new-user-password" type="password" />
+                <Label htmlFor="password">Contraseña Temporal</Label>
+                <Input id="password" type="password" value={newUser.password} onChange={handleInputChange} />
               </div>
             </CardContent>
             <CardFooter>
-              <Button>Crear Usuario</Button>
+              <Button onClick={handleCreateUser}>Crear Usuario</Button>
             </CardFooter>
           </Card>
         </div>
