@@ -80,7 +80,7 @@ export default function SettingsPage() {
       console.error('Error creating user:', error);
       const errorMessage = error.code === 'auth/email-already-in-use' 
         ? 'El correo electrónico ya está en uso.'
-        : error.message || 'Ocurrió un error inesperado.';
+        : 'Ocurrió un error inesperado al crear el usuario.';
       toast({
         variant: 'destructive',
         title: 'Error al Crear Usuario',
