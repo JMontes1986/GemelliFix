@@ -1,3 +1,4 @@
+
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -5,20 +6,30 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
+// Asegúrate de que estas variables de entorno estén configuradas
 const firebaseConfig = {
-  projectId: "gemellifix",
-  appId: "1:431414897003:web:12ca75d6bd98572a50c42e",
-  storageBucket: "gemellifix.appspot.com",
-  apiKey: "AIzaSyD-L4zCQfaMSuPAEL0SxisLXujSiKBJBJE",
-  authDomain: "gemellifix.firebaseapp.com",
-  messagingSenderId: "431414897003",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+
 // Initialize Firebase
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+let app;
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApp();
+}
+
 
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
 export { app, auth, db, storage };
+
+    

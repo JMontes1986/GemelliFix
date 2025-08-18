@@ -33,9 +33,10 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { zones, sites, users, categories } from '@/lib/data';
-import { db, storage } from '@/lib/firebase';
+import { db, storage, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud, File as FileIcon, X } from 'lucide-react';
 import type { Attachment } from '@/lib/types';
@@ -66,7 +67,22 @@ export default function CreateTicketPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isAuthReady, setIsAuthReady] = React.useState(false);
   const [attachedFiles, setAttachedFiles] = React.useState<File[]>([]);
+  
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+            setIsAuthReady(true);
+        } else {
+            // Podrías redirigir al login si no hay usuario
+            // router.push('/login');
+            // Por ahora, solo indicamos que la autenticación está lista (aunque no haya usuario)
+             setIsAuthReady(true);
+        }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketSchema),
@@ -76,7 +92,7 @@ export default function CreateTicketPage() {
       zoneId: '',
       siteId: '',
       priority: 'Media',
-      category: '',
+      category: 'General',
     },
   });
 
@@ -85,6 +101,14 @@ export default function CreateTicketPage() {
 
 
   const onSubmit = async (data: TicketFormValues) => {
+    if (!auth.currentUser) {
+        toast({
+            variant: 'destructive',
+            title: 'Error de Autenticación',
+            description: 'Debes iniciar sesión para crear un ticket.',
+        });
+        return;
+    }
     setIsLoading(true);
     try {
       const zone = zones.find((z) => z.id === data.zoneId);
@@ -132,7 +156,7 @@ export default function CreateTicketPage() {
       toast({
         variant: 'destructive',
         title: 'Error al crear el ticket',
-        description: 'Hubo un problema al guardar tu solicitud. Por favor, inténtalo de nuevo.',
+        description: 'Hubo un problema al guardar tu solicitud. Revisa los permisos de Firestore.',
       });
     } finally {
         setIsLoading(false);
@@ -389,9 +413,10 @@ export default function CreateTicketPage() {
                     
 
               <div className="flex justify-end pt-4">
-                <Button type="submit" disabled={isLoading}>
+                <Button type="submit" disabled={isLoading || !isAuthReady}>
                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Enviar Solicitud
+                   {!isAuthReady && !isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                   {!isAuthReady && !isLoading ? 'Verificando autenticación...' : 'Enviar Solicitud'}
                 </Button>
               </div>
             </form>
@@ -401,3 +426,5 @@ export default function CreateTicketPage() {
     </div>
   );
 }
+
+    
