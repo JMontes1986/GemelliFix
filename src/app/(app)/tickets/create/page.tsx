@@ -52,7 +52,7 @@ const ticketSchema = z.object({
   siteId: z.string().min(1, 'El sitio es requerido.'),
   priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
   category: z.string().min(1, 'La categoría es requerida.'),
-  attachments: z.any().optional(),
+  attachments: z.any().optional()
 });
 
 type TicketFormValues = z.infer<typeof ticketSchema>;
