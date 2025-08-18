@@ -26,9 +26,9 @@ export const sites: Site[] = [
 ];
 
 export const technicians: Technician[] = [
-  { id: 'tech-1', name: 'Carlos Gomez', avatar: 'https://placehold.co/100x100.png', skills: ['Electricidad', 'Plomería'], workload: 85 },
-  { id: 'tech-2', name: 'Lucia Fernandez', avatar: 'https://placehold.co/100x100.png', skills: ['HVAC', 'Carpintería'], workload: 60 },
-  { id: 'tech-3', name: 'Pedro Ramirez', avatar: 'https://placehold.co/100x100.png', skills: ['Redes', 'Sistemas'], workload: 40 },
+  { id: 'tech-1', name: 'Carlos Gomez', avatar: 'https://placehold.co/100x100.png', skills: ['Electricidad', 'Plomería'], workload: 85, color: 'bg-sky-200/80 border-sky-400 text-sky-900' },
+  { id: 'tech-2', name: 'Lucia Fernandez', avatar: 'https://placehold.co/100x100.png', skills: ['HVAC', 'Carpintería'], workload: 60, color: 'bg-amber-200/80 border-amber-400 text-amber-900' },
+  { id: 'tech-3', name: 'Pedro Ramirez', avatar: 'https://placehold.co/100x100.png', skills: ['Redes', 'Sistemas'], workload: 40, color: 'bg-emerald-200/80 border-emerald-400 text-emerald-900' },
 ];
 
 export const tickets: Ticket[] = [

@@ -1,4 +1,5 @@
 
+
 export type User = {
   id: string;
   name: string;
@@ -45,6 +46,7 @@ export type Technician = {
   avatar: string;
   skills: string[];
   workload: number;
+  color: string;
 };
 
 export type Notification = {
