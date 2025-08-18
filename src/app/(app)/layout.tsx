@@ -54,8 +54,16 @@ const currentUser = users[0]; // Admin User
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isMounted, setIsMounted] = React.useState(false);
+  
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const isActive = (path: string) => pathname === path || (path.startsWith(pathname) && pathname !== '/');
-  const showFab = pathname !== '/tickets/create';
+  
+  // Only render FAB if mounted and not on the create ticket page
+  const showFab = isMounted && pathname !== '/tickets/create';
 
 
   return (
