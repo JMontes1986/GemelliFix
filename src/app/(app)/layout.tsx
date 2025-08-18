@@ -54,7 +54,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar>
         <SidebarHeader className="p-4">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <GemelliFixLogo className="w-full" />
+            <GemelliFixLogo className="w-auto h-8" />
           </Link>
         </SidebarHeader>
         <SidebarContent>
