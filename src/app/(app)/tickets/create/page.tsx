@@ -39,9 +39,10 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud, File as FileIcon, X } from 'lucide-react';
 import type { Attachment } from '@/lib/types';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
 
 
 const ticketSchema = z.object({
@@ -52,7 +53,7 @@ const ticketSchema = z.object({
   priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
   attachments: z.custom<FileList>().optional()
     .refine((files) => !files || Array.from(files).every((file) => file.size <= MAX_FILE_SIZE), `Cada archivo debe ser de máximo 5MB.`)
-    .refine((files) => !files || Array.from(files).every((file) => ACCEPTED_IMAGE_TYPES.includes(file.type)), "Solo se aceptan archivos .jpg, .jpeg, .png y .webp."),
+    .refine((files) => !files || Array.from(files).every((file) => ACCEPTED_IMAGE_TYPES.includes(file.type)), "Solo se aceptan archivos de imágen y PDF."),
 });
 
 type TicketFormValues = z.infer<typeof ticketSchema>;
@@ -89,8 +90,8 @@ export default function CreateTicketPage() {
 
       // 1. Upload files to Firebase Storage
       const attachmentUrls: Attachment[] = [];
-      if (data.attachments && data.attachments.length > 0) {
-        for (const file of Array.from(data.attachments)) {
+      if (attachedFiles && attachedFiles.length > 0) {
+        for (const file of attachedFiles) {
           const storageRef = ref(storage, `ticket-attachments/${Date.now()}-${file.name}`);
           const snapshot = await uploadBytes(storageRef, file);
           const downloadURL = await getDownloadURL(snapshot.ref);
@@ -134,8 +135,13 @@ export default function CreateTicketPage() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setAttachedFiles(Array.from(e.target.files));
+     if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setAttachedFiles((prevFiles) => [...prevFiles, ...newFiles]);
+      
+      const dataTransfer = new DataTransfer();
+      [...attachedFiles, ...newFiles].forEach(file => dataTransfer.items.add(file));
+      form.setValue('attachments', dataTransfer.files);
     }
   };
 
@@ -147,7 +153,7 @@ export default function CreateTicketPage() {
     // Create a new FileList and update the form value
     const dataTransfer = new DataTransfer();
     newFiles.forEach(file => dataTransfer.items.add(file));
-    form.setValue('attachments', dataTransfer.files);
+    form.setValue('attachments', dataTransfer.files, { shouldValidate: true });
   };
 
   return (
@@ -254,7 +260,7 @@ export default function CreateTicketPage() {
               <FormField
                 control={form.control}
                 name="attachments"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
                     <FormLabel>Adjuntar Evidencia (Opcional)</FormLabel>
                     <FormControl>
@@ -264,11 +270,11 @@ export default function CreateTicketPage() {
                             <div className="flex text-sm text-muted-foreground">
                                 <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-ring">
                                     <span>Sube tus archivos</span>
-                                    <input id="file-upload" type="file" className="sr-only" {...fileRef} multiple onChange={handleFileChange} />
+                                    <input id="file-upload" type="file" className="sr-only" {...fileRef} multiple onChange={handleFileChange} accept={ACCEPTED_IMAGE_TYPES.join(",")} />
                                 </label>
                                 <p className="pl-1">o arrastra y suelta</p>
                             </div>
-                            <p className="text-xs text-muted-foreground">PNG, JPG, JPEG hasta 5MB</p>
+                            <p className="text-xs text-muted-foreground">Imágenes o PDF hasta 5MB</p>
                         </div>
                       </div>
                     </FormControl>
@@ -277,12 +283,12 @@ export default function CreateTicketPage() {
                         <p className="text-sm font-medium">Archivos adjuntos:</p>
                         <ul className="space-y-2">
                           {attachedFiles.map((file, index) => (
-                            <li key={index} className="flex items-center justify-between p-2 border rounded-md">
-                              <div className="flex items-center gap-2">
-                                <FileIcon className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm">{file.name}</span>
+                            <li key={index} className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                              <div className="flex items-center gap-2 truncate">
+                                <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <span className="text-sm truncate" title={file.name}>{file.name}</span>
                               </div>
-                              <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)}>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="flex-shrink-0">
                                 <X className="h-4 w-4" />
                               </Button>
                             </li>
@@ -314,10 +320,36 @@ export default function CreateTicketPage() {
                           <SelectItem value="Urgente">Urgente</SelectItem>
                         </SelectContent>
                       </Select>
-                       <FormDescription>
-                        Selecciona Urgente solo para problemas que impiden la operación o representan un riesgo.
-                      </FormDescription>
                       <FormMessage />
+                      <Alert className="mt-4 bg-primary/5 border-primary/20">
+                          <span className="text-2xl absolute -top-1.5 left-2">📌</span>
+                          <AlertTitle className="font-headline text-primary pl-6">SLA – Tiempos de atención de solicitudes</AlertTitle>
+                          <AlertDescription className="pl-6 space-y-3 pt-2">
+                            <p>En la aplicación GemelliFix, toda solicitud de mantenimiento cuenta con una prioridad asignada, que determina los tiempos de atención (SLA).</p>
+                             <div>
+                                <h4 className="font-semibold mb-2">⏱️ Tiempos según prioridad</h4>
+                                <ul className="space-y-2 list-inside">
+                                    <li>
+                                        <p>🔴 <strong className="font-semibold">Urgente (12 horas):</strong> situaciones críticas que afectan la seguridad, el funcionamiento del colegio o impiden el desarrollo normal de las actividades académicas.</p>
+                                    </li>
+                                    <li>
+                                        <p>🟠 <strong className="font-semibold">Alta (24 horas):</strong> problemas importantes que pueden escalar si no se atienden pronto (ej: daños eléctricos, filtraciones, equipos esenciales).</p>
+                                    </li>
+                                    <li>
+                                        <p>🟡 <strong className="font-semibold">Media (36 horas):</strong> mantenimientos necesarios pero no bloqueantes (ej: mobiliario, pintura, luminarias no esenciales).</p>
+                                    </li>
+                                     <li>
+                                        <p>🟢 <strong className="font-semibold">Baja (48 horas):</strong> ajustes menores, mejoras estéticas o preventivos programados.</p>
+                                    </li>
+                                </ul>
+                            </div>
+                             <div>
+                                <h4 className="font-semibold mb-2">⚠️ Nota importante para los usuarios</h4>
+                                 <p>La prioridad inicial puede ser sugerida al registrar la solicitud, pero solo el Líder de Mantenimiento (Administrador) tiene la facultad de confirmarla o cambiarla según el impacto real en la operación del colegio.</p>
+                                 <p className="mt-1">Esto significa que un caso marcado como “Bajo” puede ser elevado a “Urgente” si representa un riesgo, o uno marcado como “Urgente” puede reclasificarse como “Media” si no afecta procesos esenciales.</p>
+                            </div>
+                          </AlertDescription>
+                      </Alert>
                     </FormItem>
                   )}
                 />
