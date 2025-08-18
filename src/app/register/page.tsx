@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, where, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import {
