@@ -42,7 +42,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="users" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
-          <TabsTrigger value="technicians">Técnicos</TabsTrigger>
+          <TabsTrigger value="technicians">Servicios Generales</TabsTrigger>
           <TabsTrigger value="locations">Zonas y Sitios</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
         </TabsList>
@@ -101,13 +101,13 @@ export default function SettingsPage() {
             <CardHeader>
                 <div className="flex justify-between items-center">
                     <div>
-                        <CardTitle className="font-headline">Gestión de Técnicos</CardTitle>
+                        <CardTitle className="font-headline">Gestión de Servicios Generales</CardTitle>
                         <CardDescription>
                             Define el personal de mantenimiento y sus especialidades.
                         </CardDescription>
                     </div>
                     <Button>
-                        <PlusCircle className="mr-2" /> Añadir Técnico
+                        <PlusCircle className="mr-2" /> Añadir Personal
                     </Button>
                 </div>
             </CardHeader>
