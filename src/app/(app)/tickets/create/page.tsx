@@ -114,8 +114,8 @@ export default function CreateTicketPage() {
         }
       }
 
-      const zoneCode = zoneName?.substring(0,4).toUpperCase() || '????';
-      const siteCode = siteName?.substring(0,4).toUpperCase() || '????';
+      const zoneCode = zoneName ? zoneName.substring(0,4).toUpperCase() : 'ZONA';
+      const siteCode = siteName ? siteName.substring(0,4).toUpperCase() : 'SITE';
       const ticketCode = `GEMMAN-${zoneCode}-${siteCode}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       await addDoc(collection(db, 'tickets'), {
@@ -420,5 +420,3 @@ export default function CreateTicketPage() {
     </div>
   );
 }
-
-    
