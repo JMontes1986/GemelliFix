@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { zones, sites, users, categories } from '@/lib/data';
+import { zones, sites, categories } from '@/lib/data';
 import { db, storage, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -53,7 +53,7 @@ const ticketSchema = z.object({
   priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
   category: z.string().min(1, 'La categoría es requerida.'),
   attachments: z.any().optional(),
-})
+});
 
 type TicketFormValues = z.infer<typeof ticketSchema>;
 
@@ -420,3 +420,5 @@ export default function CreateTicketPage() {
     </div>
   );
 }
+
+    
