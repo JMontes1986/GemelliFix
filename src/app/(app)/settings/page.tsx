@@ -49,6 +49,15 @@ export default function SettingsPage() {
       return;
     }
 
+    if (newUser.password.length < 6) {
+      toast({
+        variant: 'destructive',
+        title: 'Contraseña Débil',
+        description: 'La contraseña debe tener al menos 6 caracteres.',
+      });
+      return;
+    }
+
     try {
       // Create user in Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
@@ -212,7 +221,7 @@ export default function SettingsPage() {
             <Card>
                  <CardHeader>
                     <CardTitle>Tema de la Aplicación</CardTitle>
-                </CardHeader>
+                </Header>
                 <CardContent className="space-y-4">
                      <div className="space-y-2">
                         <Label htmlFor="theme">Tema</Label>
