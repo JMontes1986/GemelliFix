@@ -91,24 +91,36 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   }
 
   const [ticketStatus, setTicketStatus] = useState<Ticket['status']>(currentTicket.status);
+  const [ticketPriority, setTicketPriority] = useState<Ticket['priority']>(currentTicket.priority);
 
   const assignedTechnician = technicians.find(
     (tech) => tech.name === currentTicket.assignedTo
   );
 
   const canEditStatus = currentUser.role === 'administrador' || currentUser.name === currentTicket.requester;
+  const canEditPriority = currentUser.role === 'administrador';
   const isRequester = currentUser.name === currentTicket.requester;
   
   const handleStatusChange = (newStatus: Ticket['status']) => {
     setTicketStatus(newStatus);
     // In a real app, you would also save this change to the database.
-    // For now, we just update the local state.
     const updatedTicket = { ...currentTicket, status: newStatus };
     setCurrentTicket(updatedTicket);
 
     toast({
         title: "Estado Actualizado",
         description: `El estado del ticket ha sido cambiado a "${newStatus}".`,
+    });
+  }
+
+  const handlePriorityChange = (newPriority: Ticket['priority']) => {
+    setTicketPriority(newPriority);
+    const updatedTicket = { ...currentTicket, priority: newPriority };
+    setCurrentTicket(updatedTicket);
+
+    toast({
+        title: "Prioridad Actualizada",
+        description: `La prioridad del ticket ha sido cambiada a "${newPriority}".`,
     });
   }
 
@@ -123,9 +135,23 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 <CardDescription>{currentTicket.code}</CardDescription>
                 <CardTitle className="font-headline text-2xl mt-1">{currentTicket.title}</CardTitle>
               </div>
-              <Badge variant={getPriorityBadgeVariant(currentTicket.priority)} className={`text-sm ${getPriorityBadgeClassName(currentTicket.priority)}`}>
-                {currentTicket.priority}
-              </Badge>
+              {canEditPriority ? (
+                <Select value={ticketPriority} onValueChange={handlePriorityChange}>
+                    <SelectTrigger className="w-[180px] h-9 text-sm">
+                        <SelectValue placeholder="Cambiar prioridad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Baja">Baja</SelectItem>
+                        <SelectItem value="Media">Media</SelectItem>
+                        <SelectItem value="Alta">Alta</SelectItem>
+                        <SelectItem value="Urgente">Urgente</SelectItem>
+                    </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant={getPriorityBadgeVariant(ticketPriority)} className={`text-sm ${getPriorityBadgeClassName(ticketPriority)}`}>
+                    {ticketPriority}
+                </Badge>
+              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
