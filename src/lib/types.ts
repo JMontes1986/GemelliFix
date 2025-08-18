@@ -31,7 +31,7 @@ export type Ticket = {
   description: string;
   zone: string;
   site: string;
-  category: 'Electricidad' | 'Plomería' | 'HVAC' | 'Sistemas' | 'Infraestructura' | 'General';
+  category: 'Electricidad' | 'Sistemas y Tecnología' | 'Infraestructura y Obras Civiles' | 'Fontanería e Hidráulica' | 'Carpintería y Mobiliario' | 'Pintura y Acabados' | 'Aseo y Limpieza' | 'Zonas Verdes y Jardinería' | 'Seguridad y Emergencias' | 'Eventos y Logística' | 'General';
   priority: 'Baja' | 'Media' | 'Alta' | 'Urgente';
   status: 'Abierto' | 'Asignado' | 'En Progreso' | 'Requiere Aprobación' | 'Resuelto' | 'Cerrado';
   createdAt: string;

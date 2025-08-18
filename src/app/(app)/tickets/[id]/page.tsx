@@ -244,10 +244,15 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="Electricidad">Electricidad</SelectItem>
-                                <SelectItem value="Plomería">Plomería</SelectItem>
-                                <SelectItem value="HVAC">HVAC</SelectItem>
-                                <SelectItem value="Sistemas">Sistemas</SelectItem>
-                                <SelectItem value="Infraestructura">Infraestructura</SelectItem>
+                                <SelectItem value="Sistemas y Tecnología">Sistemas y Tecnología</SelectItem>
+                                <SelectItem value="Infraestructura y Obras Civiles">Infraestructura y Obras Civiles</SelectItem>
+                                <SelectItem value="Fontanería e Hidráulica">Fontanería e Hidráulica</SelectItem>
+                                <SelectItem value="Carpintería y Mobiliario">Carpintería y Mobiliario</SelectItem>
+                                <SelectItem value="Pintura y Acabados">Pintura y Acabados</SelectItem>
+                                <SelectItem value="Aseo y Limpieza">Aseo y Limpieza</SelectItem>
+                                <SelectItem value="Zonas Verdes y Jardinería">Zonas Verdes y Jardinería</SelectItem>
+                                <SelectItem value="Seguridad y Emergencias">Seguridad y Emergencias</SelectItem>
+                                <SelectItem value="Eventos y Logística">Eventos y Logística</SelectItem>
                                 <SelectItem value="General">General</SelectItem>
                             </SelectContent>
                         </Select>

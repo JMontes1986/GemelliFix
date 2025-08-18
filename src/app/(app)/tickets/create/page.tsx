@@ -51,7 +51,7 @@ const ticketSchema = z.object({
   zoneId: z.string().min(1, 'La zona es requerida.'),
   siteId: z.string().min(1, 'El sitio es requerido.'),
   priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
-  category: z.enum(['Electricidad', 'Plomería', 'HVAC', 'Sistemas', 'Infraestructura', 'General']),
+  category: z.enum(['Electricidad', 'Sistemas y Tecnología', 'Infraestructura y Obras Civiles', 'Fontanería e Hidráulica', 'Carpintería y Mobiliario', 'Pintura y Acabados', 'Aseo y Limpieza', 'Zonas Verdes y Jardinería', 'Seguridad y Emergencias', 'Eventos y Logística', 'General']),
   attachments: z.custom<FileList>().optional()
     .refine((files) => !files || Array.from(files).every((file) => file.size <= MAX_FILE_SIZE), `Cada archivo debe ser de máximo 5MB.`)
     .refine((files) => !files || Array.from(files).every((file) => ACCEPTED_IMAGE_TYPES.includes(file.type)), "Solo se aceptan archivos de imágen y PDF."),
@@ -275,10 +275,15 @@ export default function CreateTicketPage() {
                         </FormControl>
                         <SelectContent>
                             <SelectItem value="Electricidad">Electricidad</SelectItem>
-                            <SelectItem value="Plomería">Plomería</SelectItem>
-                            <SelectItem value="HVAC">HVAC</SelectItem>
-                            <SelectItem value="Sistemas">Sistemas</SelectItem>
-                            <SelectItem value="Infraestructura">Infraestructura</SelectItem>
+                            <SelectItem value="Sistemas y Tecnología">Sistemas y Tecnología</SelectItem>
+                            <SelectItem value="Infraestructura y Obras Civiles">Infraestructura y Obras Civiles</SelectItem>
+                            <SelectItem value="Fontanería e Hidráulica">Fontanería e Hidráulica</SelectItem>
+                            <SelectItem value="Carpintería y Mobiliario">Carpintería y Mobiliario</SelectItem>
+                            <SelectItem value="Pintura y Acabados">Pintura y Acabados</SelectItem>
+                            <SelectItem value="Aseo y Limpieza">Aseo y Limpieza</SelectItem>
+                            <SelectItem value="Zonas Verdes y Jardinería">Zonas Verdes y Jardinería</SelectItem>
+                            <SelectItem value="Seguridad y Emergencias">Seguridad y Emergencias</SelectItem>
+                            <SelectItem value="Eventos y Logística">Eventos y Logística</SelectItem>
                             <SelectItem value="General">General</SelectItem>
                         </SelectContent>
                         </Select>
