@@ -55,9 +55,14 @@ const ticketSchema = z.object({
     required_error: 'La prioridad es requerida.',
   }),
   category: z.string().min(1, 'La categoría es requerida.'),
-  attachments: z.custom<FileList>().optional()
-    .refine((files) => !files || Array.from(files).every((file) => file.size <= MAX_FILE_SIZE), `Cada archivo debe ser de máximo 5MB.`)
-    .refine((files) => !files || Array.from(files).every((file) => ACCEPTED_IMAGE_TYPES.includes(file.type)), "Solo se aceptan archivos de imágen y PDF."),
+  attachments: z.custom<FileList>()
+    .optional()
+    .refine((files) => {
+        if (!files || files.length === 0) return true; // Optional field is valid if empty
+        return Array.from(files).every(file => file.size <= MAX_FILE_SIZE && ACCEPTED_IMAGE_TYPES.includes(file.type));
+    }, {
+        message: "Uno o más archivos no son válidos. Solo se aceptan imágenes y PDF de hasta 5MB.",
+    })
 });
 
 type TicketFormValues = z.infer<typeof ticketSchema>;
@@ -386,31 +391,33 @@ export default function CreateTicketPage() {
               <Alert variant="default">
                 <span className="text-2xl absolute -top-1.5 left-2">📌</span>
                 <AlertTitle className="font-headline text-primary pl-6">SLA – Tiempos de atención de solicitudes</AlertTitle>
-                <AlertDescription className="pl-6 space-y-3 pt-2">
-                  <p>En la aplicación GemelliFix, toda solicitud de mantenimiento cuenta con una prioridad asignada, que determina los tiempos de atención (SLA).</p>
-                  <div>
-                    <h4 className="font-semibold mb-2">⏱️ Tiempos según prioridad</h4>
-                    <ul className="space-y-2 list-inside">
-                        <li>
-                            <p>🔴 <strong className="font-semibold">Urgente (12 horas):</strong> situaciones críticas que afectan la seguridad, el funcionamiento del colegio o impiden el desarrollo normal de las actividades académicas.</p>
-                        </li>
-                        <li>
-                            <p>🟠 <strong className="font-semibold">Alta (24 horas):</strong> problemas importantes que pueden escalar si no se atienden pronto (ej: daños eléctricos, filtraciones, equipos esenciales).</p>
-                        </li>
-                        <li>
-                            <p>🟡 <strong className="font-semibold">Media (36 horas):</strong> mantenimientos necesarios pero no bloqueantes (ej: mobiliario, pintura, luminarias no esenciales).</p>
-                        </li>
-                        <li>
-                            <p>🟢 <strong className="font-semibold">Baja (48 horas):</strong> ajustes menores, mejoras estéticas o preventivos programados.</p>
-                        </li>
-                    </ul>
-                  </div>
-                  <div className="pt-2">
-                    <h4 className="font-semibold mb-2">⚠️ Nota importante para los usuarios</h4>
-                      <p>La prioridad inicial puede ser sugerida al registrar la solicitud, pero solo el Líder de Mantenimiento (Administrador) tiene la facultad de confirmarla o cambiarla según el impacto real en la operación del colegio.</p>
-                      <p className="mt-1">Esto significa que un caso marcado como “Bajo” puede ser elevado a “Urgente” si representa un riesgo, o uno marcado como “Urgente” puede reclasificarse como “Media” si no afecta procesos esenciales.</p>
-                  </div>
-                </AlertDescription>
+                <AlertDescription>
+                   <div className="pl-6 space-y-3 pt-2">
+                     <p>En la aplicación GemelliFix, toda solicitud de mantenimiento cuenta con una prioridad asignada, que determina los tiempos de atención (SLA).</p>
+                     <div>
+                       <h4 className="font-semibold mb-2">⏱️ Tiempos según prioridad</h4>
+                       <ul className="space-y-2 list-inside">
+                           <li>
+                               <p>🔴 <strong className="font-semibold">Urgente (12 horas):</strong> situaciones críticas que afectan la seguridad, el funcionamiento del colegio o impiden el desarrollo normal de las actividades académicas.</p>
+                           </li>
+                           <li>
+                               <p>🟠 <strong className="font-semibold">Alta (24 horas):</strong> problemas importantes que pueden escalar si no se atienden pronto (ej: daños eléctricos, filtraciones, equipos esenciales).</p>
+                           </li>
+                           <li>
+                               <p>🟡 <strong className="font-semibold">Media (36 horas):</strong> mantenimientos necesarios pero no bloqueantes (ej: mobiliario, pintura, luminarias no esenciales).</p>
+                           </li>
+                           <li>
+                               <p>🟢 <strong className="font-semibold">Baja (48 horas):</strong> ajustes menores, mejoras estéticas o preventivos programados.</p>
+                           </li>
+                       </ul>
+                     </div>
+                     <div className="pt-2">
+                       <h4 className="font-semibold mb-2">⚠️ Nota importante para los usuarios</h4>
+                         <p>La prioridad inicial puede ser sugerida al registrar la solicitud, pero solo el Líder de Mantenimiento (Administrador) tiene la facultad de confirmarla o cambiarla según el impacto real en la operación del colegio.</p>
+                         <p className="mt-1">Esto significa que un caso marcado como “Bajo” puede ser elevado a “Urgente” si representa un riesgo, o uno marcado como “Urgente” puede reclasificarse como “Media” si no afecta procesos esenciales.</p>
+                     </div>
+                   </div>
+                 </AlertDescription>
               </Alert>
 
               <div className="flex justify-end pt-4">
@@ -427,3 +434,5 @@ export default function CreateTicketPage() {
     </div>
   );
 }
+
+    
