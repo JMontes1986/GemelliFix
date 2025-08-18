@@ -43,7 +43,7 @@ import type { Attachment } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
+const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
 
 
 const ticketSchema = z.object({
@@ -70,11 +70,7 @@ export default function CreateTicketPage() {
   
   React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) {
-            setIsAuthReady(true);
-        } else {
-             setIsAuthReady(true);
-        }
+        setIsAuthReady(true);
     });
     return () => unsubscribe();
   }, []);
@@ -92,7 +88,11 @@ export default function CreateTicketPage() {
   });
 
   const selectedZoneId = form.watch('zoneId');
-  const fileRef = form.register('attachments');
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  
+   React.useEffect(() => {
+    form.setValue('attachments', attachedFiles);
+  }, [attachedFiles, form]);
 
 
   const onSubmit = async (data: TicketFormValues) => {
@@ -113,12 +113,12 @@ export default function CreateTicketPage() {
       const requesterName = userDocSnap.exists() ? userDocSnap.data().name : currentUser.email || 'Usuario Desconocido';
 
 
-      const zone = zones.find((z) => z.id === data.zoneId);
-      const site = sites.find((s) => s.id === data.siteId);
+      const zoneName = zones.find((z) => z.id === data.zoneId)?.name;
+      const siteName = sites.find((s) => s.id === data.siteId)?.name;
 
       // 1. Upload files to Firebase Storage
       const attachmentUrls: Attachment[] = [];
-      if (attachedFiles && attachedFiles.length > 0) {
+      if (attachedFiles.length > 0) {
         for (const file of attachedFiles) {
           const storageRef = ref(storage, `ticket-attachments/${Date.now()}-${file.name}`);
           const snapshot = await uploadBytes(storageRef, file);
@@ -128,16 +128,16 @@ export default function CreateTicketPage() {
       }
 
       // 2. Create ticket in Firestore
-      const zoneCode = zone?.name.substring(0,4).toUpperCase() || '????';
-      const siteCode = site?.name.substring(0,4).toUpperCase() || '????';
+      const zoneCode = zoneName?.substring(0,4).toUpperCase() || '????';
+      const siteCode = siteName?.substring(0,4).toUpperCase() || '????';
       const ticketCode = `GEMMAN-${zoneCode}-${siteCode}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       await addDoc(collection(db, 'tickets'), {
         code: ticketCode,
         title: data.title,
         description: data.description,
-        zone: zone?.name,
-        site: site?.name,
+        zone: zoneName,
+        site: siteName,
         priority: data.priority,
         category: data.category,
         status: 'Abierto',
@@ -168,30 +168,26 @@ export default function CreateTicketPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
      if (e.target.files) {
       const newFiles = Array.from(e.target.files);
-      const validFiles = newFiles.filter(file => {
-          if (file.size > MAX_FILE_SIZE) {
+      const validFiles: File[] = [];
+      
+      for(const file of newFiles) {
+        if (file.size > MAX_FILE_SIZE) {
               toast({ variant: 'destructive', title: 'Archivo demasiado grande', description: `El archivo ${file.name} supera los 5MB.`});
-              return false;
+              continue;
           }
-          if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
                toast({ variant: 'destructive', title: 'Tipo de archivo no permitido', description: `El archivo ${file.name} no es una imagen o PDF.`});
-              return false;
-          }
-          return true;
-      });
+              continue;
+        }
+        validFiles.push(file);
+      }
       
-      const updatedFiles = [...attachedFiles, ...validFiles];
-      setAttachedFiles(updatedFiles);
-      
-      form.setValue('attachments', updatedFiles, { shouldValidate: true });
+      setAttachedFiles(prevFiles => [...prevFiles, ...validFiles]);
     }
   };
 
-  const removeFile = (index: number) => {
-    const newFiles = [...attachedFiles];
-    newFiles.splice(index, 1);
-    setAttachedFiles(newFiles);
-    form.setValue('attachments', newFiles, { shouldValidate: true });
+  const removeFile = (indexToRemove: number) => {
+    setAttachedFiles(prevFiles => prevFiles.filter((_, index) => index !== indexToRemove));
   };
 
   return (
@@ -330,7 +326,7 @@ export default function CreateTicketPage() {
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecciona la prioridad de la solicitud" />
-                          </SelectTrigger>
+                          </Trigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="Baja">Baja</SelectItem>
@@ -358,7 +354,7 @@ export default function CreateTicketPage() {
                             <div className="flex text-sm text-muted-foreground">
                                 <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-ring">
                                     <span>Sube tus archivos</span>
-                                    <input id="file-upload" type="file" className="sr-only" {...fileRef} multiple onChange={handleFileChange} accept={ACCEPTED_IMAGE_TYPES.join(",")} />
+                                    <input id="file-upload" type="file" className="sr-only" ref={fileRef} multiple onChange={handleFileChange} accept={ACCEPTED_FILE_TYPES.join(",")} />
                                 </label>
                                 <p className="pl-1">o arrastra y suelta</p>
                             </div>
@@ -424,8 +420,7 @@ export default function CreateTicketPage() {
               <div className="flex justify-end pt-4">
                 <Button type="submit" disabled={isLoading || !isAuthReady}>
                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                   {!isAuthReady && !isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                   {!isAuthReady && !isLoading ? 'Verificando autenticación...' : 'Enviar Solicitud'}
+                   {!isAuthReady && !isLoading ? 'Verificando...' : 'Enviar Solicitud'}
                 </Button>
               </div>
             </form>
@@ -435,4 +430,5 @@ export default function CreateTicketPage() {
     </div>
   );
 }
+
     
