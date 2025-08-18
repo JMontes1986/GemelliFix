@@ -51,7 +51,9 @@ const ticketSchema = z.object({
   description: z.string().min(1, 'La descripción es requerida.'),
   zoneId: z.string().min(1, 'La zona es requerida.'),
   siteId: z.string().min(1, 'El sitio es requerido.'),
-  priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
+  priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente'], {
+    required_error: 'La prioridad es requerida.',
+  }),
   category: z.string().min(1, 'La categoría es requerida.'),
   attachments: z.custom<FileList>().optional()
     .refine((files) => !files || Array.from(files).every((file) => file.size <= MAX_FILE_SIZE), `Cada archivo debe ser de máximo 5MB.`)
@@ -226,7 +228,7 @@ export default function CreateTicketPage() {
                         <FormControl>
                             <SelectTrigger>
                             <SelectValue placeholder="Selecciona la zona afectada" />
-                            </SelectTrigger>
+                            </Trigger>
                         </FormControl>
                         <SelectContent>
                             {zones.map((zone) => (
@@ -251,7 +253,7 @@ export default function CreateTicketPage() {
                         <FormControl>
                             <SelectTrigger>
                             <SelectValue placeholder="Selecciona el sitio específico" />
-                            </SelectTrigger>
+                            </Trigger>
                         </FormControl>
                         <SelectContent>
                             {sites
@@ -298,7 +300,7 @@ export default function CreateTicketPage() {
                         <FormControl>
                             <SelectTrigger>
                             <SelectValue placeholder="Selecciona la categoría del problema" />
-                            </SelectTrigger>
+                            </Trigger>
                         </FormControl>
                         <SelectContent>
                             {categories.map((category) => (
