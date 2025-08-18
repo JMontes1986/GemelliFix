@@ -5,9 +5,9 @@ import Image from 'next/image';
 export function GemelliFixLogo(props: { className?: string }) {
   return (
     <Image 
-      src="https://placehold.co/220x280.png" 
+      src="https://placehold.co/180x280.png" 
       alt="GemelliFix Logo Placeholder" 
-      width={220} 
+      width={180} 
       height={280} 
       className={props.className}
       priority
