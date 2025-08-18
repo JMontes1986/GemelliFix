@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -86,7 +85,6 @@ export default function SettingsPage() {
       });
     }
   };
-
 
   return (
     <div className="space-y-6">
