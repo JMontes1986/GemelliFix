@@ -18,7 +18,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm mx-auto">
         <CardHeader className="text-center space-y-4">
             <div className="flex justify-center">
-              <GemelliFixLogo className="w-48" />
+              <GemelliFixLogo className="w-48 h-auto" />
             </div>
           <CardTitle className="text-2xl font-headline">Iniciar Sesión</CardTitle>
           <CardDescription>
