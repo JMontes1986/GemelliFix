@@ -383,37 +383,35 @@ export default function CreateTicketPage() {
                 )}
               />
 
-              
               <Alert variant="default">
-                  <span className="text-2xl absolute -top-1.5 left-2">📌</span>
-                  <AlertTitle className="font-headline text-primary pl-6">SLA – Tiempos de atención de solicitudes</AlertTitle>
-                  <AlertDescription className="pl-6 space-y-3 pt-2">
-                    <p>En la aplicación GemelliFix, toda solicitud de mantenimiento cuenta con una prioridad asignada, que determina los tiempos de atención (SLA).</p>
-                      <div>
-                        <h4 className="font-semibold mb-2">⏱️ Tiempos según prioridad</h4>
-                        <ul className="space-y-2 list-inside">
-                            <li>
-                                <p>🔴 <strong className="font-semibold">Urgente (12 horas):</strong> situaciones críticas que afectan la seguridad, el funcionamiento del colegio o impiden el desarrollo normal de las actividades académicas.</p>
-                            </li>
-                            <li>
-                                <p>🟠 <strong className="font-semibold">Alta (24 horas):</strong> problemas importantes que pueden escalar si no se atienden pronto (ej: daños eléctricos, filtraciones, equipos esenciales).</p>
-                            </li>
-                            <li>
-                                <p>🟡 <strong className="font-semibold">Media (36 horas):</strong> mantenimientos necesarios pero no bloqueantes (ej: mobiliario, pintura, luminarias no esenciales).</p>
-                            </li>
-                              <li>
-                                <p>🟢 <strong className="font-semibold">Baja (48 horas):</strong> ajustes menores, mejoras estéticas o preventivos programados.</p>
-                            </li>
-                        </ul>
-                    </div>
-                      <div>
-                        <h4 className="font-semibold mb-2">⚠️ Nota importante para los usuarios</h4>
-                          <p>La prioridad inicial puede ser sugerida al registrar la solicitud, pero solo el Líder de Mantenimiento (Administrador) tiene la facultad de confirmarla o cambiarla según el impacto real en la operación del colegio.</p>
-                          <p className="mt-1">Esto significa que un caso marcado como “Bajo” puede ser elevado a “Urgente” si representa un riesgo, o uno marcado como “Urgente” puede reclasificarse como “Media” si no afecta procesos esenciales.</p>
-                    </div>
-                  </AlertDescription>
+                <span className="text-2xl absolute -top-1.5 left-2">📌</span>
+                <AlertTitle className="font-headline text-primary pl-6">SLA – Tiempos de atención de solicitudes</AlertTitle>
+                <AlertDescription className="pl-6 space-y-3 pt-2">
+                  <p>En la aplicación GemelliFix, toda solicitud de mantenimiento cuenta con una prioridad asignada, que determina los tiempos de atención (SLA).</p>
+                  <div>
+                    <h4 className="font-semibold mb-2">⏱️ Tiempos según prioridad</h4>
+                    <ul className="space-y-2 list-inside">
+                        <li>
+                            <p>🔴 <strong className="font-semibold">Urgente (12 horas):</strong> situaciones críticas que afectan la seguridad, el funcionamiento del colegio o impiden el desarrollo normal de las actividades académicas.</p>
+                        </li>
+                        <li>
+                            <p>🟠 <strong className="font-semibold">Alta (24 horas):</strong> problemas importantes que pueden escalar si no se atienden pronto (ej: daños eléctricos, filtraciones, equipos esenciales).</p>
+                        </li>
+                        <li>
+                            <p>🟡 <strong className="font-semibold">Media (36 horas):</strong> mantenimientos necesarios pero no bloqueantes (ej: mobiliario, pintura, luminarias no esenciales).</p>
+                        </li>
+                        <li>
+                            <p>🟢 <strong className="font-semibold">Baja (48 horas):</strong> ajustes menores, mejoras estéticas o preventivos programados.</p>
+                        </li>
+                    </ul>
+                  </div>
+                  <div className="pt-2">
+                    <h4 className="font-semibold mb-2">⚠️ Nota importante para los usuarios</h4>
+                      <p>La prioridad inicial puede ser sugerida al registrar la solicitud, pero solo el Líder de Mantenimiento (Administrador) tiene la facultad de confirmarla o cambiarla según el impacto real en la operación del colegio.</p>
+                      <p className="mt-1">Esto significa que un caso marcado como “Bajo” puede ser elevado a “Urgente” si representa un riesgo, o uno marcado como “Urgente” puede reclasificarse como “Media” si no afecta procesos esenciales.</p>
+                  </div>
+                </AlertDescription>
               </Alert>
-                    
 
               <div className="flex justify-end pt-4">
                 <Button type="submit" disabled={isLoading || !isAuthReady}>
