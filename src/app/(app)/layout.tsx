@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -171,12 +172,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Link href="/profile">
                   <UserIcon className="mr-2 h-4 w-4" />
                   <span>Perfil</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Configuración</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
