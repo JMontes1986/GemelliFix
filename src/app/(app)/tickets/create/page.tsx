@@ -76,7 +76,7 @@ export default function CreateTicketPage() {
       zoneId: '',
       siteId: '',
       priority: 'Media',
-      category: 'General'
+      category: '',
     },
   });
 
