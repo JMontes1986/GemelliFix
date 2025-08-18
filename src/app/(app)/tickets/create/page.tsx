@@ -33,10 +33,16 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { zones, sites, users } from '@/lib/data';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, UploadCloud, File as FileIcon, X } from 'lucide-react';
+import type { Attachment } from '@/lib/types';
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+
 
 const ticketSchema = z.object({
   title: z.string().min(1, 'El título es requerido.'),
@@ -44,6 +50,9 @@ const ticketSchema = z.object({
   zoneId: z.string().min(1, 'La zona es requerida.'),
   siteId: z.string().min(1, 'El sitio es requerido.'),
   priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
+  attachments: z.custom<FileList>().optional()
+    .refine((files) => !files || Array.from(files).every((file) => file.size <= MAX_FILE_SIZE), `Cada archivo debe ser de máximo 5MB.`)
+    .refine((files) => !files || Array.from(files).every((file) => ACCEPTED_IMAGE_TYPES.includes(file.type)), "Solo se aceptan archivos .jpg, .jpeg, .png y .webp."),
 });
 
 type TicketFormValues = z.infer<typeof ticketSchema>;
@@ -55,6 +64,7 @@ export default function CreateTicketPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [attachedFiles, setAttachedFiles] = React.useState<File[]>([]);
 
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketSchema),
@@ -68,6 +78,8 @@ export default function CreateTicketPage() {
   });
 
   const selectedZoneId = form.watch('zoneId');
+  const fileRef = form.register('attachments');
+
 
   const onSubmit = async (data: TicketFormValues) => {
     setIsLoading(true);
@@ -75,7 +87,18 @@ export default function CreateTicketPage() {
       const zone = zones.find((z) => z.id === data.zoneId);
       const site = sites.find((s) => s.id === data.siteId);
 
-      // Generar un código de ticket simple
+      // 1. Upload files to Firebase Storage
+      const attachmentUrls: Attachment[] = [];
+      if (data.attachments && data.attachments.length > 0) {
+        for (const file of Array.from(data.attachments)) {
+          const storageRef = ref(storage, `ticket-attachments/${Date.now()}-${file.name}`);
+          const snapshot = await uploadBytes(storageRef, file);
+          const downloadURL = await getDownloadURL(snapshot.ref);
+          attachmentUrls.push({ url: downloadURL, description: file.name });
+        }
+      }
+
+      // 2. Create ticket in Firestore
       const ticketCode = `GEMMAN-${zone?.name.substring(0,4).toUpperCase()}-${site?.name.substring(0,4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       await addDoc(collection(db, 'tickets'), {
@@ -90,6 +113,7 @@ export default function CreateTicketPage() {
         assignedTo: '',
         createdAt: serverTimestamp(),
         dueDate: new Date(new Date().setDate(new Date().getDate() + 7)), // Placeholder: vence en 7 días
+        attachments: attachmentUrls,
       });
 
       toast({
@@ -107,6 +131,23 @@ export default function CreateTicketPage() {
     } finally {
         setIsLoading(false);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setAttachedFiles(Array.from(e.target.files));
+    }
+  };
+
+  const removeFile = (index: number) => {
+    const newFiles = [...attachedFiles];
+    newFiles.splice(index, 1);
+    setAttachedFiles(newFiles);
+    
+    // Create a new FileList and update the form value
+    const dataTransfer = new DataTransfer();
+    newFiles.forEach(file => dataTransfer.items.add(file));
+    form.setValue('attachments', dataTransfer.files);
   };
 
   return (
@@ -205,6 +246,50 @@ export default function CreateTicketPage() {
                         {...field}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="attachments"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Adjuntar Evidencia (Opcional)</FormLabel>
+                    <FormControl>
+                      <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md">
+                        <div className="space-y-1 text-center">
+                            <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                            <div className="flex text-sm text-muted-foreground">
+                                <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-ring">
+                                    <span>Sube tus archivos</span>
+                                    <input id="file-upload" type="file" className="sr-only" {...fileRef} multiple onChange={handleFileChange} />
+                                </label>
+                                <p className="pl-1">o arrastra y suelta</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">PNG, JPG, JPEG hasta 5MB</p>
+                        </div>
+                      </div>
+                    </FormControl>
+                     {attachedFiles.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-sm font-medium">Archivos adjuntos:</p>
+                        <ul className="space-y-2">
+                          {attachedFiles.map((file, index) => (
+                            <li key={index} className="flex items-center justify-between p-2 border rounded-md">
+                              <div className="flex items-center gap-2">
+                                <FileIcon className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm">{file.name}</span>
+                              </div>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
