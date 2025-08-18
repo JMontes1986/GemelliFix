@@ -1,4 +1,7 @@
 
+'use client';
+
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -10,7 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { tickets, technicians } from '@/lib/data';
+import { tickets, technicians, users } from '@/lib/data';
 import { notFound } from 'next/navigation';
 import {
   File,
@@ -33,6 +36,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AiSuggestion from './components/ai-suggestion';
 import Image from 'next/image';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
   switch (priority) {
@@ -74,20 +79,39 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
     }
 }
 
+// Hardcoded current user for permission checking
+const currentUser = users[0];
 
 export default function TicketDetailPage({ params }: { params: { id: string } }) {
-  const ticket = tickets.find((t) => t.id === params.id);
-
-  if (!ticket) {
+  const [currentTicket, setCurrentTicket] = useState(() => tickets.find((t) => t.id === params.id));
+  const { toast } = useToast();
+  
+  if (!currentTicket) {
     notFound();
   }
 
+  const [ticketStatus, setTicketStatus] = useState<Ticket['status']>(currentTicket.status);
+
   const assignedTechnician = technicians.find(
-    (tech) => tech.name === ticket.assignedTo
+    (tech) => tech.name === currentTicket.assignedTo
   );
 
-  // For demonstration, let's assume the current user is a requester for resolved tickets, and tech otherwise
-  const isRequester = ticket.status === 'Requiere Aprobación' || ticket.status === 'Resuelto' || ticket.status === 'Cerrado';
+  const canEditStatus = currentUser.role === 'administrador' || currentUser.name === currentTicket.requester;
+  const isRequester = currentUser.name === currentTicket.requester;
+  
+  const handleStatusChange = (newStatus: Ticket['status']) => {
+    setTicketStatus(newStatus);
+    // In a real app, you would also save this change to the database.
+    // For now, we just update the local state.
+    const updatedTicket = { ...currentTicket, status: newStatus };
+    setCurrentTicket(updatedTicket);
+
+    toast({
+        title: "Estado Actualizado",
+        description: `El estado del ticket ha sido cambiado a "${newStatus}".`,
+    });
+  }
+
 
   return (
     <div className="grid md:grid-cols-3 gap-6">
@@ -96,50 +120,67 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
           <CardHeader>
             <div className="flex justify-between items-start">
               <div>
-                <CardDescription>{ticket.code}</CardDescription>
-                <CardTitle className="font-headline text-2xl mt-1">{ticket.title}</CardTitle>
+                <CardDescription>{currentTicket.code}</CardDescription>
+                <CardTitle className="font-headline text-2xl mt-1">{currentTicket.title}</CardTitle>
               </div>
-              <Badge variant={getPriorityBadgeVariant(ticket.priority)} className={`text-sm ${getPriorityBadgeClassName(ticket.priority)}`}>
-                {ticket.priority}
+              <Badge variant={getPriorityBadgeVariant(currentTicket.priority)} className={`text-sm ${getPriorityBadgeClassName(currentTicket.priority)}`}>
+                {currentTicket.priority}
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
               <h3 className="font-semibold mb-2 text-primary">Descripción</h3>
-              <p className="text-muted-foreground">{ticket.description}</p>
+              <p className="text-muted-foreground">{currentTicket.description}</p>
             </div>
             <Separator />
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
                     <strong>Zona:</strong>
-                    <span>{ticket.zone}</span>
+                    <span>{currentTicket.zone}</span>
                 </div>
                  <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
                     <strong>Sitio:</strong>
-                    <span>{ticket.site}</span>
+                    <span>{currentTicket.site}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-muted-foreground" />
                     <strong>Solicitante:</strong>
-                    <span>{ticket.requester}</span>
+                    <span>{currentTicket.requester}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <Tag className="w-4 h-4 text-muted-foreground" />
                     <strong>Estado:</strong>
-                    <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
+                    {canEditStatus ? (
+                        <Select value={ticketStatus} onValueChange={handleStatusChange}>
+                            <SelectTrigger className="w-[180px] h-8 text-xs">
+                                <SelectValue placeholder="Cambiar estado" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Abierto">Abierto</SelectItem>
+                                <SelectItem value="Asignado">Asignado</SelectItem>
+                                <SelectItem value="En Progreso">En Progreso</SelectItem>
+                                <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>
+                                <SelectItem value="Resuelto">Resuelto</SelectItem>
+                                <SelectItem value="Cerrado">Cerrado</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                         <Badge variant={getStatusBadgeVariant(ticketStatus)} className={getStatusBadgeClassName(ticketStatus)}>{ticketStatus}</Badge>
+                    )}
+                   
                 </div>
                 <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <strong>Creado:</strong>
-                    <span><ClientFormattedDate date={ticket.createdAt} /></span>
+                    <span><ClientFormattedDate date={currentTicket.createdAt} /></span>
                 </div>
                 <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
                     <strong>Vencimiento:</strong>
-                    <span><ClientFormattedDate date={ticket.dueDate} /></span>
+                    <span><ClientFormattedDate date={currentTicket.dueDate} /></span>
                 </div>
             </div>
             <Separator />
@@ -153,20 +194,20 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
           </CardContent>
         </Card>
 
-        {ticket.attachments && ticket.attachments.length > 0 && (
+        {currentTicket.attachments && currentTicket.attachments.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="font-headline text-lg flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500" /> Evidencia de Resolución</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {ticket.attachments.map((att, index) => (
+              {currentTicket.attachments.map((att, index) => (
                 <div key={index} className="space-y-2">
                   <Image src={att.url} alt={att.description} width={400} height={300} className="rounded-md object-cover aspect-video" data-ai-hint="repair evidence"/>
                   <p className="text-sm text-muted-foreground italic">{att.description}</p>
                 </div>
               ))}
             </CardContent>
-            {isRequester && ticket.status === 'Requiere Aprobación' && (
+            {isRequester && ticketStatus === 'Requiere Aprobación' && (
               <CardFooter className="gap-4">
                 <Button className="w-full bg-green-600 hover:bg-green-700 text-white"><ThumbsUp /> Aprobar y Cerrar Ticket</Button>
                 <Button variant="destructive" className="w-full"><ThumbsDown /> Rechazar Solución</Button>
@@ -200,12 +241,12 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
           {!isRequester && (
             <CardFooter className="flex-col items-stretch space-y-2">
               <Button variant="outline">Reasignar Técnico</Button>
-              <AiSuggestion ticket={ticket} />
+              <AiSuggestion ticket={currentTicket} />
             </CardFooter>
           )}
         </Card>
 
-        {!isRequester && ['Asignado', 'En Progreso'].includes(ticket.status) && (
+        {!isRequester && ['Asignado', 'En Progreso'].includes(ticketStatus) && (
             <Card className="mb-6">
                  <CardHeader>
                     <CardTitle className="font-headline text-lg flex items-center gap-2"><Edit className="w-5 h-5" /> Actualizar Progreso</CardTitle>
@@ -249,18 +290,18 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                     <div className="flex gap-3">
                         <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
                         <div>
-                            <p>Ticket creado por <strong>{ticket.requester}</strong>.</p>
-                            <p className="text-xs text-muted-foreground"><ClientFormattedDate date={ticket.createdAt} /></p>
+                            <p>Ticket creado por <strong>{currentTicket.requester}</strong>.</p>
+                            <p className="text-xs text-muted-foreground"><ClientFormattedDate date={currentTicket.createdAt} /></p>
                         </div>
                     </div>
                      <div className="flex gap-3">
                         <div className="flex-shrink-0"><ArrowRight className="w-5 h-5 text-blue-500" /></div>
                         <div>
-                            <p>Ticket asignado a <strong>{ticket.assignedTo}</strong> por <strong>Admin</strong>.</p>
-                            <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 3600000)} /></p>
+                            <p>Ticket asignado a <strong>{currentTicket.assignedTo}</strong> por <strong>Admin</strong>.</p>
+                            <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(currentTicket.createdAt).getTime() + 3600000)} /></p>
                         </div>
                     </div>
-                     {ticket.status !== 'Abierto' && ticket.status !== 'Asignado' && (
+                     {currentTicket.status !== 'Abierto' && currentTicket.status !== 'Asignado' && (
                         <div className="flex gap-3">
                             <div className="flex-shrink-0">
                                 <Avatar className="h-5 w-5">
@@ -269,17 +310,17 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                                 </Avatar>
                             </div>
                             <div>
-                                <p><strong>{ticket.assignedTo}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 7200000)} /></p>
+                                <p><strong>{currentTicket.assignedTo}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(currentTicket.createdAt).getTime() + 7200000)} /></p>
                             </div>
                         </div>
                      )}
-                     {ticket.status === 'Resuelto' || ticket.status === 'Cerrado' || ticket.status === 'Requiere Aprobación' && (
+                     {ticketStatus === 'Resuelto' || ticketStatus === 'Cerrado' || ticketStatus === 'Requiere Aprobación' && (
                          <div className="flex gap-3">
                             <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
                             <div>
-                                <p>Ticket marcado como <strong>Resuelto</strong> por <strong>{ticket.assignedTo}</strong>.</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.dueDate).getTime() - 86400000)} /></p>
+                                <p>Ticket marcado como <strong>Resuelto</strong> por <strong>{currentTicket.assignedTo}</strong>.</p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(currentTicket.dueDate).getTime() - 86400000)} /></p>
                             </div>
                         </div>
                      )}
@@ -291,6 +332,3 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     </div>
   );
 }
-
-
-    
