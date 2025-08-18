@@ -9,14 +9,13 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { GemelliFixLogo } from '@/components/icons';
 
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm mx-auto">
         <CardHeader className="text-center space-y-4">
-            <GemelliFixLogo className="w-auto h-12 mx-auto" />
+            
           <CardTitle className="text-2xl font-headline">Iniciar Sesión</CardTitle>
           <CardDescription>
             Ingresa tu correo para acceder a tu cuenta
