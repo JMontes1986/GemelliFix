@@ -64,7 +64,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) => pathname === path || (path.startsWith(pathname) && pathname !== '/');
   
   // Only render FAB if mounted and not on the create ticket page
-  const showFab = isMounted && pathname !== '/diagnosis';
+  const showFab = isMounted && pathname !== '/tickets/create';
 
 
   return (
@@ -238,7 +238,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Link href="/diagnosis">
+                        <Link href="/tickets/create">
                             <Button
                             className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-lg z-50"
                             size="icon"
@@ -258,5 +258,3 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    
