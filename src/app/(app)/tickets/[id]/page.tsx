@@ -30,6 +30,7 @@ import {
   Camera,
   ThumbsUp,
   ThumbsDown,
+  Briefcase,
 } from 'lucide-react';
 import type { Ticket, Technician } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -38,6 +39,13 @@ import Image from 'next/image';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
   switch (priority) {
@@ -92,21 +100,19 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
 
   const [ticketStatus, setTicketStatus] = useState<Ticket['status']>(currentTicket.status);
   const [ticketPriority, setTicketPriority] = useState<Ticket['priority']>(currentTicket.priority);
-
-  const assignedTechnician = technicians.find(
+  const [ticketCategory, setTicketCategory] = useState<Ticket['category']>(currentTicket.category);
+  const [assignedTechnician, setAssignedTechnician] = useState(() => technicians.find(
     (tech) => tech.name === currentTicket.assignedTo
-  );
+  ));
 
-  const canEditStatus = currentUser.role === 'administrador' || currentUser.name === currentTicket.requester;
-  const canEditPriority = currentUser.role === 'administrador';
+
+  const canEdit = currentUser.role === 'administrador';
   const isRequester = currentUser.name === currentTicket.requester;
   
   const handleStatusChange = (newStatus: Ticket['status']) => {
     setTicketStatus(newStatus);
-    // In a real app, you would also save this change to the database.
     const updatedTicket = { ...currentTicket, status: newStatus };
     setCurrentTicket(updatedTicket);
-
     toast({
         title: "Estado Actualizado",
         description: `El estado del ticket ha sido cambiado a "${newStatus}".`,
@@ -117,10 +123,30 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     setTicketPriority(newPriority);
     const updatedTicket = { ...currentTicket, priority: newPriority };
     setCurrentTicket(updatedTicket);
-
     toast({
         title: "Prioridad Actualizada",
         description: `La prioridad del ticket ha sido cambiada a "${newPriority}".`,
+    });
+  }
+  
+  const handleCategoryChange = (newCategory: Ticket['category']) => {
+    setTicketCategory(newCategory);
+    const updatedTicket = { ...currentTicket, category: newCategory };
+    setCurrentTicket(updatedTicket);
+    toast({
+        title: "Categoría Actualizada",
+        description: `La categoría del ticket ha sido cambiada a "${newCategory}".`,
+    });
+  }
+
+  const handleAssignTechnician = (technician: Technician) => {
+    setAssignedTechnician(technician);
+    const updatedTicket = { ...currentTicket, assignedTo: technician.name, status: 'Asignado' as Ticket['status'] };
+    setCurrentTicket(updatedTicket);
+    setTicketStatus('Asignado');
+     toast({
+        title: "Técnico Asignado",
+        description: `El ticket ha sido asignado a ${technician.name}.`,
     });
   }
 
@@ -135,7 +161,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 <CardDescription>{currentTicket.code}</CardDescription>
                 <CardTitle className="font-headline text-2xl mt-1">{currentTicket.title}</CardTitle>
               </div>
-              {canEditPriority ? (
+              {canEdit ? (
                 <Select value={ticketPriority} onValueChange={handlePriorityChange}>
                     <SelectTrigger className="w-[180px] h-9 text-sm">
                         <SelectValue placeholder="Cambiar prioridad" />
@@ -179,7 +205,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 <div className="flex items-center gap-2">
                     <Tag className="w-4 h-4 text-muted-foreground" />
                     <strong>Estado:</strong>
-                    {canEditStatus ? (
+                    {canEdit || isRequester ? (
                         <Select value={ticketStatus} onValueChange={handleStatusChange}>
                             <SelectTrigger className="w-[180px] h-8 text-xs">
                                 <SelectValue placeholder="Cambiar estado" />
@@ -188,7 +214,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                                 <SelectItem value="Abierto">Abierto</SelectItem>
                                 <SelectItem value="Asignado">Asignado</SelectItem>
                                 <SelectItem value="En Progreso">En Progreso</SelectItem>
-                                <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>
+                                {isRequester && <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>}
                                 <SelectItem value="Resuelto">Resuelto</SelectItem>
                                 <SelectItem value="Cerrado">Cerrado</SelectItem>
                             </SelectContent>
@@ -207,6 +233,27 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                     <Clock className="w-4 h-4 text-muted-foreground" />
                     <strong>Vencimiento:</strong>
                     <span><ClientFormattedDate date={currentTicket.dueDate} /></span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-muted-foreground" />
+                    <strong>Categoría:</strong>
+                     {canEdit ? (
+                        <Select value={ticketCategory} onValueChange={handleCategoryChange}>
+                            <SelectTrigger className="w-[180px] h-8 text-xs">
+                                <SelectValue placeholder="Cambiar categoría" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Electricidad">Electricidad</SelectItem>
+                                <SelectItem value="Plomería">Plomería</SelectItem>
+                                <SelectItem value="HVAC">HVAC</SelectItem>
+                                <SelectItem value="Sistemas">Sistemas</SelectItem>
+                                <SelectItem value="Infraestructura">Infraestructura</SelectItem>
+                                <SelectItem value="General">General</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <span>{ticketCategory}</span>
+                    )}
                 </div>
             </div>
             <Separator />
@@ -264,15 +311,29 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
               <div className='text-muted-foreground'>Sin asignar</div>
             )}
           </CardContent>
-          {!isRequester && (
+          {canEdit && (
             <CardFooter className="flex-col items-stretch space-y-2">
-              <Button variant="outline">Reasignar Técnico</Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      {assignedTechnician ? 'Reasignar Técnico' : 'Asignar Técnico'}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {technicians.map(tech => (
+                        <DropdownMenuItem key={tech.id} onClick={() => handleAssignTechnician(tech)}>
+                            {tech.name}
+                        </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
               <AiSuggestion ticket={currentTicket} />
             </CardFooter>
           )}
         </Card>
 
-        {!isRequester && ['Asignado', 'En Progreso'].includes(ticketStatus) && (
+        {assignedTechnician && ['Asignado', 'En Progreso'].includes(ticketStatus) && (
             <Card className="mb-6">
                  <CardHeader>
                     <CardTitle className="font-headline text-lg flex items-center gap-2"><Edit className="w-5 h-5" /> Actualizar Progreso</CardTitle>
@@ -320,23 +381,25 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                             <p className="text-xs text-muted-foreground"><ClientFormattedDate date={currentTicket.createdAt} /></p>
                         </div>
                     </div>
-                     <div className="flex gap-3">
-                        <div className="flex-shrink-0"><ArrowRight className="w-5 h-5 text-blue-500" /></div>
-                        <div>
-                            <p>Ticket asignado a <strong>{currentTicket.assignedTo}</strong> por <strong>Admin</strong>.</p>
-                            <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(currentTicket.createdAt).getTime() + 3600000)} /></p>
+                     {assignedTechnician && (
+                        <div className="flex gap-3">
+                            <div className="flex-shrink-0"><ArrowRight className="w-5 h-5 text-blue-500" /></div>
+                            <div>
+                                <p>Ticket asignado a <strong>{assignedTechnician.name}</strong> por <strong>Admin User</strong>.</p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(currentTicket.createdAt).getTime() + 3600000)} /></p>
+                            </div>
                         </div>
-                    </div>
-                     {currentTicket.status !== 'Abierto' && currentTicket.status !== 'Asignado' && (
+                     )}
+                     {currentTicket.status !== 'Abierto' && currentTicket.status !== 'Asignado' && assignedTechnician && (
                         <div className="flex gap-3">
                             <div className="flex-shrink-0">
                                 <Avatar className="h-5 w-5">
-                                    <AvatarImage src={assignedTechnician?.avatar} />
-                                    <AvatarFallback>{assignedTechnician?.name.charAt(0)}</AvatarFallback>
+                                    <AvatarImage src={assignedTechnician.avatar} />
+                                    <AvatarFallback>{assignedTechnician.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                             </div>
                             <div>
-                                <p><strong>{currentTicket.assignedTo}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
+                                <p><strong>{assignedTechnician.name}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
                                 <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(currentTicket.createdAt).getTime() + 7200000)} /></p>
                             </div>
                         </div>

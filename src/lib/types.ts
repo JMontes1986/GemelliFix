@@ -31,6 +31,7 @@ export type Ticket = {
   description: string;
   zone: string;
   site: string;
+  category: 'Electricidad' | 'Plomería' | 'HVAC' | 'Sistemas' | 'Infraestructura' | 'General';
   priority: 'Baja' | 'Media' | 'Alta' | 'Urgente';
   status: 'Abierto' | 'Asignado' | 'En Progreso' | 'Requiere Aprobación' | 'Resuelto' | 'Cerrado';
   createdAt: string;
@@ -50,7 +51,7 @@ export type Technician = {
 };
 
 export type Notification = {
-  id: string;
+  id:string;
   title: string;
   description: string;
   createdAt: string;
