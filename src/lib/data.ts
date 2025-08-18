@@ -1,5 +1,5 @@
 
-import type { Zone, Site, Technician, Ticket, Notification, User } from '@/lib/types';
+import type { Zone, Site, Technician, Ticket, Notification, User, ScheduleEvent } from '@/lib/types';
 
 export const users: User[] = [
   { id: 'user-1', name: 'Admin User', email: 'admin@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'admin' },
@@ -26,9 +26,9 @@ export const sites: Site[] = [
 ];
 
 export const technicians: Technician[] = [
-  { id: 'tech-1', name: 'Carlos Gomez', avatar: 'https://placehold.co/100x100.png', skills: ['Electricidad', 'Plomería'] },
-  { id: 'tech-2', name: 'Lucia Fernandez', avatar: 'https://placehold.co/100x100.png', skills: ['HVAC', 'Carpintería'] },
-  { id: 'tech-3', name: 'Pedro Ramirez', avatar: 'https://placehold.co/100x100.png', skills: ['Redes', 'Sistemas'] },
+  { id: 'tech-1', name: 'Carlos Gomez', avatar: 'https://placehold.co/100x100.png', skills: ['Electricidad', 'Plomería'], workload: 85 },
+  { id: 'tech-2', name: 'Lucia Fernandez', avatar: 'https://placehold.co/100x100.png', skills: ['HVAC', 'Carpintería'], workload: 60 },
+  { id: 'tech-3', name: 'Pedro Ramirez', avatar: 'https://placehold.co/100x100.png', skills: ['Redes', 'Sistemas'], workload: 40 },
 ];
 
 export const tickets: Ticket[] = [
@@ -115,6 +115,56 @@ export const notifications: Notification[] = [
     { id: '2', title: 'SLA en Riesgo', description: 'El ticket GEMMAN-ZONAC-SITEC2-0003 está a punto de vencer.', createdAt: 'Hace 2 horas', read: false, type: 'sla' },
     { id: '3', title: 'Turno próximo', description: 'Tu turno de mantenimiento comienza en 60 minutos.', createdAt: 'Hace 1 día', read: true, type: 'schedule' },
     { id: '4', title: 'Ticket Resuelto', description: 'El ticket GEMMAN-ZONAD-SITED1-0004 ha sido resuelto.', createdAt: 'Hace 2 días', read: true, type: 'ticket' },
+];
+
+export const scheduleEvents: ScheduleEvent[] = [
+    {
+        id: 'evt-1',
+        title: 'Turno Mañana',
+        description: 'Ronda de inspección general',
+        start: new Date('2024-05-20T08:00:00'),
+        end: new Date('2024-05-20T12:00:00'),
+        type: 'shift',
+        technicianId: 'tech-1'
+    },
+    {
+        id: 'evt-2',
+        title: 'Ticket: GEMMAN-ZONAA-SITEA1-0001',
+        description: 'Proyector no enciende',
+        start: new Date('2024-05-20T13:00:00'),
+        end: new Date('2024-05-20T15:00:00'),
+        type: 'ticket',
+        technicianId: 'tech-1',
+        ticketId: '1'
+    },
+     {
+        id: 'evt-3',
+        title: 'Cuadrante Aseo: Bloque B',
+        description: 'Limpieza profunda de laboratorios',
+        start: new Date('2024-05-21T10:00:00'),
+        end: new Date('2024-05-21T12:00:00'),
+        type: 'task',
+        technicianId: 'tech-2'
+    },
+     {
+        id: 'evt-4',
+        title: 'Ticket: GEMMAN-ZONAC-SITEC2-0003',
+        description: 'Impresora no funciona',
+        start: new Date('2024-05-22T11:00:00'),
+        end: new Date('2024-05-22T13:00:00'),
+        type: 'ticket',
+        technicianId: 'tech-3',
+        ticketId: '3'
+    },
+     {
+        id: 'evt-5',
+        title: 'Capacitación HVAC',
+        description: 'Nuevos equipos y protocolos',
+        start: new Date('2024-05-23T09:00:00'),
+        end: new Date('2024-05-23T16:00:00'),
+        type: 'shift',
+        technicianId: 'tech-2'
+    }
 ];
 
     

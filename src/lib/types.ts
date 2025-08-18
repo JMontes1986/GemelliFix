@@ -44,6 +44,7 @@ export type Technician = {
   name: string;
   avatar: string;
   skills: string[];
+  workload: number;
 };
 
 export type Notification = {
@@ -58,11 +59,14 @@ export type Notification = {
 export type ScheduleEvent = {
   id: string;
   title: string;
+  description?: string;
   start: Date;
   end: Date;
   type: 'shift' | 'ticket' | 'task';
   technicianId?: string;
   ticketId?: string;
 };
+
+    
 
     

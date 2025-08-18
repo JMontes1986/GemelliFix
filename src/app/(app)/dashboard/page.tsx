@@ -110,10 +110,12 @@ export default function DashboardPage() {
             <PlusCircle className="mr-2 h-4 w-4" />
             Crear Ticket
           </Button>
-          <Button variant="secondary">
-            <CalendarPlus className="mr-2 h-4 w-4" />
-            Programar Turno
-          </Button>
+          <Link href="/calendar">
+            <Button variant="secondary">
+              <CalendarPlus className="mr-2 h-4 w-4" />
+              Programar Turno
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -269,3 +271,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
