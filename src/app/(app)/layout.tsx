@@ -15,7 +15,8 @@ import {
   Settings,
   User as UserIcon,
   Wrench,
-  PlusCircle
+  PlusCircle,
+  HeartPulse,
 } from 'lucide-react';
 
 import {
@@ -63,7 +64,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) => pathname === path || (path.startsWith(pathname) && pathname !== '/');
   
   // Only render FAB if mounted and not on the create ticket page
-  const showFab = isMounted && pathname !== '/tickets/create';
+  const showFab = isMounted && pathname !== '/diagnosis';
 
 
   return (
@@ -85,6 +86,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Link href="/dashboard">
                   <LayoutDashboard />
                   <span>Dashboard</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive('/diagnosis')}
+                tooltip="Diagnóstico"
+              >
+                <Link href="/diagnosis">
+                  <HeartPulse />
+                  <span>Diagnóstico</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -225,7 +238,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Link href="/tickets/create">
+                        <Link href="/diagnosis">
                             <Button
                             className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-lg z-50"
                             size="icon"
@@ -245,3 +258,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    
