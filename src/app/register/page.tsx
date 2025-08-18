@@ -1,4 +1,6 @@
 
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GemelliFixLogo } from '@/components/icons';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function RegisterPage() {
   return (
@@ -22,9 +25,9 @@ export default function RegisterPage() {
                 <GemelliFixLogo />
               </div>
             </div>
-          <CardTitle className="text-2xl font-headline">Crear Cuenta de Administrador</CardTitle>
+          <CardTitle className="text-2xl font-headline">Crear Cuenta</CardTitle>
           <CardDescription>
-            Completa el formulario para registrarte.
+            Completa el formulario para registrar un nuevo usuario.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -38,9 +41,24 @@ export default function RegisterPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@gemelli.edu.co"
+                placeholder="usuario@gemelli.edu.co"
                 required
               />
+            </div>
+             <div className="grid gap-2">
+                <Label htmlFor="role">Rol de Usuario</Label>
+                <Select>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un rol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="administrador">Administrador</SelectItem>
+                        <SelectItem value="servicios_generales">Servicios Generales</SelectItem>
+                        <SelectItem value="docente">Docentes</SelectItem>
+                        <SelectItem value="coordinador">Coordinadores</SelectItem>
+                        <SelectItem value="administrativo">Administrativos</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="password">Contraseña</Label>
