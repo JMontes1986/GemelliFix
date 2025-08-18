@@ -34,7 +34,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { zones, sites, users, categories } from '@/lib/data';
 import { db, storage, auth } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -60,9 +60,6 @@ const ticketSchema = z.object({
 
 type TicketFormValues = z.infer<typeof ticketSchema>;
 
-// Asumimos que el usuario actual es el primer usuario de la lista
-const currentUser = users[0];
-
 export default function CreateTicketPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -75,9 +72,6 @@ export default function CreateTicketPage() {
         if (user) {
             setIsAuthReady(true);
         } else {
-            // Podrías redirigir al login si no hay usuario
-            // router.push('/login');
-            // Por ahora, solo indicamos que la autenticación está lista (aunque no haya usuario)
              setIsAuthReady(true);
         }
     });
@@ -101,7 +95,8 @@ export default function CreateTicketPage() {
 
 
   const onSubmit = async (data: TicketFormValues) => {
-    if (!auth.currentUser) {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
         toast({
             variant: 'destructive',
             title: 'Error de Autenticación',
@@ -111,6 +106,12 @@ export default function CreateTicketPage() {
     }
     setIsLoading(true);
     try {
+      // Get user name from 'users' collection
+      const userDocRef = doc(db, "users", currentUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      const requesterName = userDocSnap.exists() ? userDocSnap.data().name : currentUser.email || 'Usuario Desconocido';
+
+
       const zone = zones.find((z) => z.id === data.zoneId);
       const site = sites.find((s) => s.id === data.siteId);
 
@@ -139,7 +140,7 @@ export default function CreateTicketPage() {
         priority: data.priority,
         category: data.category,
         status: 'Abierto',
-        requester: currentUser.name,
+        requester: requesterName,
         assignedTo: '',
         createdAt: serverTimestamp(),
         dueDate: new Date(new Date().setDate(new Date().getDate() + 7)), // Placeholder: vence en 7 días
@@ -426,5 +427,3 @@ export default function CreateTicketPage() {
     </div>
   );
 }
-
-    
