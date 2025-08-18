@@ -55,7 +55,7 @@ const ticketSchema = z.object({
   attachments: z.any().optional()
 });
 
-type TicketFormValues = z.infer<typeof ticketSchema>;
+type TicketFormValues = z.infer<typeof ticketSchema>
 
 export default function CreateTicketPage() {
   const router = useRouter();
@@ -168,16 +168,12 @@ export default function CreateTicketPage() {
         }
         validFiles.push(file);
       }
-      const updatedFiles = [...attachedFiles, ...validFiles];
-      setAttachedFiles(updatedFiles);
-      form.setValue('attachments', updatedFiles, { shouldValidate: true });
+      setAttachedFiles(prevFiles => [...prevFiles, ...validFiles]);
     }
   }
 
   function removeFile(indexToRemove: number) {
-    const newFiles = attachedFiles.filter((_, index) => index !== indexToRemove);
-    setAttachedFiles(newFiles);
-    form.setValue('attachments', newFiles, { shouldValidate: true });
+    setAttachedFiles(prevFiles => prevFiles.filter((_, index) => index !== indexToRemove));
   }
 
 
@@ -421,5 +417,3 @@ export default function CreateTicketPage() {
     </div>
   );
 }
-
-    
