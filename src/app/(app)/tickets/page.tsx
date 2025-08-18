@@ -1,4 +1,5 @@
 
+
 import * as React from 'react';
 import Link from 'next/link';
 import {
@@ -41,6 +42,7 @@ import {
 } from '@/components/ui/tabs';
 import { tickets, zones, sites } from '@/lib/data';
 import type { Ticket } from '@/lib/types';
+import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
   switch (priority) {
@@ -185,10 +187,10 @@ export default function TicketsPage() {
                         </TableCell>
                         <TableCell>{ticket.assignedTo ?? 'Sin Asignar'}</TableCell>
                         <TableCell className="hidden md:table-cell">
-                          {new Date(ticket.createdAt).toLocaleDateString()}
+                          <ClientFormattedDate date={ticket.createdAt} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          {new Date(ticket.dueDate).toLocaleDateString()}
+                          <ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>

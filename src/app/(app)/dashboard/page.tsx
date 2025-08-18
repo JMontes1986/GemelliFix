@@ -38,6 +38,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell } from 
 import type { ChartConfig } from '@/components/ui/chart';
 import { tickets } from '@/lib/data';
 import Link from 'next/link';
+import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 
 const slaComplianceData = [
   { status: 'en_tiempo', count: 85, fill: 'var(--color-en_tiempo)' },
@@ -256,7 +257,9 @@ export default function DashboardPage() {
                     <Badge variant={ticket.priority === 'Urgente' ? 'destructive' : 'default'} className={ticket.priority === 'Alta' ? 'bg-orange-500 text-white' : ''}>{ticket.priority}</Badge>
                   </TableCell>
                   <TableCell>{ticket.assignedTo || 'Sin asignar'}</TableCell>
-                  <TableCell className="text-right">{new Date(ticket.dueDate).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-right">
+                     <ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

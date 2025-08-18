@@ -32,6 +32,7 @@ import type { Ticket, Technician } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AiSuggestion from './components/ai-suggestion';
 import Image from 'next/image';
+import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
   switch (priority) {
@@ -133,12 +134,12 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <strong>Creado:</strong>
-                    <span>{new Date(ticket.createdAt).toLocaleString('es-CO')}</span>
+                    <span><ClientFormattedDate date={ticket.createdAt} /></span>
                 </div>
                 <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
                     <strong>Vencimiento:</strong>
-                    <span>{new Date(ticket.dueDate).toLocaleString('es-CO')}</span>
+                    <span><ClientFormattedDate date={ticket.dueDate} /></span>
                 </div>
             </div>
             <Separator />
@@ -249,14 +250,14 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                         <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
                         <div>
                             <p>Ticket creado por <strong>{ticket.requester}</strong>.</p>
-                            <p className="text-xs text-muted-foreground">{new Date(ticket.createdAt).toLocaleString()}</p>
+                            <p className="text-xs text-muted-foreground"><ClientFormattedDate date={ticket.createdAt} /></p>
                         </div>
                     </div>
                      <div className="flex gap-3">
                         <div className="flex-shrink-0"><ArrowRight className="w-5 h-5 text-blue-500" /></div>
                         <div>
                             <p>Ticket asignado a <strong>{ticket.assignedTo}</strong> por <strong>Admin</strong>.</p>
-                            <p className="text-xs text-muted-foreground">{new Date(new Date(ticket.createdAt).getTime() + 3600000).toLocaleString()}</p>
+                            <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 3600000)} /></p>
                         </div>
                     </div>
                      {ticket.status !== 'Abierto' && ticket.status !== 'Asignado' && (
@@ -269,7 +270,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                             </div>
                             <div>
                                 <p><strong>{ticket.assignedTo}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
-                                <p className="text-xs text-muted-foreground">{new Date(new Date(ticket.createdAt).getTime() + 7200000).toLocaleString()}</p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 7200000)} /></p>
                             </div>
                         </div>
                      )}
@@ -278,7 +279,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                             <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
                             <div>
                                 <p>Ticket marcado como <strong>Resuelto</strong> por <strong>{ticket.assignedTo}</strong>.</p>
-                                <p className="text-xs text-muted-foreground">{new Date(new Date(ticket.dueDate).getTime() - 86400000).toLocaleString()}</p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.dueDate).getTime() - 86400000)} /></p>
                             </div>
                         </div>
                      )}
