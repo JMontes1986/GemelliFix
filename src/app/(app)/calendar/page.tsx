@@ -39,31 +39,30 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 
-const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const weekDays = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 
 const EventCard = ({ event }: { event: ScheduleEvent }) => {
   const technician = technicians.find(t => t.id === event.technicianId);
+  const eventDate = new Date(event.start);
   
-  // Calculate top and height based on event start/end times
-  const startHour = event.start.getHours();
-  const startMinutes = event.start.getMinutes();
+  const startHour = eventDate.getHours();
+  const startMinutes = eventDate.getMinutes();
   const endHour = event.end.getHours();
   const endMinutes = event.end.getMinutes();
 
   const totalStartMinutes = (startHour - 8) * 60 + startMinutes;
   const totalEndMinutes = (endHour - 8) * 60 + endMinutes;
-
   const durationMinutes = totalEndMinutes - totalStartMinutes;
 
-  // Assuming each hour slot is 64px (h-16) high
+  // Each hour slot is 64px (h-16) high
   const top = (totalStartMinutes / 60) * 64; 
   const height = (durationMinutes / 60) * 64;
 
   return (
     <div
       className={cn(
-        'absolute w-full p-2 rounded-lg border text-xs shadow-sm cursor-pointer hover:shadow-md transition-all z-10',
+        'absolute w-[95%] left-1/2 -translate-x-1/2 p-2 rounded-lg border text-xs shadow-sm cursor-pointer hover:shadow-md transition-all z-10',
         technician?.color || 'bg-secondary text-secondary-foreground'
       )}
       style={{
@@ -99,22 +98,37 @@ const UnassignedTicketCard = ({ ticket }: { ticket: Ticket }) => (
 
 
 export default function CalendarPage() {
+    const [currentDate, setCurrentDate] = useState(new Date('2024-05-20'));
     const [events, setEvents] = useState<ScheduleEvent[]>(scheduleEvents);
     const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>(unassignedTicketsData.filter(t => !t.assignedTo));
 
-    const handleDrop = (technicianId: string, day: string, time: string) => {
-        console.log(`Dropped on ${technicianId} at ${day}, ${time}`);
+    const handleDrop = (technicianId: string, day: Date, time: string) => {
+        console.log(`Dropped on ${technicianId} at ${day.toDateString()}, ${time}`);
     };
     
-    // Create a mapping of technicians to their events for easier lookup
-    const eventsByTechnician: Record<string, ScheduleEvent[]> = technicians.reduce((acc, tech) => {
-        acc[tech.id] = events.filter(e => e.technicianId === tech.id);
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + 1); // Start on Monday
+    const weekDates = Array.from({ length: 5 }, (_, i) => {
+        const date = new Date(startOfWeek);
+        date.setDate(date.getDate() + i);
+        return date;
+    });
+
+    const eventsByTechnicianAndDay: Record<string, Record<string, ScheduleEvent[]>> = technicians.reduce((acc, tech) => {
+        acc[tech.id] = {};
+        weekDates.forEach(date => {
+            const dateString = date.toDateString();
+            acc[tech.id][dateString] = events.filter(e => {
+                const eventDate = new Date(e.start);
+                return e.technicianId === tech.id && eventDate.toDateString() === dateString;
+            });
+        });
         return acc;
-    }, {} as Record<string, ScheduleEvent[]>);
+    }, {} as Record<string, Record<string, ScheduleEvent[]>>);
 
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)]">
+    <div className="flex flex-col h-[calc(100vh-80px)]">
       <div className="flex items-center justify-between pb-4">
         <div>
           <h1 className="text-2xl font-headline font-bold">
@@ -194,70 +208,78 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-[1fr_4fr] gap-4 overflow-hidden">
-        {/* Unassigned Tickets Column */}
-        <div className="flex flex-col">
-             <Card className="flex flex-col h-full bg-muted/30">
+      <div className="flex-1 grid grid-cols-[240px_1fr] gap-4 overflow-hidden">
+        {/* Unassigned & Technicians Column */}
+        <div className="flex flex-col gap-4">
+            <Card className="flex flex-col bg-muted/30  h-1/2">
                 <CardHeader className="py-3 px-4 border-b">
-                  <CardTitle className="font-headline text-base">Tickets sin Asignar</CardTitle>
+                    <CardTitle className="font-headline text-base">Tickets sin Asignar</CardTitle>
                 </CardHeader>
                 <CardContent className="p-2 flex-1 overflow-y-auto"
-                  onDragOver={(e) => e.preventDefault()}
+                    onDragOver={(e) => e.preventDefault()}
                 >
-                  {unassignedTickets.map((ticket) => (
+                    {unassignedTickets.map((ticket) => (
                     <UnassignedTicketCard key={ticket.id} ticket={ticket} />
+                    ))}
+                </CardContent>
+            </Card>
+             <Card className="flex flex-col bg-muted/30 h-1/2">
+                <CardHeader className="py-3 px-4 border-b">
+                  <CardTitle className="font-headline text-base">Servicios Generales</CardTitle>
+                </CardHeader>
+                <CardContent className="p-2 flex-1 overflow-y-auto">
+                  {technicians.map(tech => (
+                    <div key={tech.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-background/80">
+                         <Avatar className="h-10 w-10">
+                            <AvatarImage src={tech.avatar} alt={tech.name} />
+                            <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <p className="font-semibold text-sm">{tech.name}</p>
+                            <p className="text-xs text-muted-foreground">{tech.workload}% Carga</p>
+                        </div>
+                    </div>
                   ))}
                 </CardContent>
             </Card>
         </div>
 
         {/* Calendar Grid */}
-        <div className="flex-1 overflow-auto border rounded-lg">
-          <div className="grid grid-cols-[100px_repeat(4,1fr)] sticky top-0 bg-background z-20">
-            <div className="p-2 border-b border-r font-semibold">Técnicos</div>
-            {weekDays.slice(0, 4).map(day => ( // Only show 4 days for space
-              <div key={day} className="p-2 text-center border-b font-semibold">{day}</div>
+        <div className="flex-1 overflow-auto border rounded-lg bg-background">
+          <div className="grid grid-cols-[60px_repeat(5,1fr)] sticky top-0 bg-background z-20 shadow-sm">
+            <div className="p-2 border-b border-r"></div>
+            {weekDates.map(date => (
+              <div key={date.toString()} className="p-2 text-center border-b border-r font-semibold">
+                  <p>{weekDays[date.getDay()]}</p>
+                  <p className="text-2xl font-bold">{date.getDate()}</p>
+              </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-[100px_repeat(4,1fr)]">
-             {/* Technician column */}
+          <div className="grid grid-cols-[60px_1fr] h-full">
+            {/* Hours Column */}
             <div className="border-r">
-              {technicians.map(tech => (
-                <div key={tech.id} className="h-48 border-b p-2 flex flex-col items-center justify-center text-center">
-                   <Avatar>
-                      <AvatarImage src={tech.avatar} alt={tech.name} />
-                      <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                  <p className="font-semibold text-sm mt-2">{tech.name}</p>
-                  <p className="text-xs text-muted-foreground">{tech.workload}% Carga</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Day columns */}
-            {weekDays.slice(0, 4).map((day, dayIndex) => (
-              <div key={day} className="grid grid-rows-1">
-                {technicians.map(tech => (
-                  <div 
-                    key={tech.id} 
-                    className="h-48 border-b relative"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      handleDrop(tech.id, day, 'N/A');
-                    }}
-                  >
-                    {/* Render events for this technician on this day */}
-                    {eventsByTechnician[tech.id]
-                      ?.filter(event => new Date(event.start).getDay() === (dayIndex + 1) % 7) // Simple day check
-                      .map(event => (
-                        <EventCard key={event.id} event={event} />
-                      ))}
-                  </div>
+                {hours.map(hour => (
+                    <div key={hour} className="h-16 border-b text-right pr-2">
+                        <span className="text-xs text-muted-foreground relative -top-2">{hour}</span>
+                    </div>
                 ))}
-              </div>
-            ))}
+            </div>
+            
+            {/* Day columns */}
+            <div className="grid grid-cols-5 h-full">
+                 {weekDates.map((date) => (
+                    <div key={date.toString()} className="border-r relative">
+                         {hours.map((_, hourIndex) => (
+                             <div key={hourIndex} className="h-16 border-b" />
+                         ))}
+                         {/* Events for this day */}
+                         {Object.values(eventsByTechnicianAndDay).flatMap(techEvents => techEvents[date.toDateString()] || []).map(event => (
+                            <EventCard key={event.id} event={event} />
+                         ))}
+                    </div>
+                 ))}
+            </div>
           </div>
         </div>
       </div>
