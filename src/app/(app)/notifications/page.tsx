@@ -54,10 +54,10 @@ export default function NotificationsPage() {
     React.useEffect(() => {
         if (!currentUser) return;
 
+        // Simplified query to remove the composite index dependency
         const q = query(
             collection(db, 'notifications'),
-            where('userId', '==', currentUser.id),
-            orderBy('createdAt', 'desc')
+            where('userId', '==', currentUser.id)
         );
 
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -66,10 +66,18 @@ export default function NotificationsPage() {
                 const data = doc.data();
                 fetchedNotifications.push({
                     id: doc.id,
-                    ...data
+                    ...data,
                 } as Notification);
             });
-            setNotifications(fetchedNotifications);
+            
+            // Sort notifications on the client-side
+            const sortedNotifications = fetchedNotifications.sort((a, b) => {
+                const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+                const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+                return dateB - dateA;
+            });
+
+            setNotifications(sortedNotifications);
             setIsLoading(false);
         }, (error) => {
             console.error("Error fetching notifications: ", error);
