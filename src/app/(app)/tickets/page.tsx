@@ -51,7 +51,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
-
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
   switch (priority) {
     case 'Urgente': return 'destructive';
@@ -68,7 +67,7 @@ const getStatusBadgeVariant = (status: Ticket['status']) => {
     case 'Asignado': return 'default';
     case 'En Progreso': return 'default';
     case 'Requiere Aprobación': return 'default';
-    case 'Resuelto': return 'default'; 
+    case 'Resuelto': return 'default';
     case 'Cerrado': return 'secondary';
     case 'Cancelado': return 'secondary';
     default: return 'default';
@@ -93,6 +92,7 @@ const getPriorityBadgeClassName = (priority: Ticket['priority']) => {
         default: return '';
     }
 };
+
 
 export default function TicketsPage() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
@@ -412,3 +412,5 @@ export default function TicketsPage() {
     </Tabs>
   );
 }
+
+    
