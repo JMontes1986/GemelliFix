@@ -12,13 +12,13 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const FirebaseErrorInputSchema = z.object({
+const FirebaseErrorInputSchema = z.object({
   errorCode: z.string().describe('The error code returned by Firebase (e.g., "permission-denied").'),
   errorMessage: z.string().describe('The full error message returned by Firebase.'),
 });
 export type FirebaseErrorInput = z.infer<typeof FirebaseErrorInputSchema>;
 
-export const FirebaseDiagnosisOutputSchema = z.object({
+const FirebaseDiagnosisOutputSchema = z.object({
   analysis: z.string().describe("A clear, concise analysis of what the root cause of the error is."),
   suggestedSteps: z.string().describe("A list of actionable steps the user should take to fix the issue. Use markdown for lists."),
 });
