@@ -54,15 +54,7 @@ const ticketSchema = z.object({
   attachments: z.any().optional()
 });
 
-type TicketFormValues = {
-  title: string;
-  description: string;
-  zoneId: string;
-  siteId: string;
-  priority: 'Baja' | 'Media' | 'Alta' | 'Urgente';
-  category: string;
-  attachments?: any;
-};
+type TicketFormValues = z.infer<typeof ticketSchema>;
 
 export default function CreateTicketPage() {
   const router = useRouter();
@@ -174,7 +166,7 @@ export default function CreateTicketPage() {
 
   function removeFile(indexToRemove: number) {
     const currentFiles = form.getValues('attachments') || [];
-    const newFiles = currentFiles.filter((_, index) => index !== indexToRemove);
+    const newFiles = currentFiles.filter((_: any, index: number) => index !== indexToRemove);
     form.setValue('attachments', newFiles, { shouldValidate: true });
   }
 
@@ -243,7 +235,7 @@ export default function CreateTicketPage() {
                         <FormControl>
                             <SelectTrigger>
                             <SelectValue placeholder="Selecciona el sitio específico" />
-                            </Trigger>
+                            </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                             {sites
@@ -290,7 +282,7 @@ export default function CreateTicketPage() {
                         <FormControl>
                             <SelectTrigger>
                             <SelectValue placeholder="Selecciona la categoría del problema" />
-                            </Trigger>
+                            </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                             {categories.map((category) => (
@@ -314,7 +306,7 @@ export default function CreateTicketPage() {
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecciona la prioridad de la solicitud" />
-                          </Trigger>
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="Baja">Baja</SelectItem>
@@ -354,7 +346,7 @@ export default function CreateTicketPage() {
                       <div className="mt-4 space-y-2">
                         <p className="text-sm font-medium">Archivos adjuntos:</p>
                         <ul className="space-y-2">
-                          {attachedFiles.map((file, index) => (
+                          {attachedFiles.map((file: File, index: number) => (
                             <li key={index} className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
                               <div className="flex items-center gap-2 truncate">
                                 <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
