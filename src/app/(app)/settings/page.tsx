@@ -46,6 +46,15 @@ import { db } from '@/lib/firebase';
 import type { User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import LogsPage from './logs/page';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+
 
 const userRoles: User['role'][] = ['Administrador', 'Servicios Generales', 'Docentes', 'Coordinadores', 'Administrativos'];
 
@@ -58,6 +67,7 @@ export default function SettingsPage() {
     const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
     const [isUpdating, setIsUpdating] = React.useState(false);
     const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
+    const [activeTab, setActiveTab] = React.useState("users");
     const { toast } = useToast();
 
     React.useEffect(() => {
@@ -179,7 +189,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="users" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="technicians">Servicios Generales</TabsTrigger>
@@ -473,10 +483,9 @@ export default function SettingsPage() {
                 </CardFooter>
             </Card>
         </TabsContent>
-         <TabsContent value="logs">
-            <LogsPage />
+        <TabsContent value="logs">
+            {activeTab === 'logs' ? <LogsPage /> : null}
         </TabsContent>
-
       </Tabs>
     </div>
   );
