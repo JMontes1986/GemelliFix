@@ -77,30 +77,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={isActive('/dashboard')}
-                tooltip="Dashboard"
-              >
-                <Link href="/dashboard">
-                  <LayoutDashboard />
-                  <span>Dashboard</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={isActive('/diagnosis')}
-                tooltip="Diagnóstico"
-              >
-                <Link href="/diagnosis">
-                  <HeartPulse />
-                  <span>Diagnóstico</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {currentUser.role === 'Administrador' && (
+              <>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/dashboard')}
+                    tooltip="Dashboard"
+                  >
+                    <Link href="/dashboard">
+                      <LayoutDashboard />
+                      <span>Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/diagnosis')}
+                    tooltip="Diagnóstico"
+                  >
+                    <Link href="/diagnosis">
+                      <HeartPulse />
+                      <span>Diagnóstico</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </>
+            )}
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
@@ -137,18 +141,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={isActive('/settings')}
-                tooltip="Configuración"
-              >
-                <Link href="/settings">
-                  <Settings />
-                  <span>Configuración</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+             {currentUser.role === 'Administrador' && (
+                <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/settings')}
+                    tooltip="Configuración"
+                >
+                    <Link href="/settings">
+                    <Settings />
+                    <span>Configuración</span>
+                    </Link>
+                </SidebarMenuButton>
+                </SidebarMenuItem>
+             )}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
