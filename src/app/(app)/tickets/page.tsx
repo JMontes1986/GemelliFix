@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -52,6 +51,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { createLog } from '@/lib/utils';
+
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
   switch (priority) {
