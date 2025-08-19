@@ -70,6 +70,21 @@ export default function SettingsPage() {
     const [activeTab, setActiveTab] = React.useState("users");
     const { toast } = useToast();
 
+    // State for system settings
+    const [slaTimes, setSlaTimes] = React.useState({
+        urgent: 12,
+        high: 24,
+        medium: 3,
+        low: 7,
+    });
+    const [notificationPrefs, setNotificationPrefs] = React.useState({
+        newTicket: true,
+        assigned: true,
+        slaRisk: true,
+        resolved: false,
+    });
+
+
     React.useEffect(() => {
         const q = collection(db, 'users');
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -112,7 +127,7 @@ export default function SettingsPage() {
         setIsEditDialogOpen(true);
     };
 
-    const handleSaveChanges = async () => {
+    const handleUserUpdate = async () => {
         if (!selectedUser) return;
         setIsUpdating(true);
         const userDocRef = doc(db, 'users', selectedUser.id);
@@ -129,6 +144,17 @@ export default function SettingsPage() {
         } finally {
             setIsUpdating(false);
         }
+    };
+    
+    const handleSystemSave = async () => {
+        setIsUpdating(true);
+        // Simulate saving to a database
+        await new Promise(resolve => setTimeout(resolve, 500));
+        toast({
+            title: "Configuración Guardada",
+            description: "Los cambios en la configuración del sistema han sido guardados.",
+        });
+        setIsUpdating(false);
     };
 
 
@@ -175,7 +201,7 @@ export default function SettingsPage() {
             )}
             <DialogFooter>
                 <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleSaveChanges} disabled={isUpdating}>
+                <Button onClick={handleUserUpdate} disabled={isUpdating}>
                     {isUpdating && <Loader2 className="mr-2 animate-spin" />}
                     Guardar Cambios
                 </Button>
@@ -428,19 +454,19 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <Label htmlFor="sla-urgent">Prioridad Urgente (horas)</Label>
-                            <Input id="sla-urgent" type="number" defaultValue={12} />
+                            <Input id="sla-urgent" type="number" value={slaTimes.urgent} onChange={(e) => setSlaTimes({...slaTimes, urgent: +e.target.value})} />
                         </div>
                          <div className="space-y-2">
                             <Label htmlFor="sla-high">Prioridad Alta (horas)</Label>
-                            <Input id="sla-high" type="number" defaultValue={24} />
+                            <Input id="sla-high" type="number" value={slaTimes.high} onChange={(e) => setSlaTimes({...slaTimes, high: +e.target.value})} />
                         </div>
                          <div className="space-y-2">
                             <Label htmlFor="sla-medium">Prioridad Media (días)</Label>
-                            <Input id="sla-medium" type="number" defaultValue={3} />
+                            <Input id="sla-medium" type="number" value={slaTimes.medium} onChange={(e) => setSlaTimes({...slaTimes, medium: +e.target.value})} />
                         </div>
                          <div className="space-y-2">
                             <Label htmlFor="sla-low">Prioridad Baja (días)</Label>
-                            <Input id="sla-low" type="number" defaultValue={7} />
+                            <Input id="sla-low" type="number" value={slaTimes.low} onChange={(e) => setSlaTimes({...slaTimes, low: +e.target.value})} />
                         </div>
                     </div>
                   </div>
@@ -452,34 +478,37 @@ export default function SettingsPage() {
                                 <Label htmlFor="notif-new-ticket" className="font-semibold">Nuevo Ticket Creado</Label>
                                 <p className="text-sm text-muted-foreground">Notificar a los líderes de mantenimiento cuando un usuario crea un ticket.</p>
                             </div>
-                            <Switch id="notif-new-ticket" defaultChecked />
+                            <Switch id="notif-new-ticket" checked={notificationPrefs.newTicket} onCheckedChange={(checked) => setNotificationPrefs({...notificationPrefs, newTicket: checked})} />
                         </div>
                         <div className="flex items-center justify-between p-4 border rounded-md">
                             <div>
                                 <Label htmlFor="notif-assigned" className="font-semibold">Ticket Asignado</Label>
                                 <p className="text-sm text-muted-foreground">Notificar al técnico cuando se le asigna un nuevo ticket.</p>
                             </div>
-                            <Switch id="notif-assigned" defaultChecked />
+                            <Switch id="notif-assigned" checked={notificationPrefs.assigned} onCheckedChange={(checked) => setNotificationPrefs({...notificationPrefs, assigned: checked})} />
                         </div>
                          <div className="flex items-center justify-between p-4 border rounded-md">
                             <div>
                                 <Label htmlFor="notif-sla-risk" className="font-semibold">SLA en Riesgo</Label>
                                 <p className="text-sm text-muted-foreground">Enviar una alerta cuando un ticket esté a punto de incumplir su SLA.</p>
                             </div>
-                             <Switch id="notif-sla-risk" defaultChecked />
+                             <Switch id="notif-sla-risk" checked={notificationPrefs.slaRisk} onCheckedChange={(checked) => setNotificationPrefs({...notificationPrefs, slaRisk: checked})} />
                         </div>
                          <div className="flex items-center justify-between p-4 border rounded-md">
                             <div>
                                 <Label htmlFor="notif-resolved" className="font-semibold">Ticket Resuelto</Label>
                                 <p className="text-sm text-muted-foreground">Notificar al solicitante cuando su ticket ha sido marcado como resuelto.</p>
                             </div>
-                            <Switch id="notif-resolved" />
+                            <Switch id="notif-resolved" checked={notificationPrefs.resolved} onCheckedChange={(checked) => setNotificationPrefs({...notificationPrefs, resolved: checked})} />
                         </div>
                     </div>
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button>Guardar Cambios</Button>
+                  <Button onClick={handleSystemSave} disabled={isUpdating}>
+                    {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Guardar Cambios
+                  </Button>
                 </CardFooter>
             </Card>
         </TabsContent>
