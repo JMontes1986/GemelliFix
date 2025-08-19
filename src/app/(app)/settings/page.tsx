@@ -17,6 +17,15 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
   Card,
   CardContent,
   CardDescription,
@@ -24,18 +33,131 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { PlusCircle } from 'lucide-react';
-import { users, technicians, zones, sites, categories } from '@/lib/data';
+import { PlusCircle, Loader2 } from 'lucide-react';
+import { technicians, zones, sites, categories } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { User } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
+    const [users, setUsers] = React.useState<User[]>([]);
+    const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
+    const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+    const [isUpdating, setIsUpdating] = React.useState(false);
+    const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
+    const { toast } = useToast();
+
+    React.useEffect(() => {
+        const q = collection(db, 'users');
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const fetchedUsers: User[] = [];
+            querySnapshot.forEach((doc) => {
+                fetchedUsers.push({ id: doc.id, ...doc.data() } as User);
+            });
+            setUsers(fetchedUsers);
+            setIsLoadingUsers(false);
+        }, (error) => {
+            console.error("Error fetching users:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los usuarios.' });
+            setIsLoadingUsers(false);
+        });
+
+        return () => unsubscribe();
+    }, [toast]);
+
+    const handleEditClick = (user: User) => {
+        setSelectedUser(user);
+        setIsEditDialogOpen(true);
+    };
+
+    const handleSaveChanges = async () => {
+        if (!selectedUser) return;
+        setIsUpdating(true);
+        const userDocRef = doc(db, 'users', selectedUser.id);
+        try {
+            await updateDoc(userDocRef, {
+                name: selectedUser.name,
+                role: selectedUser.role,
+            });
+            toast({ title: 'Usuario Actualizado', description: 'Los cambios se han guardado correctamente.' });
+            setIsEditDialogOpen(false);
+        } catch (error) {
+            console.error('Error updating user:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el usuario.' });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+
   return (
     <div className="space-y-6">
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Editar Usuario</DialogTitle>
+                <DialogDescription>
+                    Modifica la información del usuario. Haz clic en "Guardar Cambios" al terminar.
+                </DialogDescription>
+            </DialogHeader>
+            {selectedUser && (
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="name" className="text-right">Nombre</Label>
+                        <Input
+                            id="name"
+                            value={selectedUser.name}
+                            onChange={(e) => setSelectedUser({ ...selectedUser, name: e.target.value })}
+                            className="col-span-3"
+                        />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="email" className="text-right">Email</Label>
+                        <Input id="email" value={selectedUser.email} className="col-span-3" disabled />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="role" className="text-right">Rol</Label>
+                         <Select 
+                            value={selectedUser.role} 
+                            onValueChange={(value) => setSelectedUser({ ...selectedUser, role: value as User['role'] })}
+                         >
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Selecciona un rol" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Administrador">Administrador</SelectItem>
+                                <SelectItem value="Servicios Generales">Servicios Generales</SelectItem>
+                                <SelectItem value="Docentes">Docentes</SelectItem>
+                                <SelectItem value="Coordinadores">Coordinadores</SelectItem>
+                                <SelectItem value="Administrativos">Administrativos</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+            )}
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={handleSaveChanges} disabled={isUpdating}>
+                    {isUpdating && <Loader2 className="mr-2 animate-spin" />}
+                    Guardar Cambios
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div>
         <h1 className="text-2xl font-headline font-bold tracking-tight">Configuración General</h1>
         <p className="text-muted-foreground">
@@ -79,22 +201,30 @@ export default function SettingsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <Avatar>
-                          <AvatarImage src={user.avatar} alt={user.name} />
-                          <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                      </TableCell>
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
-                      <TableCell>
-                        <Button variant="outline" size="sm">Editar</Button>
-                      </TableCell>
+                  {isLoadingUsers ? (
+                     <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center">
+                           <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+                        </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    users.map((user) => (
+                        <TableRow key={user.id}>
+                        <TableCell>
+                            <Avatar>
+                            <AvatarImage src={user.avatar} alt={user.name} />
+                            <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                        </TableCell>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
+                        <TableCell>
+                            <Button variant="outline" size="sm" onClick={() => handleEditClick(user)}>Editar</Button>
+                        </TableCell>
+                        </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
