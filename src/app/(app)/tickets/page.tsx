@@ -292,9 +292,7 @@ export default function TicketsPage() {
   }, []);
 
   React.useEffect(() => {
-    if (!currentUser) return;
-    
-    if (currentUser.role === 'Administrador') {
+    if (currentUser?.role === 'Administrador') {
         const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
         const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
             const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
