@@ -29,6 +29,9 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import type { User as FirebaseAuthUser } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
+
 
 // Esquema de validación simple para el formulario de diagnóstico
 const diagnosisSchema = z.object({
@@ -42,7 +45,20 @@ export default function DiagnosisPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   const [executionResult, setExecutionResult] = React.useState<{status: string, message: string}>({ status: 'Pendiente', message: 'Aún no se ha intentado enviar el formulario.' });
+  const [currentUser, setCurrentUser] = React.useState<FirebaseAuthUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = React.useState(true);
   
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setIsAuthLoading(false);
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, []);
+
+
   const form = useForm<DiagnosisFormValues>({
     resolver: zodResolver(diagnosisSchema),
     defaultValues: {
@@ -52,7 +68,15 @@ export default function DiagnosisPage() {
   });
 
   const onSubmit = async (data: DiagnosisFormValues) => {
-    const currentUser = auth.currentUser;
+    if (isAuthLoading) {
+       toast({
+            variant: 'destructive',
+            title: 'Un momento...',
+            description: 'Verificando estado de autenticación.',
+        });
+        return;
+    }
+
     if (!currentUser) {
         const errorMsg = 'Error de Autenticación: Debes iniciar sesión para enviar un diagnóstico.';
         toast({
@@ -140,11 +164,13 @@ export default function DiagnosisPage() {
               />
             </CardContent>
             <CardFooter className="flex-col items-start gap-4">
-              <Button type="submit" disabled={isLoading}>
-                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                 Guardar en Firestore
+              <Button type="submit" disabled={isLoading || isAuthLoading}>
+                 {(isLoading || isAuthLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                 {isAuthLoading ? 'Verificando Auth...' : 'Guardar en Firestore'}
               </Button>
-               <Alert variant={executionResult.status === 'Error' ? 'destructive' : 'default'}>
+               <Alert variant={executionResult.status === 'Error' ? 'destructive' : (executionResult.status === 'Éxito' ? 'default' : 'default')}
+                 className={executionResult.status === 'Éxito' ? 'border-green-500' : ''}
+               >
                     <AlertTitle className="font-headline">Resultado de Ejecución: {executionResult.status}</AlertTitle>
                     <AlertDescription className="font-mono text-xs">
                         {executionResult.message}
