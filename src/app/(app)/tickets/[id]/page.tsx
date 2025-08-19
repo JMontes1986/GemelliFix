@@ -95,8 +95,7 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
 // Hardcoded current user for permission checking
 const currentUser = users[0];
 
-export default function TicketDetailPage({ params }: { params: { id: string } }) {
-  const { id: ticketId } = params;
+export default function TicketDetailPage({ params: { id: ticketId } }: { params: { id: string } }) {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
