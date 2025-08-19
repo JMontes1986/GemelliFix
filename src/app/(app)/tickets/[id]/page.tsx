@@ -140,6 +140,7 @@ export default function TicketDetailPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [technicians, setTechnicians] = useState<CurrentUser[]>([]);
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
+  const [comment, setComment] = useState("");
 
 
   useEffect(() => {
@@ -251,6 +252,16 @@ export default function TicketDetailPage() {
 
   const handleUpdate = async (field: keyof Ticket, value: any, newEvidence: Attachment[] = []) => {
     if (!ticket || !currentUser) return;
+
+    if (field === 'status' && ticket.status !== value && value !== 'Asignado' && !comment.trim()) {
+        toast({
+            variant: "destructive",
+            title: "Comentario Requerido",
+            description: "Debes agregar un comentario de progreso para cambiar el estado.",
+        });
+        return;
+    }
+
     setIsUpdating(true);
     const docRef = doc(db, "tickets", ticket.id);
     const oldValue = ticket[field];
@@ -466,8 +477,8 @@ export default function TicketDetailPage() {
                                     <SelectItem value="Abierto">Abierto</SelectItem>
                                     <SelectItem value="Asignado">Asignado</SelectItem>
                                     <SelectItem value="En Progreso">En Progreso</SelectItem>
-                                    {(isAssignedToCurrentUser || canEdit) && <SelectItem value="Resuelto">Resuelto</SelectItem>}
-                                    {(isRequester || canEdit) && <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>}
+                                    <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>
+                                    <SelectItem value="Resuelto">Resuelto</SelectItem>
                                     <SelectItem value="Cancelado">Cancelado</SelectItem>
                                     <SelectItem value="Cerrado">Cerrado</SelectItem>
                                 </SelectContent>
@@ -609,7 +620,7 @@ export default function TicketDetailPage() {
           </CardContent>
           {canEdit && (
             <CardFooter>
-                <AiSuggestion 
+                 <AiSuggestion 
                     ticket={ticket} 
                     technicians={technicians}
                     onAssign={handleAssignPersonnel}
@@ -628,7 +639,7 @@ export default function TicketDetailPage() {
                     <div className="space-y-4">
                          <div>
                             <label htmlFor="comment" className="text-sm font-medium">Agregar Comentario</label>
-                            <textarea id="comment" placeholder="Describe el trabajo realizado..." className="mt-1 block w-full rounded-md border-input bg-background p-2 text-sm shadow-sm focus:border-ring focus:ring focus:ring-ring focus:ring-opacity-50"></textarea>
+                            <textarea id="comment" placeholder="Describe el trabajo realizado..." className="mt-1 block w-full rounded-md border-input bg-background p-2 text-sm shadow-sm focus:border-ring focus:ring focus:ring-ring focus:ring-opacity-50" value={comment} onChange={(e) => setComment(e.target.value)}></textarea>
                         </div>
                         <div>
                             <label className="text-sm font-medium">Adjuntar Evidencia</label>
