@@ -286,7 +286,7 @@ export default function DiagnosisPage() {
                       </div>
                        <div>
                           <h4 className="font-semibold text-primary">Pasos Sugeridos</h4>
-                          <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: aiDiagnosis.suggestedSteps.replace(/\n/g, '<br />') }} />
+                          <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: aiDiagnosis.suggestedSteps.replace(/\\n/g, '<br />') }} />
                       </div>
                   </div>
               ) : (
