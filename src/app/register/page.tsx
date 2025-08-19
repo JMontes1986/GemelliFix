@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -48,8 +48,12 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
+      // Actualizar el perfil de Firebase Auth con el nombre
+      await updateProfile(user, { displayName: name });
+
       // Guardar información adicional en Firestore, usando el UID como ID del documento.
       await setDoc(doc(db, 'users', user.uid), {
+        id: user.uid, // Usamos el uid como id para consistencia
         uid: user.uid,
         name: name,
         email: email,
@@ -126,6 +130,7 @@ export default function RegisterPage() {
                         <SelectValue placeholder="Selecciona un rol" />
                     </SelectTrigger>
                     <SelectContent>
+                        <SelectItem value="Administrador">Administrador</SelectItem>
                         <SelectItem value="Servicios Generales">Servicios Generales</SelectItem>
                         <SelectItem value="Docentes">Docentes</SelectItem>
                         <SelectItem value="Coordinadores">Coordinadores</SelectItem>
@@ -139,14 +144,14 @@ export default function RegisterPage() {
                   id="password" 
                   type="password" 
                   required 
-                  pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}"
-                  title="Debe contener al menos un número, una mayúscula, una minúscula, y al menos 8 o más caracteres"
+                  pattern=".{6,}"
+                  title="Debe tener al menos 6 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
                 />
                  <p className="text-xs text-muted-foreground">
-                    Mínimo 8 caracteres, con mayúsculas, minúsculas y números.
+                    Mínimo 6 caracteres.
                 </p>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
