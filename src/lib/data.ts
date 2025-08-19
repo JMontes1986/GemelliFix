@@ -3,7 +3,7 @@ import type { Zone, Site, Technician, Ticket, Notification, User, ScheduleEvent,
 
 export const users: User[] = [
   { id: 'user-1', name: 'Admin User', email: 'admin@gemelli.edu.co', avatar: 'https://firebasestorage.googleapis.com/v0/b/gemellifix.firebasestorage.app/o/Logo.png?alt=media&token=3c91d664-c1d3-43b0-b81f-2b21a7cf2c05', role: 'Administrador' },
-  { id: 'user-2', name: 'Tech User', email: 'tech@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Servicios Generales' },
+  { id: 'user-2', name: 'Mantenimiento User', email: 'mantenimiento@colgemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Servicios Generales' },
   { id: 'user-3', name: 'Requester User', email: 'requester@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Docentes' },
 ];
 

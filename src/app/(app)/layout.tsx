@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Bell,
   Calendar,
@@ -17,7 +17,11 @@ import {
   Wrench,
   PlusCircle,
   HeartPulse,
+  Loader2,
 } from 'lucide-react';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 
 import {
   SidebarProvider,
@@ -41,7 +45,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { users } from '@/lib/data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Tooltip,
@@ -49,23 +52,54 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import type { User } from '@/lib/types';
 
-// Assuming we have a way to get the current user. For now, we'll hardcode it.
-const currentUser = users[0]; // Admin User
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isMounted, setIsMounted] = React.useState(false);
-  
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = React.useState(true);
+
   React.useEffect(() => {
     setIsMounted(true);
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        if (firebaseUser) {
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+                setCurrentUser(userDocSnap.data() as User);
+            } else {
+                // Handle case where user exists in Auth but not in Firestore
+                console.warn("User data not found in Firestore, redirecting to login.");
+                router.push('/login');
+            }
+        } else {
+            router.push('/login');
+        }
+        setIsLoadingUser(false);
+    });
 
-  const isActive = (path: string) => pathname === path || (path.startsWith(pathname) && pathname !== '/');
+    return () => unsubscribe();
+  }, [router]);
   
-  // Only render FAB if mounted and not on the create ticket page
+  const isActive = (path: string) => pathname === path;
   const showFab = isMounted && pathname !== '/tickets/create';
 
+  if (isLoadingUser) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
+
+  if (!currentUser) {
+    // This case should be handled by the redirect in onAuthStateChanged,
+    // but as a fallback, we can return null or a loading state.
+    return null;
+  }
 
   return (
     <SidebarProvider>
