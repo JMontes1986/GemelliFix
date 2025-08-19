@@ -30,9 +30,10 @@ interface AiSuggestionProps {
     ticket: Ticket;
     technicians: User[];
     onAssign: (technician: User[]) => void;
+    isAssigned: boolean;
 }
 
-export default function AiSuggestion({ ticket, technicians, onAssign }: AiSuggestionProps) {
+export default function AiSuggestion({ ticket, technicians, onAssign, isAssigned }: AiSuggestionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestTechnicianAssignmentOutput | null>(null);
@@ -87,13 +88,15 @@ export default function AiSuggestion({ ticket, technicians, onAssign }: AiSugges
     }
   }
 
+  const buttonText = isAssigned ? "Cambiar Asignación" : "Asignar Personal con IA";
+
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="default" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={handleOpenDialog}>
           <Sparkles className="mr-2 h-4 w-4" />
-          Asignar / Reasignar con IA
+          {buttonText}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">

@@ -137,17 +137,21 @@ export default function TicketDetailPage() {
 
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const techData: CurrentUser[] = [];
+    const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+    const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
+        const fetchedTechnicians: CurrentUser[] = [];
         querySnapshot.forEach((doc) => {
-            techData.push({ id: doc.id, ...doc.data() } as CurrentUser);
+            fetchedTechnicians.push({ id: doc.id, ...doc.data() } as CurrentUser);
         });
-        setTechnicians(techData);
+        setTechnicians(fetchedTechnicians);
+    }, (error) => {
+        console.error("Error fetching technicians:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => unsubscribe_technicians();
+  }, [toast]);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -528,11 +532,12 @@ export default function TicketDetailPage() {
           </CardContent>
           {canEdit && (
             <CardFooter>
-               <AiSuggestion 
-                ticket={ticket} 
-                technicians={technicians}
-                onAssign={handleAssignPersonnel} 
-              />
+                <AiSuggestion 
+                    ticket={ticket} 
+                    technicians={technicians}
+                    onAssign={handleAssignPersonnel}
+                    isAssigned={assignedPersonnelDetails.length > 0}
+                />
             </CardFooter>
           )}
         </Card>
