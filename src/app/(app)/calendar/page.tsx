@@ -409,17 +409,12 @@ export default function CalendarPage() {
         return date;
     });
 
-    const eventsByTechnicianAndDay: Record<string, Record<string, ScheduleEvent[]>> = techniciansToDisplay.reduce((acc, tech) => {
-        acc[tech.id] = {};
-        weekDates.forEach(date => {
-            const dateString = date.toDateString();
-            acc[tech.id][dateString] = events.filter(e => {
-                const eventDate = new Date(e.start);
-                return e.technicianId === tech.id && eventDate.toDateString() === dateString;
-            });
+    const eventsByTechnicianAndDay = (technicianId: string, day: Date) => {
+        return events.filter(e => {
+            const eventDate = new Date(e.start);
+            return e.technicianId === technicianId && eventDate.toDateString() === day.toDateString();
         });
-        return acc;
-    }, {} as Record<string, Record<string, ScheduleEvent[]>>);
+    };
 
   if (isLoadingData) {
     return (
@@ -588,9 +583,11 @@ export default function CalendarPage() {
                  {weekDates.map((date, dayIndex) => (
                     <div key={date.toDateString()} className={`relative ${dayIndex < weekDates.length - 1 ? 'border-r' : ''}`}>
                          {/* Background Hour Lines */}
-                         {hours.map((hour, hourIndex) => (
-                            <div key={`${date.toDateString()}-${hour}`} className={`h-16 ${hourIndex < hours.length - 1 ? 'border-b' : ''}`} />
-                         ))}
+                         <div className="absolute inset-0">
+                            {hours.map((_, hourIndex) => (
+                                <div key={hourIndex} className={`h-16 ${hourIndex < hours.length - 1 ? 'border-b' : ''}`} />
+                            ))}
+                         </div>
 
                          {/* Drop-target and Event Overlay */}
                          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${techniciansToDisplay.length}, 1fr)`}}>
@@ -608,7 +605,7 @@ export default function CalendarPage() {
                                     }}
                                 >
                                     {/* Events for this technician on this day */}
-                                    {(eventsByTechnicianAndDay[tech.id]?.[date.toDateString()] || []).map(event => (
+                                    {eventsByTechnicianAndDay(tech.id, date).map(event => (
                                         <EventCard key={event.id} event={event} />
                                     ))}
                                 </div>
@@ -623,5 +620,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-
-    
