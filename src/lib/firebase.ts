@@ -32,18 +32,18 @@ import { getStorage } from "firebase/storage";
 
 
 // Your web app's Firebase configuration
-// This configuration points to a known-good Firebase project to ensure correctness.
 const firebaseConfig = {
-  "projectId": "gemellifix",
-  "appId": "1:431414897003:web:12ca75d6bd98572a50c42e",
-  "storageBucket": "gemellifix.appspot.com",
-  "apiKey": "AIzaSyD-L4zCQfaMSuPAEL0SxisLXujSiKBJBJE",
-  "authDomain": "gemellifix.firebaseapp.com",
-  "messagingSenderId": "431414897003"
+  apiKey: "AIzaSyD-L4zCQfaMSuPAEL0SxisLXujSiKBJBJE",
+  authDomain: "gemellifix.firebaseapp.com",
+  projectId: "gemellifix",
+  storageBucket: "gemellifix.firebasestorage.app",
+  messagingSenderId: "431414897003",
+  appId: "1:431414897003:web:12ca75d6bd98572a50c42e"
 };
 
 
 // Initialize Firebase
+// This pattern prevents re-initializing the app on hot-reloads in Next.js
 let app;
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
