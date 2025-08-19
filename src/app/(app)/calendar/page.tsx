@@ -246,11 +246,12 @@ export default function CalendarPage() {
         const unsubscribeEvents = onSnapshot(q, (snapshot) => {
             const fetchedEvents = snapshot.docs.map(doc => {
                 const data = doc.data();
+                // Ensure dates are in a consistent, readable format for the component
                 return {
                     id: doc.id,
                     ...data,
-                    start: data.start,
-                    end: data.end,
+                    start: new Date(data.start).toISOString(),
+                    end: new Date(data.end).toISOString(),
                 } as ScheduleEvent;
             });
             setEvents(fetchedEvents);
@@ -622,3 +623,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
