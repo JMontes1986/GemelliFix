@@ -2,16 +2,40 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Rules for ticket attachments and evidence
-    // Allow any authenticated user to upload attachments and evidence
-    match /{folder}/{ticketId}/{fileName}
-      where folder == 'ticket-attachments' || folder == 'ticket-evidence' {
-      allow read, write: if request.auth != null;
+
+    // Reglas para los ARCHIVOS ADJUNTOS subidos al crear un ticket.
+    match /ticket-attachments/{fileName} {
+      // PERMITIR ESCRITURA (CREATE)
+      // 1. El usuario debe estar autenticado.
+      // 2. El tamaño del archivo debe ser menor a 5MB.
+      // 3. El tipo de archivo debe ser una imagen o un PDF.
+      allow create: if request.auth != null &&
+                       request.resource.size < 5 * 1024 * 1024 &&
+                       (request.resource.contentType.matches('image/.*') || request.resource.contentType.matches('application/pdf'));
+
+      // PERMITIR LECTURA (GET)
+      // La seguridad real se basa en que las URLs de descarga solo son conocidas
+      // por aquellos con acceso al documento del ticket en Firestore.
+      allow get: if request.auth != null;
+
+      // No permitir actualizaciones o eliminaciones.
+      allow update, delete: if false;
     }
 
-     // Public read for the logo
-    match /Logo.png {
-      allow read;
+    // Reglas para los archivos de EVIDENCIA subidos al resolver un ticket.
+    match /ticket-evidence/{ticketId}/{fileName} {
+      // PERMITIR ESCRITURA (CREATE)
+      // Mismas condiciones que los adjuntos: usuario autenticado, tamaño y tipo de archivo.
+       allow create: if request.auth != null &&
+                       request.resource.size < 5 * 1024 * 1024 &&
+                       (request.resource.contentType.matches('image/.*') || request.resource.contentType.matches('application/pdf'));
+
+      // PERMITIR LECTURA (GET)
+      // Permitir la lectura a cualquier usuario autenticado.
+      allow get: if request.auth != null;
+
+      // No permitir actualizaciones o eliminaciones.
+      allow update, delete: if false;
     }
   }
 }
