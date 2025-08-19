@@ -45,9 +45,6 @@ import Image from 'next/image';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged } from 'firebase/auth';
 import { createLog } from '@/lib/utils';
@@ -131,28 +128,23 @@ export default function TicketDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
-  const [isAssignPopoverOpen, setAssignPopoverOpen] = useState(false);
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [technicians, setTechnicians] = useState<CurrentUser[]>([]);
 
 
-  useEffect(() => {
-    const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-    const unsubscribe = onSnapshot(techQuery, (querySnapshot) => {
-        const techData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CurrentUser));
-        setTechnicians(techData);
-    }, (error) => {
-        console.error("Error fetching technicians: ", error);
-        toast({
-            variant: "destructive",
-            title: "Error al Cargar Personal",
-            description: "No se pudo obtener la lista de personal de servicios generales.",
+   useEffect(() => {
+    const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const techData: CurrentUser[] = [];
+        querySnapshot.forEach((doc) => {
+            techData.push({ id: doc.id, ...doc.data() } as CurrentUser);
         });
+        setTechnicians(techData);
     });
+
     return () => unsubscribe();
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -166,12 +158,6 @@ export default function TicketDetailPage() {
     });
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (ticket?.assignedToIds) {
-        setSelectedPersonnelIds(ticket.assignedToIds);
-    }
-  }, [ticket]);
 
   useEffect(() => {
     if (!ticketId) {
@@ -289,47 +275,6 @@ export default function TicketDetailPage() {
         title: "Personal Asignado",
         description: `El ticket ha sido actualizado y se ha notificado al personal.`,
     });
-  }
-
-  const handleApplyPersonnelChange = async () => {
-    if (!ticket || !currentUser) return;
-
-    const oldValue = ticket.assignedTo || [];
-
-    setIsUpdating(true);
-    setAssignPopoverOpen(false);
-    const docRef = doc(db, "tickets", ticket.id);
-    
-    const selectedPersonnelDetails = technicians.filter(t => selectedPersonnelIds.includes(t.id));
-    const selectedPersonnelNames = selectedPersonnelDetails.map(t => t.name);
-    
-    try {
-      await updateDoc(docRef, { 
-          assignedToIds: selectedPersonnelIds,
-          assignedTo: selectedPersonnelNames,
-          status: selectedPersonnelIds.length > 0 ? 'Asignado' : 'Abierto'
-      });
-
-      await createLog(currentUser, 'update_assignment', { ticket, oldValue, newValue: selectedPersonnelNames });
-
-      if (selectedPersonnelIds.length > 0) {
-        await createNotification(ticket, selectedPersonnelIds);
-      }
-
-      toast({
-        title: "Personal Actualizado",
-        description: `Se ha actualizado la asignación del ticket y notificado al personal.`,
-      });
-    } catch (error: any) {
-      console.error("Error updating assignment: ", error);
-      toast({
-        variant: "destructive",
-        title: "Error al Asignar",
-        description: `No se pudo actualizar la asignación. ${error.message}`,
-      });
-    } finally {
-      setIsUpdating(false);
-    }
   }
 
   const handleApproval = async (approve: boolean) => {
@@ -579,53 +524,13 @@ export default function TicketDetailPage() {
             )}
           </CardContent>
           {canEdit && (
-            <CardFooter className="flex-col items-stretch space-y-2">
-                <Popover open={isAssignPopoverOpen} onOpenChange={setAssignPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" disabled={isUpdating}>
-                         {assignedPersonnelDetails.length > 0 ? 'Reasignar Personal' : 'Asignar Personal'}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80">
-                        <div className="grid gap-4">
-                            <div className="space-y-2">
-                                <h4 className="font-medium leading-none">Asignar Personal</h4>
-                                <p className="text-sm text-muted-foreground">
-                                    Selecciona una o más personas para este ticket.
-                                </p>
-                            </div>
-                            <div className="grid gap-2 max-h-64 overflow-y-auto">
-                                {technicians.map(tech => (
-                                    <div key={tech.id} className="flex items-center space-x-2">
-                                        <Checkbox 
-                                            id={`tech-${tech.id}`}
-                                            checked={selectedPersonnelIds.includes(tech.id)}
-                                            onCheckedChange={(checked) => {
-                                                setSelectedPersonnelIds(prev => 
-                                                    checked 
-                                                        ? [...prev, tech.id]
-                                                        : prev.filter(id => id !== tech.id)
-                                                );
-                                            }}
-                                        />
-                                        <Label htmlFor={`tech-${tech.id}`} className="flex items-center gap-2 font-normal">
-                                             <Avatar className="h-8 w-8">
-                                                <AvatarImage src={tech.avatar} />
-                                                <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            {tech.name}
-                                        </Label>
-                                    </div>
-                                ))}
-                            </div>
-                            <Button onClick={handleApplyPersonnelChange} disabled={isUpdating}>
-                                {isUpdating ? <Loader2 className="animate-spin" /> : 'Aplicar Cambios'}
-                            </Button>
-                        </div>
-                    </PopoverContent>
-                </Popover>
-
-              <AiSuggestion ticket={ticket} technicians={technicians} onAssign={(tech) => handleAssignPersonnel([tech])} />
+            <CardFooter>
+               <AiSuggestion 
+                ticket={ticket} 
+                technicians={technicians}
+                assignedPersonnelDetails={assignedPersonnelDetails}
+                onAssign={handleAssignPersonnel} 
+              />
             </CardFooter>
           )}
         </Card>
