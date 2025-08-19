@@ -166,7 +166,7 @@ export default function CreateTicketPage() {
 
   function removeFile(indexToRemove: number) {
     const currentFiles = form.getValues('attachments') || [];
-    const newFiles = currentFiles.filter((_: any, index: number) => index !== indexToRemove);
+    const newFiles = currentFiles.filter((_:any, index: number) => index !== indexToRemove);
     form.setValue('attachments', newFiles, { shouldValidate: true });
   }
 
@@ -410,3 +410,5 @@ export default function CreateTicketPage() {
     </div>
   );
 }
+
+    
