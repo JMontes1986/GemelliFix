@@ -3,94 +3,66 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // =============================================================
+    
     // Helper Functions
-    // =============================================================
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isUser(userId) {
+    function isOwner(userId) {
       return request.auth.uid == userId;
     }
     
-    function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
-    }
-
-    function isUserInRole(role) {
-      return isSignedIn() && getUserData(request.auth.uid).role == role;
+    function hasRole(role) {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
     
-    function isUserInAnyRole(roles) {
-      return isSignedIn() && getUserData(request.auth.uid).role in roles;
+    function isAdmin() {
+        return hasRole('Administrador');
+    }
+    
+    function isAssignedTo(ticketId) {
+      return request.auth.uid in get(/databases/$(database)/documents/tickets/$(ticketId)).data.assignedToIds;
     }
 
-
-    // =============================================================
-    // Collection: users
-    // =============================================================
+    // Rules for 'users' collection
     match /users/{userId} {
-      // cualquiera puede leer perfiles de usuario (para listas, etc.)
       allow read: if isSignedIn();
-      // solo el admin puede crear usuarios (registro se maneja en el backend)
-      allow create: if isUserInRole('Administrador');
-      // el propio usuario o un admin puede actualizar su perfil
-      allow update: if isUser(userId) || isUserInRole('Administrador');
-      // solo un admin puede borrar usuarios
-      allow delete: if isUserInRole('Administrador');
+      allow create: if isSignedIn();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
-    // =============================================================
-    // Collection: tickets
-    // =============================================================
+    // Rules for 'tickets' collection
     match /tickets/{ticketId} {
-      // cualquiera autenticado puede crear un ticket
+      allow get, list: if isSignedIn() && (
+                          request.auth.uid == resource.data.requesterId || 
+                          request.auth.uid in resource.data.assignedToIds ||
+                          isAdmin()
+                        );
       allow create: if isSignedIn();
-      
-      // se puede leer si eres admin, el creador, o estás asignado
-      allow read: if isSignedIn() && 
-                    (isUserInRole('Administrador') || 
-                     resource.data.requesterId == request.auth.uid ||
-                     request.auth.uid in resource.data.assignedToIds);
-
-      // se puede actualizar si eres admin o estás asignado
-      allow update: if isSignedIn() && 
-                      (isUserInRole('Administrador') || 
-                       request.auth.uid in resource.data.assignedToIds);
-
-      allow delete: if isUserInRole('Administrador');
+      allow update: if isSignedIn() && (isAdmin() || isAssignedTo(ticketId));
+      allow delete: if isAdmin();
     }
 
-    // =============================================================
-    // Collection: notifications
-    // =============================================================
+    // Rules for 'notifications' collection
     match /notifications/{notificationId} {
-        // Solo el backend puede crear notificaciones
-        allow create: if isUserInRole('Administrador'); 
-        // Solo el usuario destinatario puede leer y marcar como leída su notificación
-        allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
-        allow delete: if isUserInRole('Administrador');
+      allow read, update: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow create: if isSignedIn(); // Can be created by server-side logic (functions) or other users
+      allow delete: if isAdmin();
     }
-
-    // =============================================================
-    // Collection: logs & diagnosis_logs
-    // =============================================================
+    
+    // Rules for 'logs' and 'diagnosis_logs' collections
     match /logs/{logId} {
-      // Los logs son de solo escritura desde el cliente (a través del backend)
-      // y de solo lectura para administradores.
-      allow create: if isSignedIn();
-      allow read, list: if isUserInRole('Administrador');
-      allow update, delete: if false; // Inmutables
+        allow read: if isAdmin();
+        allow create: if isSignedIn();
+        allow update, delete: if false;
     }
 
     match /diagnosis_logs/{logId} {
-      // Cualquiera autenticado puede escribir para probar conexión.
-      allow create: if isSignedIn();
-      // Solo admins pueden leer los logs
-      allow read: if isUserInRole('Administrador');
-      allow update, delete: if false;
+        allow read, create: if isSignedIn();
+        allow update, delete: if false;
     }
+
   }
 }
