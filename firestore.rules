@@ -4,105 +4,77 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =============================================================
-    // Reglas para la colección 'users'
-    // =============================================================
+    // == Funciones de ayuda reutilizables ==
+
+    // Devuelve verdadero si el usuario que realiza la solicitud tiene el rol especificado.
+    function isUserInRole(role) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    // Devuelve verdadero si el usuario que realiza la solicitud es el creador del ticket.
+    function isOwner(docData) {
+        return request.auth.uid == docData.requesterId;
+    }
+
+    // Devuelve verdadero si el usuario que realiza la solicitud está en la lista de asignados del ticket.
+    function isAssigned(docData) {
+        return request.auth.uid in docData.assignedToIds;
+    }
+
+    // == Reglas para la colección 'users' ==
     match /users/{userId} {
-      // PERMITIR LECTURA (GET):
-      // Cualquier usuario autenticado puede leer la información de perfil de otros
-      // usuarios (necesario para ver nombres, avatares, etc.).
-      allow get: if request.auth != null;
-
-      // PERMITIR CREACIÓN (CREATE):
-      // Un usuario puede crear su propio documento de perfil si el ID del documento
-      // coincide con su UID de autenticación.
-      allow create: if request.auth != null && request.auth.uid == userId;
-
-      // PERMITIR ACTUALIZACIÓN (UPDATE):
-      // Un usuario puede actualizar su propio perfil.
-      // Un 'Administrador' puede actualizar el perfil de cualquier usuario (ej: para cambiar roles).
-      allow update: if request.auth != null && (
-        request.auth.uid == userId ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador'
-      );
-
-      // No permitir eliminación de usuarios desde el cliente por seguridad.
-      allow delete: if false;
+      // Cualquiera puede leer perfiles de usuario (para ver nombres, avatares, etc.).
+      allow read: if request.auth != null;
+      // Un usuario solo puede editar su propio perfil.
+      allow write: if request.auth.uid == userId;
     }
 
-    // =============================================================
-    // Reglas para la colección 'tickets'
-    // =============================================================
+    // == Reglas para la colección 'tickets' ==
     match /tickets/{ticketId} {
-      // PERMITIR CREACIÓN (CREATE):
-      // Cualquier usuario autenticado puede crear un nuevo ticket, siempre que
-      // el 'requesterId' en el documento sea su propio UID.
-      allow create: if request.auth != null && request.resource.data.requesterId == request.auth.uid;
+      // Cualquier usuario autenticado puede crear un ticket.
+      allow create: if request.auth != null;
 
-      // PERMITIR LECTURA (GET):
-      // La lectura se permite si:
-      // 1. El usuario es un 'Administrador'.
-      // 2. El ticket está asignado al usuario ('Servicios Generales').
-      // 3. El usuario es el que creó el ticket.
-      allow get: if request.auth != null && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador' ||
-        request.auth.uid in resource.data.assignedToIds ||
-        request.auth.uid == resource.data.requesterId
-      );
+      // Solo los administradores pueden listar todos los tickets.
+      allow list: if isUserInRole('Administrador');
 
-      // PERMITIR ACTUALIZACIÓN (UPDATE):
-      // La actualización se permite si:
-      // 1. El usuario es un 'Administrador'.
-      // 2. El ticket está asignado al usuario ('Servicios Generales').
-      allow update: if request.auth != null && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador' ||
-        request.auth.uid in resource.data.assignedToIds
-      );
+      // Se puede leer un ticket si eres el dueño, estás asignado o eres administrador.
+      allow read: if request.auth != null && 
+                  (isOwner(resource.data) || isAssigned(resource.data) || isUserInRole('Administrador'));
+      
+      // Se puede actualizar un ticket si eres el dueño (con limitaciones), estás asignado o eres administrador.
+      allow update: if request.auth != null && 
+                     (isAssigned(resource.data) || isUserInRole('Administrador'));
 
-      // No permitir eliminación de tickets desde el cliente por seguridad.
-      allow delete: if false;
+      // Nadie puede eliminar tickets para mantener la integridad del historial.
+      allow delete: if false; 
     }
 
-    // =============================================================
-    // Reglas para la colección 'notifications'
-    // =============================================================
+    // == Reglas para la colección 'notifications' ==
     match /notifications/{notificationId} {
-      // PERMITIR LECTURA (GET):
-      // Un usuario solo puede leer las notificaciones que le pertenecen.
-      allow get: if request.auth != null && request.auth.uid == resource.data.userId;
-
-      // PERMITIR ACTUALIZACIÓN (UPDATE):
-      // Un usuario puede actualizar sus propias notificaciones (ej: marcarlas como leídas).
-      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
-
-      // La creación se gestiona desde el backend (o funciones seguras), no directamente desde el cliente.
-      // Sin embargo, para este proyecto, la creación se realiza desde flujos que se ejecutan en el servidor de Next.js
-      // que actúa en nombre del usuario autenticado, por lo que es seguro permitir la creación aquí.
-      allow create: if request.auth != null;
+        // Un usuario solo puede leer sus propias notificaciones.
+        allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+        // El sistema crea notificaciones, por lo que se permite la escritura a usuarios autenticados.
+        allow create: if request.auth != null;
+        // Un usuario puede actualizar (marcar como leída) su propia notificación.
+        allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+        // No se permite eliminar notificaciones.
+        allow delete: if false;
     }
 
-    // =============================================================
-    // Reglas para la colección 'logs'
-    // =============================================================
+    // == Reglas para la colección 'logs' ==
     match /logs/{logId} {
-      // PERMITIR CREACIÓN (CREATE):
-      // Cualquier usuario autenticado puede escribir en la colección de logs.
-      allow create: if request.auth != null;
-
-      // PERMITIR LECTURA (GET):
-      // Solo los administradores pueden leer todos los logs de auditoría.
-      allow list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
-      allow get: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
+        // El sistema crea logs en nombre de los usuarios.
+        allow create: if request.auth != null;
+        // Solo los administradores pueden leer, actualizar o borrar logs.
+        allow read, update, delete: if isUserInRole('Administrador');
     }
 
-    // =============================================================
-    // Reglas para la colección de diagnóstico
-    // =============================================================
-    match /diagnosis_logs/{docId} {
-        // Cualquiera que esté autenticado puede escribir en esta colección
-        // para la prueba de diagnóstico.
-        allow read, write: if request.auth != null;
+    // == Reglas para la colección de diagnóstico ==
+    match /diagnosis_logs/{logId} {
+        // La prueba de diagnóstico puede ser creada por cualquier usuario autenticado.
+        allow create: if request.auth != null;
+        // Solo los administradores pueden ver los resultados de los diagnósticos.
+        allow read, update, delete: if isUserInRole('Administrador');
     }
-
   }
 }
