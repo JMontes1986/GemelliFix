@@ -234,6 +234,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 p-4 sm:px-6 sm:py-0 space-y-4">
           {children}
         </main>
+         {showFab && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href="/tickets/create">
+                  <Button
+                    className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-lg z-50"
+                  >
+                    <PlusCircle className="h-8 w-8" />
+                    <span className="sr-only">Crear Nuevo Ticket</span>
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                Crear Nuevo Ticket
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </SidebarInset>
     </SidebarProvider>
   );
