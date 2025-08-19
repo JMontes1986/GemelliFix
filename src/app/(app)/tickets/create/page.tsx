@@ -36,7 +36,6 @@ import { zones, sites, categories } from '@/lib/data';
 import { db, storage, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { onAuthStateChanged } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud, File as FileIcon, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -55,13 +54,12 @@ const ticketSchema = z.object({
   attachments: z.any().optional()
 });
 
-type TicketFormValues = z.infer<typeof ticketSchema>;
+type TicketFormValues = z.infer<typeof ticketSchema>
 
 export default function CreateTicketPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
-  const [isAuthReady, setIsAuthReady] = React.useState(false);
   
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketSchema),
@@ -75,13 +73,6 @@ export default function CreateTicketPage() {
       attachments: [],
     },
   });
-
-  React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-        setIsAuthReady(true);
-    });
-    return () => unsubscribe();
-  }, []);
 
   const attachedFiles = form.watch('attachments') || [];
   const selectedZoneId = form.watch('zoneId');
@@ -407,9 +398,9 @@ export default function CreateTicketPage() {
               </Alert>
 
               <div className="flex justify-end pt-4">
-                <Button type="submit" disabled={isLoading || !isAuthReady}>
+                <Button type="submit" disabled={isLoading}>
                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                   {!isAuthReady && !isLoading ? 'Verificando...' : 'Enviar Solicitud'}
+                   Enviar Solicitud
                 </Button>
               </div>
             </form>
