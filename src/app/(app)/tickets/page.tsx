@@ -80,8 +80,8 @@ const getStatusBadgeVariant = (status: Ticket['status']) => {
 const getStatusBadgeClassName = (status: Ticket['status']) => {
     switch (status) {
       case 'Asignado': return 'bg-blue-500 text-white';
-      case 'En Progreso': return 'bg-yellow-500 text-black';
       case 'Requiere Aprobación': return 'bg-purple-500 text-white';
+      case 'En Progreso': return 'bg-yellow-500 text-black';
       case 'Resuelto': return 'bg-green-600 text-white';
       case 'Cancelado': return 'bg-gray-400 text-black';
       default: return '';
@@ -285,24 +285,32 @@ export default function TicketsPage() {
             }
         } else {
             setIsLoading(false);
+            setError("No hay un usuario autenticado.");
         }
     });
     return () => unsubscribeAuth();
   }, []);
 
   React.useEffect(() => {
-    if (!currentUser) {
-        if (!auth.currentUser) setIsLoading(false);
-        return;
-    }
-
+    if (!currentUser) return;
+    
     if (currentUser.role === 'Administrador') {
         const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
         const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
             const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
             setTechnicians(techData);
+        }, (err) => {
+            console.error("Error fetching technicians: ", err);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
         });
-        // Remember to unsubscribe
+        return () => unsubscribeTechs();
+    }
+  }, [currentUser, toast]);
+
+  React.useEffect(() => {
+    if (!currentUser) {
+        setIsLoading(false);
+        return;
     }
     
     let q;
