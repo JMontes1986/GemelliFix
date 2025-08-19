@@ -1,11 +1,11 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, getDoc } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, getDoc, arrayUnion } from 'firebase/firestore';
+import { db, auth, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   Card,
   CardContent,
@@ -38,8 +38,10 @@ import {
   Users,
   Download,
   Sparkles,
+  UploadCloud,
+  X as XIcon,
 } from 'lucide-react';
-import type { Ticket, User as CurrentUser } from '@/lib/types';
+import type { Ticket, User as CurrentUser, Attachment } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AiSuggestion from './components/ai-suggestion';
 import AiStateSuggestion from './components/ai-state-suggestion';
@@ -54,6 +56,9 @@ import Link from 'next/link';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import PdfViewer from '@/components/ui/pdf-viewer';
 import { cn } from '@/lib/utils';
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
 
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
@@ -134,6 +139,7 @@ export default function TicketDetailPage() {
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [technicians, setTechnicians] = useState<CurrentUser[]>([]);
+  const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
 
 
   useEffect(() => {
@@ -218,12 +224,42 @@ export default function TicketDetailPage() {
 
   const canEdit = currentUser?.role === 'Administrador';
 
-  const handleUpdate = async (field: keyof Ticket, value: any) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+        const newFiles = Array.from(e.target.files);
+        const validFiles: File[] = [];
+
+        for (const file of newFiles) {
+            if (file.size > MAX_FILE_SIZE) {
+                toast({ variant: 'destructive', title: 'Archivo demasiado grande', description: `El archivo ${file.name} supera los 5MB.` });
+                continue;
+            }
+            if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
+                toast({ variant: 'destructive', title: 'Tipo de archivo no permitido', description: `El archivo ${file.name} no es una imagen o PDF.` });
+                continue;
+            }
+            validFiles.push(file);
+        }
+        setFilesToUpload(prev => [...prev, ...validFiles]);
+    }
+  };
+
+  const removeFile = (indexToRemove: number) => {
+      setFilesToUpload(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
+
+  const handleUpdate = async (field: keyof Ticket, value: any, newEvidence: Attachment[] = []) => {
     if (!ticket || !currentUser) return;
     setIsUpdating(true);
     const docRef = doc(db, "tickets", ticket.id);
     const oldValue = ticket[field];
+    
     let updates: { [key: string]: any } = { [field]: value };
+     if (newEvidence.length > 0) {
+        updates.evidence = arrayUnion(...newEvidence);
+    }
+
     let logDetails: any = { ticket, oldValue, newValue: value };
 
     if (field === 'priority') {
@@ -261,6 +297,39 @@ export default function TicketDetailPage() {
         setIsUpdating(false);
     }
   }
+
+  const handleMarkAsResolved = async () => {
+    if (!ticket) return;
+
+    setIsUpdating(true);
+    let uploadedEvidence: Attachment[] = [];
+
+    try {
+        if (filesToUpload.length > 0) {
+            toast({ title: 'Subiendo evidencia...', description: 'Por favor, espera un momento.' });
+            const uploadPromises = filesToUpload.map(async (file) => {
+                const storageRef = ref(storage, `ticket-evidence/${ticket.id}/${Date.now()}-${file.name}`);
+                const snapshot = await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                return { url: downloadURL, description: file.name };
+            });
+            uploadedEvidence = await Promise.all(uploadPromises);
+        }
+        
+        await handleUpdate('status', 'Resuelto', uploadedEvidence);
+        setFilesToUpload([]); // Clear files after successful upload
+
+    } catch (uploadError: any) {
+        console.error("Error uploading evidence:", uploadError);
+        toast({
+            variant: "destructive",
+            title: "Error al Subir Evidencia",
+            description: `No se pudieron subir los archivos. ${uploadError.message}`,
+        });
+    } finally {
+        setIsUpdating(false);
+    }
+  };
   
    const handleAssignPersonnel = async (personnel: CurrentUser[]) => {
     if(!ticket || !currentUser) return;
@@ -390,8 +459,8 @@ export default function TicketDetailPage() {
                                     <SelectItem value="Abierto">Abierto</SelectItem>
                                     <SelectItem value="Asignado">Asignado</SelectItem>
                                     <SelectItem value="En Progreso">En Progreso</SelectItem>
+                                    {(isAssignedToCurrentUser || canEdit) && <SelectItem value="Resuelto">Resuelto</SelectItem>}
                                     {(isRequester || canEdit) && <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>}
-                                    <SelectItem value="Resuelto">Resuelto</SelectItem>
                                     <SelectItem value="Cancelado">Cancelado</SelectItem>
                                     <SelectItem value="Cerrado">Cerrado</SelectItem>
                                 </SelectContent>
@@ -543,7 +612,7 @@ export default function TicketDetailPage() {
           )}
         </Card>
 
-        {assignedPersonnelDetails.length > 0 && ['Asignado', 'En Progreso'].includes(ticket.status) && (
+        {(isAssignedToCurrentUser || canEdit) && ['Asignado', 'En Progreso'].includes(ticket.status) && (
             <Card className="mb-6">
                  <CardHeader>
                     <CardTitle className="font-headline text-lg flex items-center gap-2"><Edit className="w-5 h-5" /> Actualizar Progreso</CardTitle>
@@ -555,25 +624,46 @@ export default function TicketDetailPage() {
                             <textarea id="comment" placeholder="Describe el trabajo realizado..." className="mt-1 block w-full rounded-md border-input bg-background p-2 text-sm shadow-sm focus:border-ring focus:ring focus:ring-ring focus:ring-opacity-50"></textarea>
                         </div>
                         <div>
-                            <label className="text-sm font-medium">Adjuntar Evidencia Fotográfica</label>
+                            <label className="text-sm font-medium">Adjuntar Evidencia</label>
                             <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md">
                                 <div className="space-y-1 text-center">
-                                    <Camera className="mx-auto h-12 w-12 text-muted-foreground" />
+                                    <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
                                     <div className="flex text-sm text-muted-foreground">
                                         <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-ring">
-                                            <span>Sube un archivo</span>
-                                            <input id="file-upload" name="file-upload" type="file" className="sr-only" multiple />
+                                            <span>Sube tus archivos</span>
+                                            <input id="file-upload" name="file-upload" type="file" className="sr-only" multiple onChange={handleFileChange} accept={ACCEPTED_FILE_TYPES.join(',')} />
                                         </label>
                                         <p className="pl-1">o arrastra y suelta</p>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">PNG, JPG, GIF hasta 10MB</p>
+                                    <p className="text-xs text-muted-foreground">Imágenes o PDF, hasta 5MB</p>
                                 </div>
                             </div>
+                            {filesToUpload.length > 0 && (
+                                <div className="mt-4 space-y-2">
+                                    <p className="text-sm font-medium">Archivos para subir:</p>
+                                    <ul className="space-y-2">
+                                        {filesToUpload.map((file, index) => (
+                                            <li key={index} className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                                                <div className="flex items-center gap-2 truncate">
+                                                    <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                                    <span className="text-sm truncate" title={file.name}>{file.name}</span>
+                                                </div>
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="flex-shrink-0 h-6 w-6">
+                                                    <XIcon className="h-4 w-4" />
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </div>
                     </div>
                  </CardContent>
                  <CardFooter>
-                    <Button className="w-full" onClick={() => handleUpdate('status', 'Resuelto')}>Marcar como Resuelto</Button>
+                    <Button className="w-full" onClick={handleMarkAsResolved} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Marcar como Resuelto y Enviar Evidencia
+                    </Button>
                  </CardFooter>
             </Card>
         )}
@@ -631,3 +721,5 @@ export default function TicketDetailPage() {
     </div>
   );
 }
+
+    
