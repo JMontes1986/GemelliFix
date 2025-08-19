@@ -25,7 +25,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { db, auth } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, type DocumentReference } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Zap, BrainCircuit } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -101,8 +101,9 @@ export default function DiagnosisPage() {
 
     setExecutionResult({ status: 'Enviando...', message: `Intentando escribir en la colección \`diagnosis_logs\` como usuario ${currentUser.email}...` });
     
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Connection timeout')), 5000)
+    const TIMEOUT_SYMBOL = Symbol();
+    const timeoutPromise = new Promise((resolve) => 
+      setTimeout(() => resolve(TIMEOUT_SYMBOL), 5000)
     );
 
     try {
@@ -112,10 +113,16 @@ export default function DiagnosisPage() {
         createdAt: serverTimestamp(),
       });
 
-      const docRef = await Promise.race([writePromise, timeoutPromise]) as typeof writePromise extends Promise<infer U> ? U : never;
-
+      const result = await Promise.race([writePromise, timeoutPromise]);
+      
+      if (result === TIMEOUT_SYMBOL) {
+        throw new Error('Connection timeout');
+      }
+      
+      const docRef = result as DocumentReference;
       const successMsg = `¡Éxito! Se ha escrito un documento en Firestore con el ID: ${docRef.id}. La conexión es correcta y las reglas de seguridad lo permiten.`;
       setExecutionResult({ status: 'Éxito', message: successMsg });
+
     } catch (error: any) {
       console.error('Error en la prueba de conexión:', error);
       let errorMsg = `No se pudo escribir en Firestore. Código de error: ${error.code}. Detalles: ${error.message}`;
