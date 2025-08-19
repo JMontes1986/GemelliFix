@@ -44,12 +44,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 // This pattern prevents re-initializing the app on hot-reloads in Next.js
-let app;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
-}
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 
 const auth = getAuth(app);
