@@ -335,10 +335,9 @@ export default function CalendarPage() {
                 <CardContent className="p-2 flex-1 overflow-y-auto"
                     onDragOver={(e) => e.preventDefault()}
                 >
-                    {unassignedTickets.map((ticket) => (
-                    <UnassignedTicketCard key={ticket.id} ticket={ticket} />
-                    ))}
-                    {unassignedTickets.length === 0 && (
+                    {unassignedTickets.length > 0 ? unassignedTickets.map((ticket) => (
+                      <UnassignedTicketCard key={ticket.id} ticket={ticket} />
+                    )) : (
                         <p className="text-sm text-muted-foreground p-4 text-center">¡No hay tickets pendientes!</p>
                     )}
                 </CardContent>
@@ -423,5 +422,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-
-    

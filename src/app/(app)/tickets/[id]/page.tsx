@@ -91,11 +91,24 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
 const currentUser = users[0];
 
 export default function TicketDetailPage({ params }: { params: { id: string } }) {
-  const [currentTicket, setCurrentTicket] = useState(() => tickets.find((t) => t.id === params.id));
+  // NOTE: This will be replaced with a real-time Firestore listener
+  const initialTicket = tickets.find((t) => t.id === params.id);
+  
+  const [currentTicket, setCurrentTicket] = useState(initialTicket);
   const { toast } = useToast();
   
   if (!currentTicket) {
-    notFound();
+    // In a real app, you might fetch from DB here as a fallback
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Ticket no encontrado</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p>El ticket que buscas no existe o ha sido eliminado. En una aplicación real, los datos se cargarían desde Firestore.</p>
+            </CardContent>
+        </Card>
+    );
   }
 
   const [ticketStatus, setTicketStatus] = useState<Ticket['status']>(currentTicket.status);

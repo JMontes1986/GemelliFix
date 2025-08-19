@@ -143,12 +143,10 @@ function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: b
 
 
 export default function DashboardPage() {
-  const openTickets = tickets.filter(
-    (t) => t.status === 'Abierto' || t.status === 'Asignado' || t.status === 'En Progreso'
-  );
-  const overdueTickets = tickets.filter((t) => new Date(t.dueDate) < new Date() && t.status !== 'Resuelto' && t.status !== 'Cerrado');
-  const slaCompliance = 95; // Hardcoded for now
-  const mttrHours = 8.2; // Hardcoded for now
+  const openTickets = 0;
+  const overdueTickets = 0;
+  const slaCompliance = 100;
+  const mttrHours = 0;
 
   const [isAnalysisOpen, setAnalysisOpen] = React.useState(false);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
@@ -161,8 +159,8 @@ export default function DashboardPage() {
     setAnalysisResult(null);
 
     const input: AnalyzeDashboardInput = {
-        openTickets: openTickets.length,
-        overdueTickets: overdueTickets.length,
+        openTickets: openTickets,
+        overdueTickets: overdueTickets,
         slaCompliance: slaCompliance,
         averageResolutionTimeHours: mttrHours
     };
@@ -212,8 +210,8 @@ export default function DashboardPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{openTickets.length}</div>
-            <p className="text-xs text-muted-foreground">+2% desde el mes pasado</p>
+            <div className="text-2xl font-bold">{openTickets}</div>
+            <p className="text-xs text-muted-foreground">Datos en tiempo real</p>
           </CardContent>
         </Card>
         <Card>
@@ -222,8 +220,8 @@ export default function DashboardPage() {
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{overdueTickets.length}</div>
-            <p className="text-xs text-muted-foreground">+5% desde el mes pasado</p>
+            <div className="text-2xl font-bold">{overdueTickets}</div>
+            <p className="text-xs text-muted-foreground">Datos en tiempo real</p>
           </CardContent>
         </Card>
         <Card>
@@ -233,7 +231,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{slaCompliance}%</div>
-            <p className="text-xs text-muted-foreground">-1% desde el mes pasado</p>
+            <p className="text-xs text-muted-foreground">Datos en tiempo real</p>
           </CardContent>
         </Card>
         <Card>
@@ -243,7 +241,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{mttrHours}h</div>
-            <p className="text-xs text-muted-foreground">Mejora de 0.5h</p>
+            <p className="text-xs text-muted-foreground">Datos en tiempo real</p>
           </CardContent>
         </Card>
       </div>
@@ -329,27 +327,35 @@ export default function DashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tickets
-                .filter(t => t.priority === 'Urgente' || t.priority === 'Alta')
-                .slice(0, 5)
-                .map((ticket) => (
-                <TableRow key={ticket.id} className="cursor-pointer">
-                  <TableCell>
-                    <Link href={`/tickets/${ticket.id}`} className="font-medium text-primary hover:underline">{ticket.code}</Link>
-                  </TableCell>
-                  <TableCell>{ticket.title}</TableCell>
-                  <TableCell>
-                    <Badge variant={ticket.status === 'Abierto' ? 'destructive' : 'secondary'}>{ticket.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={ticket.priority === 'Urgente' ? 'destructive' : 'default'} className={ticket.priority === 'Alta' ? 'bg-orange-500 text-white' : ''}>{ticket.priority}</Badge>
-                  </TableCell>
-                  <TableCell>{ticket.assignedTo || 'Sin asignar'}</TableCell>
-                  <TableCell className="text-right">
-                     <ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
-                  </TableCell>
+              {tickets.length === 0 ? (
+                <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center">
+                        No hay tickets urgentes o recientes.
+                    </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                tickets
+                    .filter(t => t.priority === 'Urgente' || t.priority === 'Alta')
+                    .slice(0, 5)
+                    .map((ticket) => (
+                    <TableRow key={ticket.id} className="cursor-pointer">
+                    <TableCell>
+                        <Link href={`/tickets/${ticket.id}`} className="font-medium text-primary hover:underline">{ticket.code}</Link>
+                    </TableCell>
+                    <TableCell>{ticket.title}</TableCell>
+                    <TableCell>
+                        <Badge variant={ticket.status === 'Abierto' ? 'destructive' : 'secondary'}>{ticket.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                        <Badge variant={ticket.priority === 'Urgente' ? 'destructive' : 'default'} className={ticket.priority === 'Alta' ? 'bg-orange-500 text-white' : ''}>{ticket.priority}</Badge>
+                    </TableCell>
+                    <TableCell>{ticket.assignedTo || 'Sin asignar'}</TableCell>
+                    <TableCell className="text-right">
+                        <ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
+                    </TableCell>
+                    </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

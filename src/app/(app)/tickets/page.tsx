@@ -39,7 +39,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { tickets, zones, sites } from '@/lib/data';
+import { tickets } from '@/lib/data';
 import type { Ticket } from '@/lib/types';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 
@@ -92,6 +92,8 @@ export default function TicketsPage() {
     acc[zone].push(ticket);
     return acc;
   }, {} as Record<string, Ticket[]>);
+
+  const hasTickets = tickets.length > 0;
 
   return (
     <Tabs defaultValue="all">
@@ -156,59 +158,67 @@ export default function TicketsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Object.entries(groupedTickets).map(([zone, ticketsInZone]) => (
-                  <React.Fragment key={zone}>
-                    <TableRow className="bg-muted/50">
-                      <TableCell colSpan={9} className="font-bold font-headline text-primary">
-                        {zone}
-                      </TableCell>
+                {hasTickets ? (
+                    Object.entries(groupedTickets).map(([zone, ticketsInZone]) => (
+                    <React.Fragment key={zone}>
+                        <TableRow className="bg-muted/50">
+                        <TableCell colSpan={9} className="font-bold font-headline text-primary">
+                            {zone}
+                        </TableCell>
+                        </TableRow>
+                        {ticketsInZone.map((ticket) => (
+                        <TableRow key={ticket.id}>
+                            <TableCell className="font-medium">
+                            <Link href={`/tickets/${ticket.id}`} className="text-primary hover:underline">
+                                {ticket.code}
+                            </Link>
+                            </TableCell>
+                            <TableCell>{ticket.site}</TableCell>
+                            <TableCell>{ticket.title}</TableCell>
+                            <TableCell>
+                                <Badge variant={getPriorityBadgeVariant(ticket.priority)} className={getPriorityBadgeClassName(ticket.priority)}>{ticket.priority}</Badge>
+                            </TableCell>
+                            <TableCell>
+                            <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
+                            </TableCell>
+                            <TableCell>{ticket.assignedTo ?? 'Sin Asignar'}</TableCell>
+                            <TableCell className="hidden md:table-cell">
+                            <ClientFormattedDate date={ticket.createdAt} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                            <ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
+                            </TableCell>
+                            <TableCell>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                <Button
+                                    aria-haspopup="true"
+                                    size="icon"
+                                    variant="ghost"
+                                >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Toggle menu</span>
+                                </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
+                                <DropdownMenuItem>Asignar</DropdownMenuItem>
+                                <DropdownMenuItem>Cambiar Estado</DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                    </React.Fragment>
+                    ))
+                ) : (
+                    <TableRow>
+                        <TableCell colSpan={9} className="h-24 text-center">
+                            No hay solicitudes de mantenimiento registradas.
+                        </TableCell>
                     </TableRow>
-                    {ticketsInZone.map((ticket) => (
-                      <TableRow key={ticket.id}>
-                        <TableCell className="font-medium">
-                          <Link href={`/tickets/${ticket.id}`} className="text-primary hover:underline">
-                            {ticket.code}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{ticket.site}</TableCell>
-                        <TableCell>{ticket.title}</TableCell>
-                        <TableCell>
-                            <Badge variant={getPriorityBadgeVariant(ticket.priority)} className={getPriorityBadgeClassName(ticket.priority)}>{ticket.priority}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
-                        </TableCell>
-                        <TableCell>{ticket.assignedTo ?? 'Sin Asignar'}</TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <ClientFormattedDate date={ticket.createdAt} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                aria-haspopup="true"
-                                size="icon"
-                                variant="ghost"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                              <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
-                              <DropdownMenuItem>Asignar</DropdownMenuItem>
-                              <DropdownMenuItem>Cambiar Estado</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </React.Fragment>
-                ))}
+                )}
               </TableBody>
             </Table>
           </CardContent>
