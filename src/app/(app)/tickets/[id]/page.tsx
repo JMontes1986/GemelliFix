@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -556,8 +557,8 @@ export default function TicketDetailPage() {
                                 <SelectContent>
                                     <SelectItem value="Abierto">Abierto</SelectItem>
                                     <SelectItem value="Asignado">Asignado</SelectItem>
-                                    <SelectItem value="En Progreso">En Progreso</SelectItem>
                                     <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>
+                                    <SelectItem value="En Progreso">En Progreso</SelectItem>
                                     <SelectItem value="Resuelto">Resuelto</SelectItem>
                                     <SelectItem value="Cancelado">Cancelado</SelectItem>
                                     <SelectItem value="Cerrado">Cerrado</SelectItem>

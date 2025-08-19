@@ -72,10 +72,10 @@ The current date is ${new Date().toISOString()}.
     -   **Analysis:** Briefly explain the current state.
     -   **Recommendation:** Suggest the next valid status based on this logic:
         -   If status is 'Abierto': The next step is 'Asignado'.
-        -   If status is 'Asignado': The next step is 'En Progreso'.
+        -   If status is 'Asignado': The next step is 'Requiere Aprobación'.
+        -   If status is 'Requiere Aprobación': The next step for the technician is 'En Progreso'.
         -   If status is 'En Progreso': The next step is 'Resuelto'.
         -   If status is 'Resuelto': The next step is 'Cerrado'.
-        -   If status is 'Requiere Aprobación': The next step for the requester is to approve it ('Cerrado') or reject it.
         -   If status is 'Cerrado' or 'Cancelado': There are no further actions. State this clearly.
     -   Set \`isActionable\` to \`true\` if you are suggesting a direct state change.
 
@@ -101,4 +101,3 @@ const suggestTicketStateChangeFlow = ai.defineFlow(
   }
 );
     
-

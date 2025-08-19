@@ -194,8 +194,8 @@ const TicketsTable: React.FC<TicketsTableProps> = ({
                                             <SelectContent>
                                                 <SelectItem value="Abierto">Abierto</SelectItem>
                                                 <SelectItem value="Asignado">Asignado</SelectItem>
-                                                <SelectItem value="En Progreso">En Progreso</SelectItem>
                                                 <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>
+                                                <SelectItem value="En Progreso">En Progreso</SelectItem>
                                                 <SelectItem value="Resuelto">Resuelto</SelectItem>
                                                 <SelectItem value="Cancelado">Cancelado</SelectItem>
                                                 <SelectItem value="Cerrado">Cerrado</SelectItem>
@@ -358,7 +358,7 @@ export default function TicketsPage() {
     }
   };
   
-  const statuses: Ticket['status'][] = ['Abierto', 'Asignado', 'En Progreso', 'Requiere Aprobación', 'Resuelto', 'Cancelado', 'Cerrado'];
+  const statuses: Ticket['status'][] = ['Abierto', 'Asignado', 'Requiere Aprobación', 'En Progreso', 'Resuelto', 'Cancelado', 'Cerrado'];
   const filteredTickets = (status: Ticket['status']) => tickets.filter(t => t.status === status);
 
   return (
