@@ -256,7 +256,7 @@ export default function TicketDetailPage() {
   const handleUpdate = async (field: keyof Ticket, value: any) => {
     if (!ticket || !currentUser) return;
 
-    if (field === 'status' && ticket.status !== value && value !== 'Asignado' && !comment.trim()) {
+    if (field === 'status' && ticket.status !== 'Asignado' && value !== 'Asignado' && !comment.trim()) {
         toast({
             variant: "destructive",
             title: "Comentario Requerido",
@@ -292,6 +292,8 @@ export default function TicketDetailPage() {
       if (field === 'status' || field === 'priority') {
         await createLog(currentUser, `update_${field}`, logDetails);
       }
+      
+      setComment('');
 
       toast({
         title: "Ticket Actualizado",
@@ -399,9 +401,11 @@ export default function TicketDetailPage() {
   }
 
   const handleApproval = async (approve: boolean) => {
-    if (!ticket) return;
+    if (!ticket || !currentUser || currentUser.role !== 'Administrador') return;
+    
     const newStatus = approve ? 'Cerrado' : 'Asignado'; // Si se rechaza, vuelve a 'Asignado'
     await handleUpdate('status', newStatus);
+
     toast({
         title: `Ticket ${approve ? 'Aprobado y Cerrado' : 'Rechazado'}`,
         description: approve ? 'La solicitud ha sido marcada como cerrada.' : 'La solicitud ha sido devuelta al personal asignado.'
@@ -614,7 +618,7 @@ export default function TicketDetailPage() {
                     )
                 })}
             </CardContent>
-            {isRequester && ticket.status === 'Requiere Aprobación' && (
+            {canEdit && ticket.status === 'Requiere Aprobación' && (
               <CardFooter className="gap-4">
                 <Button className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApproval(true)} disabled={isUpdating}><ThumbsUp className="mr-2" /> Aprobar y Cerrar Ticket</Button>
                 <Button variant="destructive" className="w-full" onClick={() => handleApproval(false)} disabled={isUpdating}><ThumbsDown className="mr-2" /> Rechazar Solución</Button>
@@ -768,5 +772,3 @@ export default function TicketDetailPage() {
     </div>
   );
 }
-
-    
