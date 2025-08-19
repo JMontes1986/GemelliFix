@@ -44,7 +44,7 @@ type DiagnosisFormValues = z.infer<typeof diagnosisSchema>;
 export default function DiagnosisPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
-  const [executionResult, setExecutionResult] = React.useState<{status: string, message: string}>({ status: 'Pendiente', message: 'Aún no se ha intentado enviar el formulario.' });
+  const [executionResult, setExecutionResult] = React.useState<{status: string, message: string}>({ status: 'Pendiente', message: 'Aún no se ha intentado ninguna operación.' });
   const [currentUser, setCurrentUser] = React.useState<FirebaseAuthUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = React.useState(true);
   
@@ -59,23 +59,38 @@ export default function DiagnosisPage() {
   }, []);
 
   const handleSimpleConnectionTest = async () => {
-    if (!currentUser) {
+    if (isAuthLoading) {
+      const authWaitMsg = 'Esperando la confirmación de autenticación de Firebase... Por favor, inténtalo de nuevo en un segundo.';
+      setExecutionResult({ status: 'Verificando Auth...', message: authWaitMsg });
       toast({
-        variant: 'destructive',
-        title: 'Error de Autenticación',
-        description: 'Debes iniciar sesión para realizar la prueba.',
+        variant: 'default',
+        title: 'Un momento...',
+        description: authWaitMsg,
       });
       return;
     }
+    
+    if (!currentUser) {
+      const authErrorMsg = 'Debes iniciar sesión para realizar esta prueba. El sistema no detecta un usuario autenticado.';
+      toast({
+        variant: 'destructive',
+        title: 'Error de Autenticación',
+        description: authErrorMsg,
+      });
+      setExecutionResult({ status: 'Error de Autenticación', message: authErrorMsg });
+      return;
+    }
+
     setIsLoading(true);
-    setExecutionResult({ status: 'Enviando...', message: 'Intentando escribir en `diagnosis_logs`...' });
+    setExecutionResult({ status: 'Enviando...', message: `Intentando escribir en la colección \`diagnosis_logs\` como usuario ${currentUser.email}...` });
+    
     try {
       const docRef = await addDoc(collection(db, 'diagnosis_logs'), {
         test: 'simple_connection_test',
         user: currentUser.email,
         createdAt: serverTimestamp(),
       });
-      const successMsg = `¡Éxito! Se ha escrito un documento en Firestore con el ID: ${docRef.id}. La conexión es correcta.`;
+      const successMsg = `¡Éxito! Se ha escrito un documento en Firestore con el ID: ${docRef.id}. La conexión es correcta y las reglas de seguridad lo permiten.`;
       toast({
         title: 'Conexión Exitosa',
         description: 'Se ha verificado la escritura en Firestore.',
@@ -83,11 +98,21 @@ export default function DiagnosisPage() {
       setExecutionResult({ status: 'Éxito', message: successMsg });
     } catch (error: any) {
       console.error('Error en la prueba de conexión:', error);
-      const errorMsg = `No se pudo escribir en Firestore. Detalles: ${error.message}`;
+      let errorMsg = `No se pudo escribir en Firestore. Código de error: ${error.code}. Detalles: ${error.message}`;
+      
+      if (error.code === 'permission-denied') {
+        errorMsg += "\n\nDIAGNÓSTICO: Este error significa que las Reglas de Seguridad de Firestore están bloqueando la escritura. Asegúrate de que las reglas para la ruta `/diagnosis_logs/{logId}` permitan la creación de documentos por parte de usuarios autenticados. Ejemplo: `allow create: if request.auth != null;`";
+      } else if (error.code === 'unauthenticated') {
+        errorMsg += "\n\nDIAGNÓSTICO: El servidor de Firebase rechazó la solicitud por falta de autenticación, aunque la app creía que el usuario estaba conectado. Esto puede indicar un problema con el token de autenticación.";
+      } else {
+        errorMsg += "\n\nDIAGNÓSTICO: Este es un error inesperado. Verifica tu conexión a internet y que la configuración de tu proyecto de Firebase (apiKey, projectId, etc.) en `src/lib/firebase.ts` sea correcta.";
+      }
+
       toast({
         variant: 'destructive',
         title: 'Error de Conexión',
-        description: errorMsg,
+        description: `No se pudo escribir en Firestore. Detalles: ${error.message}`,
+        duration: 9000,
       });
        setExecutionResult({ status: 'Error', message: errorMsg });
     } finally {
@@ -230,11 +255,11 @@ export default function DiagnosisPage() {
                  {(isLoading || isAuthLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                  {isAuthLoading ? 'Verificando Auth...' : 'Crear Colección de Prueba'}
               </Button>
-               <Alert variant={executionResult.status === 'Error' ? 'destructive' : (executionResult.status === 'Éxito' ? 'default' : 'default')}
+               <Alert variant={executionResult.status === 'Error' || executionResult.status === 'Error de Autenticación' ? 'destructive' : (executionResult.status === 'Éxito' ? 'default' : 'default')}
                  className={executionResult.status === 'Éxito' ? 'border-green-500' : ''}
                >
                     <AlertTitle className="font-headline">Resultado de Ejecución: {executionResult.status}</AlertTitle>
-                    <AlertDescription className="font-mono text-xs">
+                    <AlertDescription className="font-mono text-xs whitespace-pre-wrap">
                         {executionResult.message}
                     </AlertDescription>
                 </Alert>
