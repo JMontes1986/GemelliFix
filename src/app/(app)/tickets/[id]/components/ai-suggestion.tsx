@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -28,11 +29,10 @@ import { Separator } from '@/components/ui/separator';
 interface AiSuggestionProps {
     ticket: Ticket;
     technicians: User[];
-    assignedPersonnelDetails: User[];
     onAssign: (technician: User[]) => void;
 }
 
-export default function AiSuggestion({ ticket, technicians, assignedPersonnelDetails, onAssign }: AiSuggestionProps) {
+export default function AiSuggestion({ ticket, technicians, onAssign }: AiSuggestionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestTechnicianAssignmentOutput | null>(null);
@@ -43,7 +43,7 @@ export default function AiSuggestion({ ticket, technicians, assignedPersonnelDet
     if (ticket?.assignedToIds) {
         setSelectedPersonnelIds(ticket.assignedToIds);
     }
-  }, [ticket]);
+  }, [ticket, isOpen]);
 
 
   const handleOpenDialog = async () => {

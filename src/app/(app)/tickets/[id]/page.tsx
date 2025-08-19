@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -36,6 +37,7 @@ import {
   Loader2,
   Users,
   Download,
+  Sparkles,
 } from 'lucide-react';
 import type { Ticket, User as CurrentUser } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -51,6 +53,7 @@ import { createLog } from '@/lib/utils';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import PdfViewer from '@/components/ui/pdf-viewer';
+import { cn } from '@/lib/utils';
 
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
@@ -133,7 +136,7 @@ export default function TicketDetailPage() {
   const [technicians, setTechnicians] = useState<CurrentUser[]>([]);
 
 
-   useEffect(() => {
+  useEffect(() => {
     const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const techData: CurrentUser[] = [];
@@ -528,7 +531,6 @@ export default function TicketDetailPage() {
                <AiSuggestion 
                 ticket={ticket} 
                 technicians={technicians}
-                assignedPersonnelDetails={assignedPersonnelDetails}
                 onAssign={handleAssignPersonnel} 
               />
             </CardFooter>
