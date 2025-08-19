@@ -57,25 +57,25 @@ const prompt = ai.definePrompt({
   input: {schema: SuggestTechnicianAssignmentInputSchema},
   output: {schema: SuggestTechnicianAssignmentOutputSchema},
   tools: [techniciansTool],
-  prompt: `You are an AI assistant helping maintenance leaders to assign tickets to technicians.
+  prompt: `You are an AI assistant helping maintenance leaders to assign tickets to personnel.
 
-Your goal is to suggest the best technician for a new ticket based on their skills and current workload.
+Your goal is to suggest the best person for a new ticket based on their skills and current workload.
 
 1.  **Analyze the Ticket**: Review the ticket's title, description, and category to understand the required skills.
     -   Title: {{{ticketTitle}}}
     -   Description: {{{ticketDescription}}}
     -   Category: {{{ticketCategory}}}
 
-2.  **Get Technician Data**: Use the \`getTechnicianList\` tool to get a list of all available technicians, including their skills and workload.
+2.  **Get Personnel Data**: Use the \`getTechnicianList\` tool to get a list of all available personnel, including their skills and workload.
 
 3.  **Find the Best Match**:
-    -   Prioritize technicians whose skills match the ticket's category and description.
+    -   Prioritize personnel whose skills match the ticket's category and description.
     -   Among those with the right skills, choose the one with the lowest workload.
-    -   If multiple technicians have similar low workloads, any of them is a good choice.
+    -   If multiple people have similar low workloads, any of them is a good choice.
 
 4.  **Provide a Recommendation**:
     -   Fill in the \`technicianId\`, \`technicianName\`, and \`workloadPercentage\` fields.
-    -   In the \`reason\` field, explain *why* you chose that technician, mentioning their relevant skills and how their low workload makes them a good fit.
+    -   In the \`reason\` field, explain *why* you chose that person, mentioning their relevant skills and how their low workload makes them a good fit.
 `,
 });
 
@@ -90,3 +90,5 @@ const suggestTechnicianAssignmentFlow = ai.defineFlow(
     return output!;
   }
 );
+
+    

@@ -179,7 +179,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
           status: 'Asignado' 
       });
       toast({
-        title: "Técnico Asignado",
+        title: "Personal Asignado",
         description: `El ticket ha sido asignado a ${technician.name}.`,
       });
     } catch (error: any) {
@@ -187,7 +187,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
       toast({
         variant: "destructive",
         title: "Error al Asignar",
-        description: `No se pudo asignar el técnico. ${error.message}`,
+        description: `No se pudo asignar el personal. ${error.message}`,
       });
     } finally {
         setIsUpdating(false);
@@ -377,7 +377,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
       <div>
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="font-headline text-lg">Técnico Asignado</CardTitle>
+            <CardTitle className="font-headline text-lg">Personal Asignado</CardTitle>
           </CardHeader>
           <CardContent>
             {isUpdating && <Loader2 className="animate-spin" />}
@@ -401,7 +401,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" disabled={isUpdating}>
-                      {assignedTechnician ? 'Reasignar Técnico' : 'Asignar Técnico'}
+                      {assignedTechnician ? 'Reasignar Personal' : 'Asignar Personal'}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
@@ -510,5 +510,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     
 
 
+
+    
 
     

@@ -73,7 +73,7 @@ export default function AiSuggestion({ ticket, onAssign }: AiSuggestionProps) {
              toast({
                 variant: 'destructive',
                 title: 'Error al Asignar',
-                description: 'No se pudo encontrar al técnico sugerido.',
+                description: 'No se pudo encontrar al personal sugerido.',
             });
         }
     }
@@ -85,7 +85,7 @@ export default function AiSuggestion({ ticket, onAssign }: AiSuggestionProps) {
       <DialogTrigger asChild>
         <Button variant="default" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={handleSuggestion}>
           <Sparkles className="mr-2 h-4 w-4" />
-          Sugerir Técnico con IA
+          Sugerir Personal con IA
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -95,7 +95,7 @@ export default function AiSuggestion({ ticket, onAssign }: AiSuggestionProps) {
             Sugerencia de Asignación
           </DialogTitle>
           <DialogDescription>
-            El asistente de IA ha analizado la carga de trabajo y las habilidades, y recomienda al siguiente técnico.
+            El asistente de IA ha analizado la carga de trabajo y las habilidades, y recomienda al siguiente personal.
           </DialogDescription>
         </DialogHeader>
         {isLoading && (
@@ -107,16 +107,18 @@ export default function AiSuggestion({ ticket, onAssign }: AiSuggestionProps) {
         )}
         {suggestion && (
           <div className="space-y-4 py-4">
-            <h3 className="text-lg font-semibold text-primary">{suggestion.technicianName || 'Técnico Sugerido'}</h3>
+            <h3 className="text-lg font-semibold text-primary">{suggestion.technicianName || 'Personal Sugerido'}</h3>
             <p><strong>Carga de trabajo estimada:</strong> {suggestion.workloadPercentage}%</p>
             <div>
               <p className="font-semibold">Razón:</p>
               <p className="text-muted-foreground italic">"{suggestion.reason}"</p>
             </div>
-            <Button className="w-full" onClick={handleAssignFromSuggestion}>Asignar a {suggestion.technicianName || 'este técnico'}</Button>
+            <Button className="w-full" onClick={handleAssignFromSuggestion}>Asignar a {suggestion.technicianName || 'este personal'}</Button>
           </div>
         )}
       </DialogContent>
     </Dialog>
   );
 }
+
+    
