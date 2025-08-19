@@ -388,7 +388,7 @@ export default function TicketsPage() {
                                 <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                 <DropdownMenuItem asChild><Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link></DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>Asignar</Link>
+                                <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>Asignar</DropdownMenuItem>
                                 <DropdownMenuItem>Cambiar Estado</DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
