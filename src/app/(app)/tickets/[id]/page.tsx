@@ -17,7 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { technicians, users as staticUsers, categories } from '@/lib/data';
+import { users as staticUsers, categories } from '@/lib/data';
 import {
   File,
   User,
@@ -136,6 +136,18 @@ export default function TicketDetailPage() {
   const [isAssignPopoverOpen, setAssignPopoverOpen] = useState(false);
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [technicians, setTechnicians] = useState<CurrentUser[]>([]);
+
+
+  useEffect(() => {
+    const fetchTechnicians = async () => {
+        const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        const querySnapshot = await getDocs(techQuery);
+        const techData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CurrentUser));
+        setTechnicians(techData);
+    };
+    fetchTechnicians();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -252,7 +264,7 @@ export default function TicketDetailPage() {
     }
   }
   
-   const handleAssignPersonnel = async (personnel: Technician[]) => {
+   const handleAssignPersonnel = async (personnel: CurrentUser[]) => {
     if(!ticket || !currentUser) return;
 
     const oldValue = ticket.assignedTo || [];
@@ -554,7 +566,6 @@ export default function TicketDetailPage() {
                         </Avatar>
                         <div>
                         <h4 className="font-semibold">{person.name}</h4>
-                        <p className="text-sm text-muted-foreground">{person.skills.join(', ')}</p>
                         </div>
                     </div>
                 ))

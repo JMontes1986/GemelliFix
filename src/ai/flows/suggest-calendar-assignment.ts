@@ -15,8 +15,9 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { technicians } from '@/lib/data';
-import type { Technician, Ticket } from '@/lib/types';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { User, Ticket } from '@/lib/types';
 
 // Define input schema
 const SuggestCalendarAssignmentInputSchema = z.object({
@@ -55,13 +56,23 @@ const techniciansTool = ai.defineTool(
         outputSchema: z.array(z.object({
             id: z.string(),
             name: z.string(),
-            skills: z.array(z.string()),
-            workload: z.number(),
+            skills: z.array(z.string()).describe('A list of skills the technician has. This is a placeholder for now.'),
+            workload: z.number().describe('The current workload percentage of the technician. This is a placeholder for now.'),
         })),
     },
     async () => {
-        // In a real scenario, this would fetch data from a database including their availability.
-        return technicians.map(t => ({ id: t.id, name: t.name, skills: t.skills, workload: t.workload }));
+        const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        const querySnapshot = await getDocs(q);
+        const technicians = querySnapshot.docs.map(doc => {
+            const data = doc.data() as User;
+            return {
+                id: data.id,
+                name: data.name,
+                skills: ['General', data.role], // Placeholder skills
+                workload: Math.floor(Math.random() * 80) + 10, // Placeholder workload
+            };
+        });
+        return technicians;
     }
 );
 
@@ -134,5 +145,3 @@ const suggestCalendarAssignmentFlow = ai.defineFlow(
     return finalSuggestion;
   }
 );
-
-    

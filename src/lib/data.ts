@@ -2,9 +2,9 @@
 import type { Zone, Site, Technician, Ticket, Notification, User, ScheduleEvent, Category } from '@/lib/types';
 
 export const users: User[] = [
-  { id: 'user-1', name: 'Admin User', email: 'sistemas@colgemelli.edu.co', avatar: 'https://firebasestorage.googleapis.com/v0/b/gemellifix.firebasestorage.app/o/Logo.png?alt=media&token=3c91d664-c1d3-43b0-b81f-2b21a7cf2c05', role: 'Administrador' },
-  { id: 'user-2', name: 'Mantenimiento User', email: 'mantenimiento@colgemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Servicios Generales' },
-  { id: 'user-3', name: 'Requester User', email: 'requester@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Docentes' },
+  { id: 'user-1', uid:'user-1', name: 'Admin User', email: 'sistemas@colgemelli.edu.co', avatar: 'https://firebasestorage.googleapis.com/v0/b/gemellifix.firebasestorage.app/o/Logo.png?alt=media&token=3c91d664-c1d3-43b0-b81f-2b21a7cf2c05', role: 'Administrador' },
+  { id: 'user-2', uid:'user-2', name: 'Mantenimiento User', email: 'mantenimiento@colgemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Servicios Generales' },
+  { id: 'user-3', uid:'user-3', name: 'Requester User', email: 'requester@gemelli.edu.co', avatar: 'https://placehold.co/100x100.png', role: 'Docentes' },
 ];
 
 export const zones: Zone[] = [
@@ -40,15 +40,13 @@ export const categories: Category[] = [
 ];
 
 
-export const technicians: Technician[] = [];
-
 export const tickets: Ticket[] = [];
 
 export const notifications: Notification[] = [
-    { id: '1', title: 'Nuevo ticket asignado', description: 'Se te ha asignado el ticket GEMMAN-ZONAA-SITEA1-0001', createdAt: 'Hace 5 minutos', read: false, type: 'ticket' },
-    { id: '2', title: 'SLA en Riesgo', description: 'El ticket GEMMAN-ZONAC-SITEC2-0003 está a punto de vencer.', createdAt: 'Hace 2 horas', read: false, type: 'sla' },
-    { id: '3', title: 'Turno próximo', description: 'Tu turno de mantenimiento comienza en 60 minutos.', createdAt: 'Hace 1 día', read: true, type: 'schedule' },
-    { id: '4', title: 'Ticket Resuelto', description: 'El ticket GEMMAN-ZONAD-SITED1-0004 ha sido resuelto.', createdAt: 'Hace 2 días', read: true, type: 'ticket' },
+    { id: '1', userId: 'user-2', title: 'Nuevo ticket asignado', description: 'Se te ha asignado el ticket GEMMAN-ZONAA-SITEA1-0001', createdAt: new Date(), read: false, type: 'ticket', linkTo: '/tickets/1' },
+    { id: '2', userId: 'user-1', title: 'SLA en Riesgo', description: 'El ticket GEMMAN-ZONAC-SITEC2-0003 está a punto de vencer.', createdAt: new Date(), read: false, type: 'sla', linkTo: '/tickets/3' },
+    { id: '3', userId: 'user-2', title: 'Turno próximo', description: 'Tu turno de mantenimiento comienza en 60 minutos.', createdAt: new Date(), read: true, type: 'schedule', linkTo: '/calendar' },
+    { id: '4', userId: 'user-3', title: 'Ticket Resuelto', description: 'El ticket GEMMAN-ZONAD-SITED1-0004 ha sido resuelto.', createdAt: new Date(), read: true, type: 'ticket', linkTo: '/tickets/4' },
 ];
 
 export const scheduleEvents: ScheduleEvent[] = [
@@ -59,7 +57,7 @@ export const scheduleEvents: ScheduleEvent[] = [
         start: new Date('2024-08-19T08:00:00'),
         end: new Date('2024-08-19T12:00:00'),
         type: 'shift',
-        technicianId: 'tech-1'
+        technicianId: 'user-2'
     },
     {
         id: 'evt-2',
@@ -68,35 +66,7 @@ export const scheduleEvents: ScheduleEvent[] = [
         start: new Date('2024-08-20T13:00:00'),
         end: new Date('2024-08-20T15:00:00'),
         type: 'ticket',
-        technicianId: 'tech-1',
+        technicianId: 'user-2',
         ticketId: '1'
     },
-     {
-        id: 'evt-3',
-        title: 'Cuadrante Aseo: Bloque B',
-        description: 'Limpieza profunda de laboratorios',
-        start: new Date('2024-08-21T10:00:00'),
-        end: new Date('2024-08-21T12:00:00'),
-        type: 'task',
-        technicianId: 'tech-2'
-    },
-     {
-        id: 'evt-4',
-        title: 'Ticket: GEMMAN-ZONAC-SITEC2-0003',
-        description: 'Impresora no funciona',
-        start: new Date('2024-08-22T11:00:00'),
-        end: new Date('2024-08-22T13:00:00'),
-        type: 'ticket',
-        technicianId: 'tech-3',
-        ticketId: '3'
-    },
-     {
-        id: 'evt-5',
-        title: 'Capacitación HVAC',
-        description: 'Nuevos equipos y protocolos',
-        start: new Date('2024-08-23T09:00:00'),
-        end: new Date('2024-08-23T16:00:00'),
-        type: 'shift',
-        technicianId: 'tech-2'
-    }
 ];

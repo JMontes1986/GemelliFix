@@ -38,8 +38,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { technicians as allTechnicians, scheduleEvents, tickets as unassignedTicketsData } from '@/lib/data';
-import type { Technician, ScheduleEvent, Ticket, User } from '@/lib/types';
+import { scheduleEvents, tickets as unassignedTicketsData } from '@/lib/data';
+import type { ScheduleEvent, Ticket, User } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
@@ -50,7 +50,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 const weekDays = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 
-const EventCard = ({ event }: { event: ScheduleEvent }) => {
+const EventCard = ({ event, allTechnicians }: { event: ScheduleEvent, allTechnicians: User[] }) => {
   const technician = allTechnicians.find(t => t.id === event.technicianId);
   const eventDate = new Date(event.start);
   
@@ -71,7 +71,7 @@ const EventCard = ({ event }: { event: ScheduleEvent }) => {
     <div
       className={cn(
         'absolute w-full p-2 rounded-lg border text-xs shadow-sm cursor-pointer hover:shadow-md transition-all z-10',
-        technician?.color || 'bg-secondary text-secondary-foreground'
+         'bg-secondary text-secondary-foreground'
       )}
       style={{
         top: `${top}px`,
@@ -192,6 +192,17 @@ export default function CalendarPage() {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [isLoadingUser, setIsLoadingUser] = useState(true);
     const { toast } = useToast();
+    const [allTechnicians, setAllTechnicians] = useState<User[]>([]);
+
+     useEffect(() => {
+        const fetchTechnicians = async () => {
+            const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+            const querySnapshot = await getDocs(techQuery);
+            const techData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+            setAllTechnicians(techData);
+        };
+        fetchTechnicians();
+    }, []);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -212,7 +223,7 @@ export default function CalendarPage() {
         return () => unsubscribe();
     }, []);
 
-    const technicians = currentUser?.role === 'Servicios Generales' 
+    const techniciansToDisplay = currentUser?.role === 'Servicios Generales' 
         ? allTechnicians.filter(t => t.name === currentUser.name)
         : allTechnicians;
 
@@ -285,7 +296,7 @@ export default function CalendarPage() {
         return date;
     });
 
-    const eventsByTechnicianAndDay: Record<string, Record<string, ScheduleEvent[]>> = technicians.reduce((acc, tech) => {
+    const eventsByTechnicianAndDay: Record<string, Record<string, ScheduleEvent[]>> = techniciansToDisplay.reduce((acc, tech) => {
         acc[tech.id] = {};
         weekDates.forEach(date => {
             const dateString = date.toDateString();
@@ -415,7 +426,7 @@ export default function CalendarPage() {
                   <CardTitle className="font-headline text-base">Servicios Generales</CardTitle>
                 </CardHeader>
                 <CardContent className="p-2 flex-1 overflow-y-auto">
-                  {technicians.length > 0 ? technicians.map(tech => (
+                  {techniciansToDisplay.length > 0 ? techniciansToDisplay.map(tech => (
                     <div key={tech.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-background/80">
                          <Avatar className="h-10 w-10">
                             <AvatarImage src={tech.avatar} alt={tech.name} />
@@ -423,7 +434,6 @@ export default function CalendarPage() {
                         </Avatar>
                         <div>
                             <p className="font-semibold text-sm">{tech.name}</p>
-                            <p className="text-xs text-muted-foreground">{tech.workload}% Carga</p>
                         </div>
                     </div>
                   )) : (
@@ -456,7 +466,7 @@ export default function CalendarPage() {
             </div>
             
             {/* Day columns */}
-            <div className={`grid h-full`} style={{ gridTemplateColumns: `repeat(${technicians.length > 0 ? technicians.length : 1}, 1fr)`}}>
+            <div className={`grid h-full`} style={{ gridTemplateColumns: `repeat(${techniciansToDisplay.length > 0 ? techniciansToDisplay.length : 1}, 1fr)`}}>
                  {weekDates.map((date) => (
                     <div key={date.toString()} className="border-r relative" onDragOver={e => e.preventDefault()}>
                          {hours.map((hour, hourIndex) => (
@@ -468,7 +478,7 @@ export default function CalendarPage() {
                                     const ticketId = e.dataTransfer.getData('ticketId');
                                     // Drop logic needs to determine which technician's sub-column it was dropped into.
                                     // This is a simplified placeholder.
-                                    const techId = technicians.length > 0 ? technicians[0].id : ''; 
+                                    const techId = techniciansToDisplay.length > 0 ? techniciansToDisplay[0].id : ''; 
                                     if (ticketId && techId) {
                                       handleDrop(techId, date, hour, ticketId);
                                     }
@@ -476,11 +486,11 @@ export default function CalendarPage() {
                              />
                          ))}
                          {/* Events for this day */}
-                         <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${technicians.length}, 1fr)`}}>
-                             {technicians.map(tech => (
+                         <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${techniciansToDisplay.length}, 1fr)`}}>
+                             {techniciansToDisplay.map(tech => (
                                 <div key={tech.id} className="relative border-r last:border-r-0">
                                     {(eventsByTechnicianAndDay[tech.id]?.[date.toDateString()] || []).map(event => (
-                                        <EventCard key={event.id} event={event} />
+                                        <EventCard key={event.id} event={event} allTechnicians={allTechnicians} />
                                     ))}
                                 </div>
                              ))}

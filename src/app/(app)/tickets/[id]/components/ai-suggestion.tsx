@@ -20,15 +20,15 @@ import {
   type SuggestTechnicianAssignmentInput,
   type SuggestTechnicianAssignmentOutput,
 } from '@/ai/flows/suggest-technician-assignment';
-import type { Ticket, Technician } from '@/lib/types';
-import { technicians } from '@/lib/data';
+import type { Ticket, User } from '@/lib/types';
 
 interface AiSuggestionProps {
     ticket: Ticket;
-    onAssign: (technician: Technician) => void;
+    technicians: User[];
+    onAssign: (technician: User) => void;
 }
 
-export default function AiSuggestion({ ticket, onAssign }: AiSuggestionProps) {
+export default function AiSuggestion({ ticket, technicians, onAssign }: AiSuggestionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestTechnicianAssignmentOutput | null>(null);

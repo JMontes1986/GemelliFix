@@ -46,10 +46,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { PlusCircle, Loader2 } from 'lucide-react';
-import { technicians, zones, sites, categories } from '@/lib/data';
+import { zones, sites, categories } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -58,6 +58,8 @@ import Link from 'next/link';
 export default function SettingsPage() {
     const [users, setUsers] = React.useState<User[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
+    const [technicians, setTechnicians] = React.useState<User[]>([]);
+    const [isLoadingTechnicians, setIsLoadingTechnicians] = React.useState(true);
     const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
     const [isUpdating, setIsUpdating] = React.useState(false);
     const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
@@ -80,6 +82,25 @@ export default function SettingsPage() {
 
         return () => unsubscribe();
     }, [toast]);
+    
+    React.useEffect(() => {
+        const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const fetchedTechnicians: User[] = [];
+            querySnapshot.forEach((doc) => {
+                fetchedTechnicians.push({ id: doc.id, ...doc.data() } as User);
+            });
+            setTechnicians(fetchedTechnicians);
+            setIsLoadingTechnicians(false);
+        }, (error) => {
+            console.error("Error fetching technicians:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
+            setIsLoadingTechnicians(false);
+        });
+
+        return () => unsubscribe();
+    }, [toast]);
+
 
     const handleEditClick = (user: User) => {
         setSelectedUser(user);
@@ -255,28 +276,34 @@ export default function SettingsPage() {
                   <TableRow>
                     <TableHead className="w-[80px]">Avatar</TableHead>
                     <TableHead>Nombre</TableHead>
-                    <TableHead>Habilidades</TableHead>
-                    <TableHead>Carga</TableHead>
+                    <TableHead>Rol</TableHead>
                     <TableHead>Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {technicians.map((tech) => (
-                    <TableRow key={tech.id}>
-                       <TableCell>
-                        <Avatar>
-                          <AvatarImage src={tech.avatar} alt={tech.name} />
-                          <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                      </TableCell>
-                      <TableCell className="font-medium">{tech.name}</TableCell>
-                      <TableCell>{tech.skills.join(', ')}</TableCell>
-                      <TableCell>{tech.workload}%</TableCell>
-                      <TableCell>
-                        <Button variant="outline" size="sm">Editar</Button>
-                      </TableCell>
+                  {isLoadingTechnicians ? (
+                    <TableRow>
+                        <TableCell colSpan={4} className="h-24 text-center">
+                           <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+                        </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    technicians.map((tech) => (
+                        <TableRow key={tech.id}>
+                        <TableCell>
+                            <Avatar>
+                            <AvatarImage src={tech.avatar} alt={tech.name} />
+                            <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                        </TableCell>
+                        <TableCell className="font-medium">{tech.name}</TableCell>
+                        <TableCell><Badge variant="secondary">{tech.role}</Badge></TableCell>
+                        <TableCell>
+                            <Button variant="outline" size="sm" onClick={() => handleEditClick(tech)}>Editar</Button>
+                        </TableCell>
+                        </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
