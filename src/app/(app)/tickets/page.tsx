@@ -3,8 +3,9 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+import { db, auth } from '@/lib/firebase';
 import { File, ListFilter, MoreHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import type { Ticket } from '@/lib/types';
+import type { Ticket, User } from '@/lib/types';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -85,10 +86,53 @@ export default function TicketsPage() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
   React.useEffect(() => {
-    const q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        if (firebaseUser) {
+            try {
+                const userDocRef = doc(db, 'users', firebaseUser.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
+                } else {
+                   setError("Usuario no encontrado en la base de datos.");
+                   setIsLoading(false);
+                }
+            } catch (err) {
+                 setError("Error al cargar datos del usuario.");
+                 setIsLoading(false);
+            }
+        } else {
+            // No user is signed in.
+            setIsLoading(false);
+        }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  React.useEffect(() => {
+    if (!currentUser) {
+        // Wait for user to be loaded
+        return;
+    }
+    
+    let q;
+    if (currentUser.role === 'Servicios Generales') {
+        // Filter tickets for 'Servicios Generales'
+        q = query(
+            collection(db, 'tickets'), 
+            where('assignedTo', 'array-contains', currentUser.name),
+            orderBy('createdAt', 'desc')
+        );
+    } else {
+        // Admins and other roles see all tickets
+        q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
+    }
+    
+    const unsubscribeTickets = onSnapshot(q, (querySnapshot) => {
       const ticketsData: Ticket[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
@@ -116,8 +160,8 @@ export default function TicketsPage() {
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => unsubscribeTickets();
+  }, [currentUser]);
 
   const groupedTickets = tickets.reduce((acc, ticket) => {
     const { zone } = ticket;
@@ -239,7 +283,7 @@ export default function TicketsPage() {
                             <TableCell>
                             <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
                             </TableCell>
-                            <TableCell>{ticket.assignedTo || 'Sin Asignar'}</TableCell>
+                            <TableCell>{(Array.isArray(ticket.assignedTo) ? ticket.assignedTo.join(', ') : ticket.assignedTo) || 'Sin Asignar'}</TableCell>
                             <TableCell className="hidden md:table-cell">
                             <ClientFormattedDate date={ticket.createdAt} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
                             </TableCell>
