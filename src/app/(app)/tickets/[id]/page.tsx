@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, getDoc, arrayUnion } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, getDoc, arrayUnion, orderBy } from 'firebase/firestore';
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
@@ -41,8 +41,10 @@ import {
   UploadCloud,
   X as XIcon,
   Send,
+  LogIn,
+  PenSquare,
 } from 'lucide-react';
-import type { Ticket, User as CurrentUser, Attachment } from '@/lib/types';
+import type { Ticket, User as CurrentUser, Attachment, Log } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AiSuggestion from './components/ai-suggestion';
 import AiStateSuggestion from './components/ai-state-suggestion';
@@ -57,6 +59,7 @@ import Link from 'next/link';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import PdfViewer from '@/components/ui/pdf-viewer';
 import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
@@ -104,6 +107,16 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
     }
 }
 
+const LogIcon = ({ action }: { action: Log['action'] }) => {
+    switch (action) {
+        case 'create_ticket': return <CheckCircle className="w-5 h-5 text-green-500" />;
+        case 'update_status': return <PenSquare className="w-5 h-5 text-yellow-500" />;
+        case 'update_assignment': return <ArrowRight className="w-5 h-5 text-blue-500" />;
+        case 'add_comment': return <MessageSquare className="w-5 h-5 text-gray-500" />;
+        default: return <LogIn className="w-5 h-5 text-gray-400" />;
+    }
+};
+
 async function createNotification(ticket: Ticket, assignedPersonnelIds: string[]) {
     try {
         const usersRef = collection(db, "users");
@@ -142,6 +155,7 @@ export default function TicketDetailPage() {
   const [technicians, setTechnicians] = useState<CurrentUser[]>([]);
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
   const [comment, setComment] = useState("");
+  const [logs, setLogs] = useState<Log[]>([]);
 
 
   useEffect(() => {
@@ -219,9 +233,37 @@ export default function TicketDetailPage() {
         setError("Error al cargar el ticket. Verifique su conexión y permisos.");
         setIsLoading(false);
     });
+    
+    // Fetch logs for the ticket
+    const logsQuery = query(
+      collection(db, 'logs'), 
+      where('details.ticketId', '==', ticketId),
+      orderBy('timestamp', 'asc')
+    );
+    const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
+        const fetchedLogs: Log[] = [];
+        snapshot.forEach(doc => {
+            fetchedLogs.push({ id: doc.id, ...doc.data()} as Log);
+        });
+        setLogs(fetchedLogs);
+    }, (err) => {
+        console.error("Error fetching logs: ", err);
+        // Inform user that a new index might be required
+        if (err.code === 'failed-precondition') {
+            toast({
+                variant: 'destructive',
+                title: 'Índice de base de datos requerido',
+                description: 'La consulta de historial necesita un índice. Por favor, créalo en la consola de Firebase.',
+                duration: 10000,
+            });
+        }
+    });
 
-    return () => unsubscribe();
-}, [ticketId]);
+    return () => {
+        unsubscribe();
+        unsubscribeLogs();
+    };
+}, [ticketId, toast]);
 
 
   const canEdit = currentUser?.role === 'Administrador';
@@ -293,6 +335,10 @@ export default function TicketDetailPage() {
         await createLog(currentUser, `update_${field}`, logDetails);
       }
       
+      if(comment.trim()){
+         await createLog(currentUser, 'add_comment', { ticket, comment });
+      }
+
       setComment('');
 
       toast({
@@ -348,17 +394,18 @@ export default function TicketDetailPage() {
         await updateDoc(docRef, {
             status: 'Requiere Aprobación',
             evidence: arrayUnion(...uploadedEvidence),
-            // Aquí podríamos agregar el comentario también si lo guardamos en un historial.
         });
         
         await createLog(currentUser, 'update_status', { ticket, oldValue: ticket.status, newValue: 'Requiere Aprobación' });
+        await createLog(currentUser, 'add_comment', { ticket, comment });
+
 
         setFilesToUpload([]); // Limpiar archivos después de la subida exitosa
         setComment(''); // Limpiar comentario
         
         toast({
             title: 'Progreso Actualizado',
-            description: 'El ticket ha sido enviado para su aprobación por el solicitante.'
+            description: 'El ticket ha sido enviado para su aprobación.'
         });
 
     } catch (uploadError: any) {
@@ -671,7 +718,7 @@ export default function TicketDetailPage() {
                     <div className="space-y-4">
                          <div>
                             <label htmlFor="comment" className="text-sm font-medium">Agregar Comentario</label>
-                            <textarea id="comment" placeholder="Describe el trabajo realizado..." className="mt-1 block w-full rounded-md border-input bg-background p-2 text-sm shadow-sm focus:border-ring focus:ring focus:ring-ring focus:ring-opacity-50" value={comment} onChange={(e) => setComment(e.target.value)}></textarea>
+                            <Textarea id="comment" placeholder="Describe el trabajo realizado..." className="mt-1 block w-full rounded-md border-input bg-background p-2 text-sm shadow-sm focus:border-ring focus:ring focus:ring-ring focus:ring-opacity-50 min-h-[100px]" value={comment} onChange={(e) => setComment(e.target.value)} />
                         </div>
                         <div>
                             <label className="text-sm font-medium">Adjuntar Evidencia</label>
@@ -725,45 +772,23 @@ export default function TicketDetailPage() {
             </CardHeader>
             <CardContent>
                 <div className="space-y-4 text-sm">
-                    <div className="flex gap-3">
-                        <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
-                        <div>
-                            <p>Ticket creado por <strong>{ticket.requester}</strong>.</p>
-                            <p className="text-xs text-muted-foreground"><ClientFormattedDate date={ticket.createdAt} /></p>
-                        </div>
-                    </div>
-                     {assignedPersonnelDetails.length > 0 && (
-                        <div className="flex gap-3">
-                            <div className="flex-shrink-0"><ArrowRight className="w-5 h-5 text-blue-500" /></div>
-                            <div>
-                                <p>Ticket asignado a <strong>{assignedPersonnelDetails.map(p => p.name).join(', ')}</strong> por <strong>Admin User</strong>.</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 3600000).toISOString()} /></p>
+                    {logs.length > 0 ? (
+                        logs.map((log) => (
+                             <div key={log.id} className="flex gap-3">
+                                <div className="flex-shrink-0">
+                                   <LogIcon action={log.action} />
+                                </div>
+                                <div>
+                                    <p dangerouslySetInnerHTML={{ __html: log.details.description }} />
+                                    <p className="text-xs text-muted-foreground">
+                                        <ClientFormattedDate date={log.timestamp?.toDate()} options={{ dateStyle: 'medium', timeStyle: 'short' }} />
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                     )}
-                     {ticket.status !== 'Abierto' && ticket.status !== 'Asignado' && assignedPersonnelDetails.length > 0 && (
-                        <div className="flex gap-3">
-                            <div className="flex-shrink-0">
-                                <Avatar className="h-5 w-5">
-                                    <AvatarImage src={assignedPersonnelDetails[0].avatar} />
-                                    <AvatarFallback>{assignedPersonnelDetails[0].name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                            </div>
-                            <div>
-                                <p><strong>{assignedPersonnelDetails[0].name}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 7200000).toISOString()} /></p>
-                            </div>
-                        </div>
-                     )}
-                     {(ticket.status === 'Resuelto' || ticket.status === 'Cerrado' || ticket.status === 'Requiere Aprobación') && assignedPersonnelDetails.length > 0 && (
-                         <div className="flex gap-3">
-                            <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
-                            <div>
-                                <p>Ticket marcado como <strong>Resuelto</strong> por <strong>{ticket.assignedTo?.[0] || ''}</strong>.</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.dueDate).getTime() - 86400000).toISOString()} /></p>
-                            </div>
-                        </div>
-                     )}
+                        ))
+                    ) : (
+                        <p className="text-muted-foreground">No hay historial para este ticket.</p>
+                    )}
                 </div>
             </CardContent>
         </Card>
@@ -772,3 +797,5 @@ export default function TicketDetailPage() {
     </div>
   );
 }
+
+    

@@ -39,6 +39,9 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud, File as FileIcon, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { createLog } from '@/lib/utils';
+import type { User } from '@/lib/types';
+
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
@@ -103,6 +106,14 @@ export default function CreateTicketPage() {
     setIsLoading(true);
     try {
       const requesterName = currentUser.displayName || currentUser.email || 'Usuario Desconocido';
+      const userRole = 'Docentes'; // This should be fetched from user's profile
+      const userObject: User = {
+          id: currentUser.uid,
+          name: requesterName,
+          email: currentUser.email || 'unknown',
+          role: userRole,
+          avatar: currentUser.photoURL || '',
+      };
 
       const zoneName = zones.find((z) => z.id === data.zoneId)?.name;
       const siteName = sites.find((s) => s.id === data.siteId)?.name;
@@ -143,7 +154,7 @@ export default function CreateTicketPage() {
       }
 
 
-      await addDoc(collection(db, 'tickets'), {
+      const docRef = await addDoc(collection(db, 'tickets'), {
         code: ticketCode,
         title: data.title,
         description: data.description,
@@ -161,6 +172,9 @@ export default function CreateTicketPage() {
         dueDate: dueDate, 
         attachments: attachmentUrls,
       });
+
+      const newTicket = { id: docRef.id, code: ticketCode, ...data };
+      await createLog(userObject, 'create_ticket', { ticket: newTicket });
 
       toast({
         title: '¡Ticket Creado!',
@@ -451,3 +465,4 @@ export default function CreateTicketPage() {
   );
 }
 
+    

@@ -85,7 +85,7 @@ export type Log = {
     id: string;
     userEmail: string;
     userName: string;
-    action: 'login' | 'update_status' | 'update_priority' | 'update_assignment';
+    action: 'login' | 'create_ticket' | 'update_status' | 'update_priority' | 'update_assignment' | 'add_comment';
     timestamp: any;
     details: {
         ticketId?: string;
@@ -93,11 +93,14 @@ export type Log = {
         field?: 'status' | 'priority' | 'assignedTo';
         oldValue?: any;
         newValue?: any;
-        description?: string;
+        description: string;
     }
 }
     
 
     
+
+    
+
 
     
