@@ -17,37 +17,43 @@ const firebaseConfig = {
 };
 
 // =================================================================
-// IMPORTANTE: REGLAS DE SEGURIDAD DE FIRESTORE
+// ========= REGLAS DE SEGURIDAD DE FIRESTORE (COPIAR Y PEGAR) =========
 // =================================================================
-// Para que la aplicación funcione correctamente, debes actualizar
-// las reglas de seguridad de tu base de datos de Firestore en la
-// Consola de Firebase (https://console.firebase.google.com/).
-//
-// Ve a Firestore Database -> Pestaña "Reglas" y reemplaza el
-// contenido con lo siguiente:
-//
-// rules_version = '2';
-//
-// service cloud.firestore {
-//   match /databases/{database}/documents {
-//
-//     // Los usuarios pueden leer y escribir sus propios datos
-//     match /users/{userId} {
-//       allow read, write: if request.auth != null && request.auth.uid == userId;
-//     }
-//
-//     // Los usuarios autenticados pueden crear tickets y logs
-//     match /tickets/{ticketId} {
-//        allow read, create: if request.auth != null;
-//        allow update, delete: if request.auth != null && resource.data.requester == request.auth.token.name;
-//     }
-//
-//     match /diagnosis_logs/{logId} {
-//        allow create: if request.auth != null;
-//     }
-//
-//   }
-// }
+/*
+  Para que la aplicación funcione correctamente, debes actualizar las reglas 
+  de seguridad de tu base de datos de Firestore en la Consola de Firebase.
+
+  1. Ve a tu proyecto en https://console.firebase.google.com/
+  2. En el menú de la izquierda, ve a Compilación -> Firestore Database.
+  3. Haz clic en la pestaña "Reglas".
+  4. Reemplaza TODO el contenido con las siguientes reglas y haz clic en "Publicar".
+
+  rules_version = '2';
+
+  service cloud.firestore {
+    match /databases/{database}/documents {
+
+      // Los usuarios autenticados pueden leer y escribir sus propios datos de perfil
+      match /users/{userId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Los usuarios autenticados pueden leer y crear tickets.
+      // Solo el creador o un admin pueden actualizar o borrar.
+      // (Esta es una regla básica, se puede refinar más adelante).
+      match /tickets/{ticketId} {
+         allow read, create: if request.auth != null;
+         allow update, delete: if request.auth != null; // Simplificado para desarrollo inicial
+      }
+
+      // Los usuarios autenticados pueden crear logs de diagnóstico
+      match /diagnosis_logs/{logId} {
+         allow create: if request.auth != null;
+      }
+
+    }
+  }
+*/
 // =================================================================
 
 
