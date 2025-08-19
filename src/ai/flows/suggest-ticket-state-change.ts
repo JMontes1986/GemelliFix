@@ -22,7 +22,7 @@ const SuggestTicketStateChangeInputSchema = z.object({
     id: z.string(),
     status: z.string(),
     dueDate: z.string().describe("The ticket's due date in ISO 8601 format."),
-    assignedTo: z.string().optional().describe("The name of the assigned technician."),
+    assignedTo: z.array(z.string()).optional().describe("The names of the assigned technicians."),
   }),
   currentUserRole: z.enum(['Administrador', 'Servicios Generales', 'Docentes', 'Coordinadores', 'Administrativos']).describe("The role of the user requesting the analysis."),
 });
@@ -53,7 +53,7 @@ The current date is ${new Date().toISOString()}.
 **Ticket Information:**
 - **Status:** {{ticket.status}}
 - **Due Date:** {{ticket.dueDate}}
-- **Assigned To:** {{ticket.assignedTo}}
+- **Assigned To:** {{#if ticket.assignedTo}}{{ticket.assignedTo.join ", "}}{{else}}Sin Asignar{{/if}}
 - **User Role:** {{currentUserRole}}
 
 **Your Analysis Task:**
@@ -63,7 +63,7 @@ The current date is ${new Date().toISOString()}.
 2.  **If the ticket is OVERDUE:**
     -   Your tone must be **urgent and direct**.
     -   **Analysis:** State clearly that the ticket is overdue and by how long.
-    -   **Recommendation:** Provide concrete, actionable steps. For example: "Contact the technician '{{ticket.assignedTo}}' immediately to get a status update," or "Consider reassigning this ticket to another technician due to the delay."
+    -   **Recommendation:** Provide concrete, actionable steps. For example: "Contact the technician(s) '{{ticket.assignedTo.join ", "}}' immediately to get a status update," or "Consider reassigning this ticket to another technician due to the delay."
     -   Set \`isActionable\` to \`false\` as the primary action is investigation, not a simple state change.
 
 3.  **If the ticket is NOT overdue:**

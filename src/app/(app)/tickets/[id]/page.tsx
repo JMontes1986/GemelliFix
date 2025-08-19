@@ -100,8 +100,8 @@ const getStatusBadgeVariant = (status: Ticket['status']) => {
 const getStatusBadgeClassName = (status: Ticket['status']) => {
     switch (status) {
       case 'Asignado': return 'bg-blue-500 text-white';
-      case 'En Progreso': return 'bg-yellow-500 text-black';
       case 'Requiere Aprobación': return 'bg-purple-500 text-white';
+      case 'En Progreso': return 'bg-yellow-500 text-black';
       case 'Resuelto': return 'bg-green-600 text-white';
       case 'Cancelado': return 'bg-gray-400 text-black';
       default: return '';
@@ -567,7 +567,7 @@ export default function TicketDetailPage() {
                         ) : (
                              <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
                         )}
-                         {canEdit && <AiStateSuggestion ticket={ticket} onStatusChange={(newStatus) => handleUpdate('status', newStatus)} />}
+                         {canEdit && <AiStateSuggestion ticket={ticket} currentUser={currentUser} onStatusChange={(newStatus) => handleUpdate('status', newStatus)} />}
                     </div>
                    
                 </div>

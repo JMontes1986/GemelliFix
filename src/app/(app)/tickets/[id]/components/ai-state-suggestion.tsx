@@ -19,18 +19,16 @@ import {
   type SuggestTicketStateChangeInput,
   type SuggestTicketStateChangeOutput,
 } from '@/ai/flows/suggest-ticket-state-change';
-import type { Ticket } from '@/lib/types';
-import { users } from '@/lib/data';
+import type { Ticket, User } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface AiStateSuggestionProps {
     ticket: Ticket;
     onStatusChange: (newStatus: string) => void;
+    currentUser: User | null;
 }
 
-const currentUser = users[0]; // Assuming admin user
-
-export default function AiStateSuggestion({ ticket, onStatusChange }: AiStateSuggestionProps) {
+export default function AiStateSuggestion({ ticket, onStatusChange, currentUser }: AiStateSuggestionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestTicketStateChangeOutput | null>(null);
@@ -39,6 +37,15 @@ export default function AiStateSuggestion({ ticket, onStatusChange }: AiStateSug
   const handleSuggestion = async () => {
     if (!isOpen) {
         setIsOpen(true);
+    }
+    
+    if (!currentUser) {
+        toast({
+            variant: 'destructive',
+            title: 'Error de autenticación',
+            description: 'No se ha podido identificar al usuario actual.',
+        });
+        return;
     }
     
     setIsLoading(true);
