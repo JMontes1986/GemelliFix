@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -241,7 +240,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
      return <Card><CardHeader><CardTitle>Ticket no encontrado</CardTitle></CardHeader><CardContent><p>El ticket que buscas no existe o ha sido eliminado.</p></CardContent></Card>
   }
   
-  const assignedPersonnel = technicians.filter(
+  const assignedPersonnelDetails = technicians.filter(
     (tech) => ticket.assignedTo?.includes(tech.name)
   );
   const isRequester = currentUser.name === ticket.requester;
@@ -400,8 +399,8 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
           </CardHeader>
           <CardContent className="space-y-4">
             {isUpdating && <div className="flex justify-center"><Loader2 className="animate-spin" /></div>}
-            {!isUpdating && assignedPersonnel.length > 0 ? (
-                assignedPersonnel.map(person => (
+            {!isUpdating && assignedPersonnelDetails.length > 0 ? (
+                assignedPersonnelDetails.map(person => (
                     <div key={person.id} className="flex items-center gap-4">
                         <Avatar className="h-12 w-12">
                         <AvatarImage src={person.avatar} />
@@ -422,7 +421,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 <Popover open={isAssignPopoverOpen} onOpenChange={setAssignPopoverOpen}>
                     <PopoverTrigger asChild>
                         <Button variant="outline" disabled={isUpdating}>
-                         {assignedPersonnel.length > 0 ? 'Reasignar Personal' : 'Asignar Personal'}
+                         {assignedPersonnelDetails.length > 0 ? 'Reasignar Personal' : 'Asignar Personal'}
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80">
@@ -469,7 +468,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
           )}
         </Card>
 
-        {assignedPersonnel.length > 0 && ['Asignado', 'En Progreso'].includes(ticket.status) && (
+        {assignedPersonnelDetails.length > 0 && ['Asignado', 'En Progreso'].includes(ticket.status) && (
             <Card className="mb-6">
                  <CardHeader>
                     <CardTitle className="font-headline text-lg flex items-center gap-2"><Edit className="w-5 h-5" /> Actualizar Progreso</CardTitle>
@@ -517,30 +516,30 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                             <p className="text-xs text-muted-foreground"><ClientFormattedDate date={ticket.createdAt} /></p>
                         </div>
                     </div>
-                     {assignedPersonnel.length > 0 && (
+                     {assignedPersonnelDetails.length > 0 && (
                         <div className="flex gap-3">
                             <div className="flex-shrink-0"><ArrowRight className="w-5 h-5 text-blue-500" /></div>
                             <div>
-                                <p>Ticket asignado a <strong>{assignedPersonnel.map(p => p.name).join(', ')}</strong> por <strong>Admin User</strong>.</p>
+                                <p>Ticket asignado a <strong>{assignedPersonnelDetails.map(p => p.name).join(', ')}</strong> por <strong>Admin User</strong>.</p>
                                 <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 3600000)} /></p>
                             </div>
                         </div>
                      )}
-                     {ticket.status !== 'Abierto' && ticket.status !== 'Asignado' && assignedPersonnel.length > 0 && (
+                     {ticket.status !== 'Abierto' && ticket.status !== 'Asignado' && assignedPersonnelDetails.length > 0 && (
                         <div className="flex gap-3">
                             <div className="flex-shrink-0">
                                 <Avatar className="h-5 w-5">
-                                    <AvatarImage src={assignedPersonnel[0].avatar} />
-                                    <AvatarFallback>{assignedPersonnel[0].name.charAt(0)}</AvatarFallback>
+                                    <AvatarImage src={assignedPersonnelDetails[0].avatar} />
+                                    <AvatarFallback>{assignedPersonnelDetails[0].name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                             </div>
                             <div>
-                                <p><strong>{assignedPersonnel[0].name}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
+                                <p><strong>{assignedPersonnelDetails[0].name}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
                                 <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 7200000)} /></p>
                             </div>
                         </div>
                      )}
-                     {(ticket.status === 'Resuelto' || ticket.status === 'Cerrado' || ticket.status === 'Requiere Aprobación') && (
+                     {(ticket.status === 'Resuelto' || ticket.status === 'Cerrado' || ticket.status === 'Requiere Aprobación') && assignedPersonnelDetails.length > 0 && (
                          <div className="flex gap-3">
                             <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
                             <div>

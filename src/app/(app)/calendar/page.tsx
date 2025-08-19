@@ -135,7 +135,7 @@ function AiAssignmentDialog({
                         </div>
                         <div className="p-4 bg-muted/50 rounded-lg space-y-2 text-sm">
                             <p><strong>Ticket:</strong> {suggestion.ticket.title}</p>
-                            <p><strong>Técnico:</strong> {suggestion.technician.name}</p>
+                            <p><strong>Personal:</strong> {suggestion.technician.name}</p>
                             <p><strong>Fecha y Hora:</strong> {new Date(suggestion.suggestedTime).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}</p>
                         </div>
                         <Button className="w-full" onClick={() => onConfirm(suggestion)}>
@@ -282,10 +282,10 @@ export default function CalendarPage() {
                         <Input id="title" placeholder="Ej: Turno de mañana" className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="technician" className="text-right">Técnico</Label>
+                        <Label htmlFor="technician" className="text-right">Personal</Label>
                         <Select>
                             <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Seleccionar técnico" />
+                                <SelectValue placeholder="Seleccionar personal" />
                             </SelectTrigger>
                             <SelectContent>
                                 {technicians.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
@@ -347,7 +347,7 @@ export default function CalendarPage() {
                   <CardTitle className="font-headline text-base">Servicios Generales</CardTitle>
                 </CardHeader>
                 <CardContent className="p-2 flex-1 overflow-y-auto">
-                  {technicians.map(tech => (
+                  {technicians.length > 0 ? technicians.map(tech => (
                     <div key={tech.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-background/80">
                          <Avatar className="h-10 w-10">
                             <AvatarImage src={tech.avatar} alt={tech.name} />
@@ -358,7 +358,9 @@ export default function CalendarPage() {
                             <p className="text-xs text-muted-foreground">{tech.workload}% Carga</p>
                         </div>
                     </div>
-                  ))}
+                  )) : (
+                     <p className="text-sm text-muted-foreground p-4 text-center">No hay personal registrado.</p>
+                  )}
                 </CardContent>
             </Card>
         </div>
@@ -397,7 +399,7 @@ export default function CalendarPage() {
                                     e.preventDefault();
                                     const techId = "tech-1"; // Simplified: in a real scenario, determine technician from column
                                     const ticketId = e.dataTransfer.getData('ticketId');
-                                    if (ticketId) {
+                                    if (ticketId && technicians.length > 0) {
                                       handleDrop(techId, date, hour, ticketId);
                                     }
                                 }} 
