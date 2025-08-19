@@ -48,6 +48,7 @@ export type Ticket = {
   requester: string;
   requesterId: string;
   attachments?: Attachment[];
+  evidence?: Attachment[];
 };
 
 export type Technician = {

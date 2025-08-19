@@ -36,6 +36,7 @@ import {
   Briefcase,
   Loader2,
   Users,
+  Download,
 } from 'lucide-react';
 import type { Ticket, Technician, User as CurrentUser } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -51,6 +52,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged } from 'firebase/auth';
 import { createLog } from '@/lib/utils';
+import Link from 'next/link';
 
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
@@ -165,6 +167,7 @@ export default function TicketDetailPage() {
             const data = docSnap.data();
             const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
             const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
+            const resolvedAt = data.resolvedAt?.toDate ? data.resolvedAt.toDate().toISOString() : undefined;
             
             const ticketData: Ticket = {
                 id: docSnap.id,
@@ -178,11 +181,13 @@ export default function TicketDetailPage() {
                 status: data.status,
                 createdAt,
                 dueDate,
+                resolvedAt,
                 assignedTo: data.assignedTo || [],
                 requester: data.requester,
                 requesterId: data.requesterId,
                 assignedToIds: data.assignedToIds || [],
                 attachments: data.attachments || [],
+                evidence: data.evidence || [],
             };
             setTicket(ticketData);
         } else {
@@ -347,6 +352,38 @@ export default function TicketDetailPage() {
     (tech) => ticket.assignedToIds?.includes(tech.id)
   );
   const isRequester = currentUser.id === ticket.requesterId;
+  const allEvidence = [...(ticket.attachments || []), ...(ticket.evidence || [])];
+
+  const renderEvidence = (att: { url: string, description: string }) => {
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(att.url);
+    const isPdf = /\.pdf$/i.test(att.url);
+
+    return (
+      <div className="group relative space-y-2 border rounded-lg p-2">
+        {isImage ? (
+          <Image src={att.url} alt={att.description} width={400} height={300} className="rounded-md object-cover aspect-video" data-ai-hint="repair evidence"/>
+        ) : isPdf ? (
+           <div className="aspect-video bg-gray-100 flex flex-col items-center justify-center rounded-md">
+              <File className="h-16 w-16 text-red-500" />
+              <p className="mt-2 text-sm font-semibold">Archivo PDF</p>
+           </div>
+        ) : (
+          <div className="aspect-video bg-gray-100 flex flex-col items-center justify-center rounded-md">
+            <File className="h-16 w-16 text-gray-500" />
+            <p className="mt-2 text-sm font-semibold">Archivo</p>
+          </div>
+        )}
+         <p className="text-sm text-muted-foreground truncate" title={att.description}>{att.description}</p>
+         <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <Link href={att.url} target="_blank" rel="noopener noreferrer">
+              <Button>
+                {isPdf ? "Ver PDF" : "Ver Imagen"}
+              </Button>
+            </Link>
+         </div>
+      </div>
+    );
+  };
 
 
   return (
@@ -473,18 +510,39 @@ export default function TicketDetailPage() {
           </CardContent>
         </Card>
 
-        {ticket.attachments && ticket.attachments.length > 0 && (
+        {ticket.evidence && ticket.evidence.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="font-headline text-lg flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500" /> Evidencia de Resolución</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {ticket.attachments.map((att, index) => (
-                <div key={index} className="space-y-2">
-                  <Image src={att.url} alt={att.description} width={400} height={300} className="rounded-md object-cover aspect-video" data-ai-hint="repair evidence"/>
-                  <p className="text-sm text-muted-foreground italic">{att.description}</p>
-                </div>
-              ))}
+             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {ticket.evidence.map((att, index) => {
+                    const isPdf = att.url.toLowerCase().includes('.pdf');
+                    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(att.url);
+                    
+                    return (
+                        <Card key={index} className="overflow-hidden">
+                            <CardContent className="p-0">
+                                {isImage ? (
+                                    <Image src={att.url} alt={att.description} width={400} height={300} className="w-full h-auto object-cover aspect-video" data-ai-hint="repair evidence"/>
+                                ) : (
+                                    <div className="aspect-video bg-muted flex flex-col items-center justify-center p-4">
+                                        {isPdf ? <File className="w-12 h-12 text-red-500"/> : <File className="w-12 h-12 text-muted-foreground"/>}
+                                        <p className="mt-2 text-center text-sm text-muted-foreground">{att.description}</p>
+                                    </div>
+                                )}
+                            </CardContent>
+                            <CardFooter className="p-2 bg-background/50">
+                                <a href={att.url} target="_blank" rel="noopener noreferrer" className="w-full">
+                                    <Button variant="secondary" className="w-full">
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Descargar/Ver
+                                    </Button>
+                                </a>
+                            </CardFooter>
+                        </Card>
+                    )
+                })}
             </CardContent>
             {isRequester && ticket.status === 'Requiere Aprobación' && (
               <CardFooter className="gap-4">
@@ -660,3 +718,4 @@ export default function TicketDetailPage() {
     </div>
   );
 }
+
