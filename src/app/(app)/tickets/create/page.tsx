@@ -55,14 +55,13 @@ const ticketSchema = z.object({
   attachments: z.any().optional()
 });
 
-type TicketFormValues = z.infer<typeof ticketSchema>
+type TicketFormValues = z.infer<typeof ticketSchema>;
 
 export default function CreateTicketPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   const [isAuthReady, setIsAuthReady] = React.useState(false);
-  const [attachedFiles, setAttachedFiles] = React.useState<File[]>([]);
   
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketSchema),
@@ -73,6 +72,7 @@ export default function CreateTicketPage() {
       siteId: '',
       priority: 'Media',
       category: 'General',
+      attachments: [],
     },
   });
 
@@ -83,7 +83,7 @@ export default function CreateTicketPage() {
     return () => unsubscribe();
   }, []);
 
-
+  const attachedFiles = form.watch('attachments') || [];
   const selectedZoneId = form.watch('zoneId');
   
   const onSubmit = async (data: TicketFormValues) => {
@@ -98,16 +98,16 @@ export default function CreateTicketPage() {
     }
     setIsLoading(true);
     try {
-      // NOTE: We are not using user profiles from firestore for the requester name for now.
-      // This can be added later if needed.
       const requesterName = currentUser.displayName || currentUser.email || 'Usuario Desconocido';
 
       const zoneName = zones.find((z) => z.id === data.zoneId)?.name;
       const siteName = sites.find((s) => s.id === data.siteId)?.name;
       
       const attachmentUrls: { url: string, description: string }[] = [];
-      if (attachedFiles.length > 0) {
-        for (const file of attachedFiles) {
+      const filesToUpload: File[] = data.attachments || [];
+
+      if (filesToUpload.length > 0) {
+        for (const file of filesToUpload) {
           const storageRef = ref(storage, `ticket-attachments/${Date.now()}-${file.name}`);
           const snapshot = await uploadBytes(storageRef, file);
           const downloadURL = await getDownloadURL(snapshot.ref);
@@ -155,6 +155,7 @@ export default function CreateTicketPage() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
      if (e.target.files) {
       const newFiles = Array.from(e.target.files);
+      const currentFiles = form.getValues('attachments') || [];
       const validFiles: File[] = [];
       
       for(const file of newFiles) {
@@ -168,14 +169,15 @@ export default function CreateTicketPage() {
         }
         validFiles.push(file);
       }
-      setAttachedFiles(prevFiles => [...prevFiles, ...validFiles]);
+      form.setValue('attachments', [...currentFiles, ...validFiles], { shouldValidate: true });
     }
   }
 
   function removeFile(indexToRemove: number) {
-    setAttachedFiles(prevFiles => prevFiles.filter((_, index) => index !== indexToRemove));
+    const currentFiles = form.getValues('attachments') || [];
+    const newFiles = currentFiles.filter((_, index) => index !== indexToRemove);
+    form.setValue('attachments', newFiles, { shouldValidate: true });
   }
-
 
   return (
     <div className="flex justify-center items-start py-8">
@@ -417,3 +419,5 @@ export default function CreateTicketPage() {
     </div>
   );
 }
+
+    
