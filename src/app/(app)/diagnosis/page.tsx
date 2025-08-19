@@ -27,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Zap } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { User as FirebaseAuthUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -57,6 +57,43 @@ export default function DiagnosisPage() {
     // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
+
+  const handleSimpleConnectionTest = async () => {
+    if (!currentUser) {
+      toast({
+        variant: 'destructive',
+        title: 'Error de Autenticación',
+        description: 'Debes iniciar sesión para realizar la prueba.',
+      });
+      return;
+    }
+    setIsLoading(true);
+    setExecutionResult({ status: 'Enviando...', message: 'Intentando escribir en `diagnosis_logs`...' });
+    try {
+      const docRef = await addDoc(collection(db, 'diagnosis_logs'), {
+        test: 'simple_connection_test',
+        user: currentUser.email,
+        createdAt: serverTimestamp(),
+      });
+      const successMsg = `¡Éxito! Se ha escrito un documento en Firestore con el ID: ${docRef.id}. La conexión es correcta.`;
+      toast({
+        title: 'Conexión Exitosa',
+        description: 'Se ha verificado la escritura en Firestore.',
+      });
+      setExecutionResult({ status: 'Éxito', message: successMsg });
+    } catch (error: any) {
+      console.error('Error en la prueba de conexión:', error);
+      const errorMsg = `No se pudo escribir en Firestore. Detalles: ${error.message}`;
+      toast({
+        variant: 'destructive',
+        title: 'Error de Conexión',
+        description: errorMsg,
+      });
+       setExecutionResult({ status: 'Error', message: errorMsg });
+    } finally {
+        setIsLoading(false);
+    }
+  };
 
 
   const form = useForm<DiagnosisFormValues>({
@@ -120,7 +157,32 @@ export default function DiagnosisPage() {
   };
 
   return (
-    <div className="flex justify-center items-start py-8">
+    <div className="flex flex-col items-center justify-start py-8 gap-8">
+      
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle className="font-headline text-2xl">Prueba de Conexión Rápida</CardTitle>
+          <CardDescription>
+            Usa este botón para realizar una prueba de escritura simple y directa a Firestore. Esto ayuda a verificar rápidamente si las reglas de seguridad y la configuración del proyecto son correctas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleSimpleConnectionTest} disabled={isLoading || isAuthLoading} className="w-full">
+            {(isLoading || isAuthLoading) ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verificando...
+              </>
+            ) : (
+              <>
+                <Zap className="mr-2 h-4 w-4" />
+                Probar Conexión de Escritura
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="font-headline text-2xl">Diagnóstico de Conexión a Firestore</CardTitle>
@@ -180,6 +242,7 @@ export default function DiagnosisPage() {
           </form>
         </Form>
       </Card>
+
     </div>
   );
 }
