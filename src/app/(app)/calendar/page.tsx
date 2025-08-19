@@ -52,10 +52,11 @@ const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 const generateColorFromString = (str: string): string => {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        hash = str.charCodeAt(i) + ((hash << 7) - hash);
+        hash = hash & hash;
     }
     const h = hash % 360;
-    return `hsl(${h}, 50%, 60%)`;
+    return `hsl(${h}, 60%, 70%)`;
 };
 
 
@@ -76,7 +77,8 @@ const EventCard = ({ event, color }: { event: ScheduleEvent, color: string }) =>
   const height = (durationMinutes / 60) * 64;
 
   const hsl = color.match(/\d+/g)?.map(Number);
-  const textColor = (hsl && hsl[2] > 50) ? 'black' : 'white';
+  const textColor = (hsl && hsl[1] > 50 && hsl[2] > 50) ? 'black' : 'white';
+
 
   return (
     <div
@@ -643,4 +645,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-
