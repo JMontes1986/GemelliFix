@@ -239,14 +239,14 @@ export default function TicketDetailPage() {
     const logsQuery = query(
       collection(db, 'logs'), 
       where('details.ticketId', '==', ticketId),
-      orderBy('timestamp', 'desc')
+      orderBy('timestamp', 'asc')
     );
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
         const fetchedLogs: Log[] = [];
         snapshot.forEach(doc => {
             fetchedLogs.push({ id: doc.id, ...doc.data()} as Log);
         });
-        setLogs(fetchedLogs.reverse());
+        setLogs(fetchedLogs);
     }, (err) => {
         console.error("Error fetching logs: ", err);
         // Inform user that a new index might be required
