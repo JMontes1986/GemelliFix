@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
   ChevronLeft,
@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/select';
 import { tickets as unassignedTicketsData } from '@/lib/data';
 import type { ScheduleEvent, Ticket, User } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, createLog } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { suggestCalendarAssignment, type SuggestCalendarAssignmentInput, type SuggestCalendarAssignmentOutput } from '@/ai/flows/suggest-calendar-assignment';
@@ -79,7 +79,7 @@ const EventCard = ({ event }: { event: ScheduleEvent }) => {
       }}
     >
       <p className="font-bold truncate">{event.title}</p>
-      <p className="truncate opacity-80">{event.description}</p>
+      <p className="opacity-80 truncate">{event.description}</p>
     </div>
   );
 };
@@ -188,7 +188,7 @@ async function createCalendarNotification(technicianName: string, event: Omit<Sc
 export default function CalendarPage() {
     const [currentDate, setCurrentDate] = useState(new Date('2024-08-18T00:00:00'));
     const [events, setEvents] = useState<ScheduleEvent[]>([]);
-    const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>(unassignedTicketsData.filter(t => !t.assignedTo || t.assignedTo.length === 0));
+    const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>([]);
     const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
     const [isLoadingAi, setIsLoadingAi] = useState(false);
     const [aiSuggestion, setAiSuggestion] = useState<SuggestCalendarAssignmentOutput | null>(null);
@@ -216,6 +216,15 @@ export default function CalendarPage() {
             setAllTechnicians(techData);
         };
         fetchTechnicians();
+        
+        const ticketsQuery = query(collection(db, 'tickets'), where('status', 'in', ['Abierto', 'Asignado']));
+        const unsubscribeTickets = onSnapshot(ticketsQuery, (snapshot) => {
+            const ticketsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as Ticket));
+            setUnassignedTickets(ticketsData.filter(t => !t.assignedToIds || t.assignedToIds.length === 0));
+        });
+
+        return () => unsubscribeTickets();
+
     }, []);
 
     useEffect(() => {
@@ -235,10 +244,15 @@ export default function CalendarPage() {
 
         const q = query(collection(db, 'scheduleEvents'));
         const unsubscribeEvents = onSnapshot(q, (snapshot) => {
-            const fetchedEvents = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            } as ScheduleEvent));
+            const fetchedEvents = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    start: data.start,
+                    end: data.end,
+                } as ScheduleEvent;
+            });
             setEvents(fetchedEvents);
             setIsLoadingData(false);
         }, (error) => {
@@ -310,8 +324,18 @@ export default function CalendarPage() {
         
         try {
             await addDoc(collection(db, "scheduleEvents"), newEvent);
-            setUnassignedTickets(prev => prev.filter(t => t.id !== ticket.id));
             
+            const ticketRef = doc(db, "tickets", ticket.id);
+            await updateDoc(ticketRef, {
+                status: 'Asignado',
+                assignedTo: [technician.name],
+                assignedToIds: [technician.id]
+            });
+
+            if (currentUser) {
+              await createLog(currentUser, 'update_assignment', { ticket: { ...ticket, assignedTo: [technician.name] } as Ticket, oldValue: 'Sin Asignar', newValue: technician.name });
+            }
+
             const tech = allTechnicians.find(t => t.id === technician.id);
             if (tech) {
               await createCalendarNotification(tech.name, newEvent);
@@ -495,7 +519,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[240px_1fr] gap-4 overflow-hidden">
+      <div className="grid grid-cols-[240px_1fr] gap-4 overflow-hidden h-full">
         {/* Unassigned & Technicians Column */}
         <div className="flex flex-col gap-4">
             <Card className="flex flex-col bg-muted/30 h-1/2">
@@ -548,7 +572,7 @@ export default function CalendarPage() {
               </div>
           </div>
 
-          <div className="grid grid-cols-[60px_1fr] h-full">
+          <div className="grid grid-cols-[60px_1fr] h-[calc(13*4rem)]">
             {/* Hours Column */}
             <div className="border-r">
                 {hours.map(hour => (
@@ -559,12 +583,12 @@ export default function CalendarPage() {
             </div>
             
             {/* Day columns */}
-            <div className={`grid grid-cols-7 h-full`}>
+            <div className={`grid h-full`} style={{gridTemplateColumns: `repeat(7, 1fr)`}}>
                  {weekDates.map((date, dayIndex) => (
                     <div key={date.toDateString()} className={`relative ${dayIndex < weekDates.length - 1 ? 'border-r' : ''}`}>
                          {/* Background Hour Lines */}
-                         {hours.map((hour) => (
-                            <div key={`${date.toDateString()}-${hour}`} className="h-16 border-b" />
+                         {hours.map((hour, hourIndex) => (
+                            <div key={`${date.toDateString()}-${hour}`} className={`h-16 ${hourIndex < hours.length - 1 ? 'border-b' : ''}`} />
                          ))}
 
                          {/* Drop-target and Event Overlay */}
