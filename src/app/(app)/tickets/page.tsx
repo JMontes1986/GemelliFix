@@ -202,7 +202,7 @@ export default function TicketsPage() {
     return acc;
   }, {} as Record<string, Ticket[]>);
 
-   const handleUpdate = async (ticketId: string, field: keyof Ticket, value: any) => {
+  const handleUpdate = async (ticketId: string, field: keyof Ticket, value: any) => {
     setIsUpdating(true);
     const docRef = doc(db, "tickets", ticketId);
     try {
@@ -222,7 +222,6 @@ export default function TicketsPage() {
         setIsUpdating(false);
     }
   };
-
 
   return (
     <Tabs defaultValue="all">
@@ -412,5 +411,3 @@ export default function TicketsPage() {
     </Tabs>
   );
 }
-
-    
