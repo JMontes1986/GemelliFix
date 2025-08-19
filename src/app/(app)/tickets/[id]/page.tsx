@@ -95,7 +95,7 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
 // Hardcoded current user for permission checking
 const currentUser = users[0];
 
-export default function TicketDetailPage({ params: { id: ticketId } }: { params: { id: string } }) {
+export default function TicketDetailPage({ params }: { params: { id: string } }) {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -103,6 +103,7 @@ export default function TicketDetailPage({ params: { id: ticketId } }: { params:
   const { toast } = useToast();
 
   useEffect(() => {
+    const ticketId = params.id;
     if (!ticketId) {
         setError("No se proporcionó un ID de ticket.");
         setIsLoading(false);
@@ -141,7 +142,7 @@ export default function TicketDetailPage({ params: { id: ticketId } }: { params:
     });
 
     return () => unsubscribe();
-}, [ticketId]);
+}, [params.id]);
 
 
   const canEdit = currentUser.role === 'Administrador';
@@ -504,6 +505,7 @@ export default function TicketDetailPage({ params: { id: ticketId } }: { params:
       </div>
     </div>
   );
+    
 
     
-    
+
