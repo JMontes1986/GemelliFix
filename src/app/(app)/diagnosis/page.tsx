@@ -27,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, type DocumentReference } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, BrainCircuit } from 'lucide-react';
+import { Loader2, Zap, BrainCircuit, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { User as FirebaseAuthUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -202,6 +202,29 @@ export default function DiagnosisPage() {
   return (
     <div className="flex flex-col items-center justify-start py-8 gap-8">
       
+      <Card className="w-full max-w-2xl border-yellow-500 border-2 bg-yellow-50">
+        <CardHeader>
+           <CardTitle className="font-headline text-2xl flex items-center gap-3">
+              <AlertTriangle className="text-yellow-600 h-8 w-8" />
+              Acción Requerida: Problema de Conexión
+            </CardTitle>
+          <CardDescription className="text-yellow-800">
+             Si la aplicación se queda en "Enviando..." y nunca termina, la causa más común (99% de las veces) es que **la base de datos de Cloud Firestore no ha sido creada**.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-yellow-900">
+           <p>Aunque tu proyecto de Firebase exista, debes inicializar la base de datos manualmente. Es un paso obligatorio.</p>
+            <ol className="list-decimal list-inside space-y-2 font-medium">
+              <li>Ve a la <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Consola de Firebase</a>.</li>
+              <li>Selecciona tu proyecto: <strong>gemellifix</strong>.</li>
+              <li>En el menú de la izquierda, ve a <strong>Compilación → Firestore Database</strong>.</li>
+              <li>Si ves un botón grande que dice <strong>"Crear base de datos"</strong>, haz clic en él.</li>
+              <li>Sigue los pasos (se recomienda el modo de producción) para crearla.</li>
+            </ol>
+            <p>Una vez que la base de datos esté creada, esta prueba de conexión debería funcionar.</p>
+        </CardContent>
+      </Card>
+
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="font-headline text-2xl">Prueba de Conexión Rápida</CardTitle>
@@ -332,3 +355,5 @@ export default function DiagnosisPage() {
     </div>
   );
 }
+
+    
