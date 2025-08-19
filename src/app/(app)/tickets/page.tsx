@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { collection, onSnapshot, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import { File, ListFilter, MoreHorizontal } from 'lucide-react';
@@ -38,9 +38,19 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import type { Ticket, User } from '@/lib/types';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
   switch (priority) {
@@ -72,7 +82,7 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
       case 'Resuelto': return 'bg-green-600 text-white';
       default: return '';
     }
-}
+};
 
 const getPriorityBadgeClassName = (priority: Ticket['priority']) => {
     switch(priority) {
@@ -80,13 +90,16 @@ const getPriorityBadgeClassName = (priority: Ticket['priority']) => {
         case 'Media': return 'bg-yellow-400 text-black';
         default: return '';
     }
-}
+};
 
 export default function TicketsPage() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isUpdating, setIsUpdating] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const { toast } = useToast();
+  const router = useRouter();
 
   React.useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -156,7 +169,7 @@ export default function TicketsPage() {
           status: data.status,
           createdAt: data.createdAt?.toDate().toISOString() ?? new Date().toISOString(),
           dueDate: data.dueDate?.toDate().toISOString() ?? new Date().toISOString(),
-          assignedTo: data.assignedTo,
+          assignedTo: data.assignedTo || [],
           requester: data.requester,
           requesterId: data.requesterId,
           assignedToIds: data.assignedToIds || [],
@@ -182,6 +195,27 @@ export default function TicketsPage() {
     acc[zone].push(ticket);
     return acc;
   }, {} as Record<string, Ticket[]>);
+
+   const handleUpdate = async (ticketId: string, field: keyof Ticket, value: any) => {
+    setIsUpdating(true);
+    const docRef = doc(db, "tickets", ticketId);
+    try {
+      await updateDoc(docRef, { [field]: value });
+      toast({
+        title: "Ticket Actualizado",
+        description: `El campo ha sido cambiado.`,
+      });
+    } catch (error: any) {
+      console.error("Error updating ticket: ", error);
+      toast({
+        variant: "destructive",
+        title: "Error al Actualizar",
+        description: `No se pudo actualizar el ticket. ${error.message}`,
+      });
+    } finally {
+        setIsUpdating(false);
+    }
+  };
 
 
   return (
@@ -289,12 +323,50 @@ export default function TicketsPage() {
                             <TableCell>{ticket.site}</TableCell>
                             <TableCell>{ticket.title}</TableCell>
                             <TableCell>
-                                <Badge variant={getPriorityBadgeVariant(ticket.priority)} className={getPriorityBadgeClassName(ticket.priority)}>{ticket.priority}</Badge>
+                                {currentUser?.role === 'Administrador' ? (
+                                    <Select 
+                                        value={ticket.priority} 
+                                        onValueChange={(value) => handleUpdate(ticket.id, 'priority', value)}
+                                        disabled={isUpdating}
+                                    >
+                                        <SelectTrigger className="w-[120px] h-8 text-xs">
+                                            <SelectValue placeholder="Prioridad" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Baja">Baja</SelectItem>
+                                            <SelectItem value="Media">Media</SelectItem>
+                                            <SelectItem value="Alta">Alta</SelectItem>
+                                            <SelectItem value="Urgente">Urgente</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <Badge variant={getPriorityBadgeVariant(ticket.priority)} className={getPriorityBadgeClassName(ticket.priority)}>{ticket.priority}</Badge>
+                                )}
                             </TableCell>
                             <TableCell>
-                            <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
+                                {currentUser?.role === 'Administrador' ? (
+                                    <Select 
+                                        value={ticket.status} 
+                                        onValueChange={(value) => handleUpdate(ticket.id, 'status', value)}
+                                        disabled={isUpdating}
+                                    >
+                                        <SelectTrigger className="w-[150px] h-8 text-xs">
+                                            <SelectValue placeholder="Estado" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                             <SelectItem value="Abierto">Abierto</SelectItem>
+                                             <SelectItem value="Asignado">Asignado</SelectItem>
+                                             <SelectItem value="En Progreso">En Progreso</SelectItem>
+                                             <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>
+                                             <SelectItem value="Resuelto">Resuelto</SelectItem>
+                                             <SelectItem value="Cerrado">Cerrado</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
+                                )}
                             </TableCell>
-                            <TableCell>{(Array.isArray(ticket.assignedTo) ? ticket.assignedTo.join(', ') : ticket.assignedTo) || 'Sin Asignar'}</TableCell>
+                            <TableCell>{(Array.isArray(ticket.assignedTo) && ticket.assignedTo.length > 0) ? ticket.assignedTo.join(', ') : 'Sin Asignar'}</TableCell>
                             <TableCell className="hidden md:table-cell">
                             <ClientFormattedDate date={ticket.createdAt} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
                             </TableCell>
@@ -316,7 +388,7 @@ export default function TicketsPage() {
                                 <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                 <DropdownMenuItem asChild><Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link></DropdownMenuItem>
-                                <DropdownMenuItem>Asignar</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>Asignar</Link>
                                 <DropdownMenuItem>Cambiar Estado</DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
