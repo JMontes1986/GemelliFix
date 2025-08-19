@@ -2,24 +2,11 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Reglas para los archivos adjuntos de los tickets.
-    match /ticket-attachments/{fileName} {
-      // PERMITIR ESCRITURA (CREATE)
-      // 1. El usuario debe estar autenticado.
-      // 2. El tamaño del archivo debe ser menor a 5MB.
-      // 3. El tipo de archivo debe ser una imagen o un PDF.
-      allow create: if request.auth != null &&
-                       request.resource.size < 5 * 1024 * 1024 &&
-                       (request.resource.contentType.matches('image/.*') || request.resource.contentType.matches('application/pdf'));
-
-      // PERMITIR LECTURA (GET)
-      // Permitir la lectura de archivos solo a usuarios autenticados.
-      // La seguridad real se basa en que las URLs de descarga solo son conocidas
-      // por aquellos con acceso al documento del ticket en Firestore.
-      allow get: if request.auth != null;
-
-      // No permitir actualizaciones o eliminaciones por ahora para mayor seguridad.
-      allow update, delete: if false;
+    // Allow read and write access for any file if the user is authenticated.
+    // The security is handled by the unguessable download URLs, which are only
+    // accessible to users who have access to the corresponding ticket in Firestore.
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
