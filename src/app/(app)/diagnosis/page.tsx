@@ -27,11 +27,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, type DocumentReference } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, BrainCircuit, AlertTriangle } from 'lucide-react';
+import { Loader2, Zap, BrainCircuit, AlertTriangle, CalendarPlus } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { User as FirebaseAuthUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { diagnoseFirebaseConnection, type FirebaseDiagnosisOutput } from '@/ai/flows/diagnose-firebase-connection';
+import { diagnoseCalendarCreation } from '@/ai/flows/diagnose-calendar-creation';
 import { Skeleton } from '@/components/ui/skeleton';
 
 
@@ -62,11 +63,16 @@ export default function DiagnosisPage() {
     return () => unsubscribe();
   }, []);
 
-  const runAiDiagnosis = async (params: { errorCode?: string, errorMessage?: string, symptom?: string }) => {
+  const runAiDiagnosis = async (params: { flow: 'connection' | 'calendar', errorCode?: string, errorMessage?: string, symptom?: string }) => {
       setIsAiLoading(true);
       setAiDiagnosis(null);
       try {
-        const diagnosis = await diagnoseFirebaseConnection(params);
+        let diagnosis;
+        if (params.flow === 'connection') {
+            diagnosis = await diagnoseFirebaseConnection(params);
+        } else {
+            diagnosis = await diagnoseCalendarCreation(params);
+        }
         setAiDiagnosis(diagnosis);
       } catch (aiError) {
         console.error('Error getting AI diagnosis:', aiError);
@@ -95,7 +101,7 @@ export default function DiagnosisPage() {
       const authErrorMsg = 'Debes iniciar sesión para realizar esta prueba. El sistema no detecta un usuario autenticado.';
       setExecutionResult({ status: 'Error de Autenticación', message: authErrorMsg });
       setIsLoading(false);
-      runAiDiagnosis({ errorCode: 'unauthenticated', errorMessage: authErrorMsg });
+      runAiDiagnosis({ flow: 'connection', errorCode: 'unauthenticated', errorMessage: authErrorMsg });
       return;
     }
 
@@ -129,9 +135,9 @@ export default function DiagnosisPage() {
 
       if (error.message === 'Connection timeout') {
           errorMsg = "La conexión con Firestore ha tardado demasiado (más de 5 segundos) y ha sido cancelada. Esto usualmente indica que la base de datos no ha sido creada en la consola de Firebase o hay un problema de red.";
-          runAiDiagnosis({ symptom: "La conexión con Firestore se queda colgada y no responde (timeout)." });
+          runAiDiagnosis({ flow: 'connection', symptom: "La conexión con Firestore se queda colgada y no responde (timeout)." });
       } else {
-          runAiDiagnosis({ errorCode: error.code, errorMessage: error.message });
+          runAiDiagnosis({ flow: 'connection', errorCode: error.code, errorMessage: error.message });
       }
       
       setExecutionResult({ status: 'Error', message: errorMsg });
@@ -142,6 +148,49 @@ export default function DiagnosisPage() {
         duration: 9000,
       });
 
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  const handleCalendarTest = async () => {
+    setAiDiagnosis(null);
+    setIsLoading(true);
+
+     if (!currentUser) {
+      const authErrorMsg = 'Debes iniciar sesión para realizar esta prueba. El sistema no detecta un usuario autenticado.';
+      setExecutionResult({ status: 'Error de Autenticación', message: authErrorMsg });
+      setIsLoading(false);
+      runAiDiagnosis({ flow: 'calendar', errorCode: 'unauthenticated', errorMessage: authErrorMsg });
+      return;
+    }
+
+    setExecutionResult({ status: 'Enviando...', message: `Intentando crear un evento en la colección \`scheduleEvents\`...` });
+
+    const testEvent = {
+        title: 'Evento de Prueba de Diagnóstico',
+        description: `Creado por ${currentUser.email} en ${new Date().toISOString()}`,
+        start: new Date().toISOString(),
+        end: new Date(new Date().getTime() + 60 * 60 * 1000).toISOString(),
+        type: 'task' as const,
+        technicianId: currentUser.uid
+    };
+
+    try {
+        const docRef = await addDoc(collection(db, "scheduleEvents"), testEvent);
+        const successMsg = `¡Éxito! Se creó un evento de prueba en el calendario con el ID: ${docRef.id}. La escritura en la colección 'scheduleEvents' es correcta.`;
+        setExecutionResult({ status: 'Éxito', message: successMsg });
+    } catch (error: any) {
+        console.error('Error en la prueba de calendario:', error);
+        const errorMsg = `No se pudo crear el evento en el calendario. Código de error: ${error.code}. Detalles: ${error.message}`;
+        setExecutionResult({ status: 'Error', message: errorMsg });
+        runAiDiagnosis({ flow: 'calendar', errorCode: error.code, errorMessage: error.message });
+        toast({
+            variant: 'destructive',
+            title: 'Error al Crear Evento',
+            description: error.message,
+            duration: 9000,
+        });
     } finally {
         setIsLoading(false);
     }
@@ -246,6 +295,35 @@ export default function DiagnosisPage() {
               </>
             )}
           </Button>
+            
+        </CardContent>
+      </Card>
+      
+       <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle className="font-headline text-2xl">Prueba de Creación de Evento en Calendario</CardTitle>
+          <CardDescription>
+            Este botón intenta crear un evento de prueba en la colección `scheduleEvents` para verificar si las reglas de seguridad específicas del calendario son correctas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleCalendarTest} disabled={isLoading || isAuthLoading} className="w-full">
+            {(isLoading || isAuthLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <CalendarPlus className="mr-2 h-4 w-4" />
+            Probar Creación de Evento
+          </Button>
+        </CardContent>
+      </Card>
+
+
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle>Resultados y Diagnóstico</CardTitle>
+          <CardDescription>
+              Aquí se mostrará el resultado de la última prueba ejecutada y el análisis de la IA si ocurre un error.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
             <Alert variant={executionResult.status === 'Error' || executionResult.status === 'Error de Autenticación' ? 'destructive' : (executionResult.status === 'Éxito' ? 'default' : 'default')}
                 className={executionResult.status === 'Éxito' ? 'border-green-500' : ''}
             >
@@ -254,51 +332,41 @@ export default function DiagnosisPage() {
                     {executionResult.message}
                 </AlertDescription>
             </Alert>
+          
+              <div className="space-y-4">
+                  <h3 className="font-headline text-lg flex items-center gap-2">
+                      <BrainCircuit className="text-primary" />
+                      Diagnóstico por IA
+                  </h3>
+                   {isAiLoading ? (
+                      <div className="space-y-4">
+                          <Skeleton className="h-4 w-1/3" />
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-3/4" />
+                           <Skeleton className="h-4 w-1/3 mt-4" />
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-full" />
+                      </div>
+                  ) : aiDiagnosis ? (
+                      <div className="space-y-4 text-sm">
+                          <div>
+                              <h4 className="font-semibold text-primary">Análisis del Problema</h4>
+                              <p className="text-muted-foreground">{aiDiagnosis.analysis}</p>
+                          </div>
+                           <div>
+                              <h4 className="font-semibold text-primary">Pasos Sugeridos</h4>
+                              <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: aiDiagnosis.suggestedSteps.replace(/\\n/g, '<br />') }} />
+                          </div>
+                      </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      Esperando el resultado de una prueba para iniciar el diagnóstico...
+                    </div>
+                  )}
+              </div>
         </CardContent>
       </Card>
-
       
-      <Card className="w-full max-w-2xl">
-          <CardHeader>
-              <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                  <BrainCircuit className="text-primary" />
-                  Diagnóstico por IA
-              </CardTitle>
-              <CardDescription>
-                  Si la prueba de conexión falla, el asistente de IA analizará el error y sugerirá los siguientes pasos.
-              </CardDescription>
-          </CardHeader>
-          <CardContent>
-              {isAiLoading ? (
-                  <div className="space-y-4">
-                      <Skeleton className="h-4 w-1/3" />
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-3/4" />
-                       <Skeleton className="h-4 w-1/3 mt-4" />
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-full" />
-                  </div>
-              ) : aiDiagnosis ? (
-                  <div className="space-y-4 text-sm">
-                      <div>
-                          <h4 className="font-semibold text-primary">Análisis del Problema</h4>
-                          <p className="text-muted-foreground">{aiDiagnosis.analysis}</p>
-                      </div>
-                       <div>
-                          <h4 className="font-semibold text-primary">Pasos Sugeridos</h4>
-                          <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: aiDiagnosis.suggestedSteps.replace(/\\n/g, '<br />') }} />
-                      </div>
-                  </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Esperando el resultado de la prueba de conexión para iniciar el diagnóstico...
-                </div>
-              )}
-          </CardContent>
-      </Card>
-      
-
-
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="font-headline text-2xl">Formulario de Prueba Completo</CardTitle>
@@ -355,5 +423,3 @@ export default function DiagnosisPage() {
     </div>
   );
 }
-
-    
