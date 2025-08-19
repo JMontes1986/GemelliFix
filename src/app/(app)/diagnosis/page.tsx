@@ -28,6 +28,7 @@ import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Esquema de validación simple para el formulario de diagnóstico
 const diagnosisSchema = z.object({
@@ -40,6 +41,7 @@ type DiagnosisFormValues = z.infer<typeof diagnosisSchema>;
 export default function DiagnosisPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [executionResult, setExecutionResult] = React.useState<{status: string, message: string}>({ status: 'Pendiente', message: 'Aún no se ha intentado enviar el formulario.' });
   
   const form = useForm<DiagnosisFormValues>({
     resolver: zodResolver(diagnosisSchema),
@@ -52,35 +54,42 @@ export default function DiagnosisPage() {
   const onSubmit = async (data: DiagnosisFormValues) => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
+        const errorMsg = 'Error de Autenticación: Debes iniciar sesión para enviar un diagnóstico.';
         toast({
             variant: 'destructive',
             title: 'Error de Autenticación',
             description: 'Debes iniciar sesión para enviar un diagnóstico.',
         });
+        setExecutionResult({ status: 'Error', message: errorMsg });
         return;
     }
     setIsLoading(true);
+    setExecutionResult({ status: 'Enviando...', message: 'Intentando conectar con Firestore...' });
     try {
       // Intenta guardar en una colección simple para probar la conexión
-      await addDoc(collection(db, 'diagnosis_logs'), {
+      const docRef = await addDoc(collection(db, 'diagnosis_logs'), {
         title: data.title,
         description: data.description,
         user: currentUser.email,
         createdAt: serverTimestamp(),
       });
-
+      
+      const successMsg = `El registro de diagnóstico ha sido guardado en Firestore con el ID: ${docRef.id}`;
       toast({
         title: 'Diagnóstico Enviado',
-        description: 'Tu registro de diagnóstico ha sido guardado en Firestore.',
+        description: successMsg,
       });
+      setExecutionResult({ status: 'Éxito', message: successMsg });
       form.reset(); // Limpia el formulario después de enviar
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error guardando el diagnóstico:', error);
+      const errorMsg = `No se pudo guardar el registro en Firestore. Detalles: ${error.message}`;
       toast({
         variant: 'destructive',
         title: 'Error al Guardar',
-        description: 'No se pudo guardar el registro en Firestore. Revisa la consola y los permisos de la base de datos.',
+        description: errorMsg,
       });
+       setExecutionResult({ status: 'Error', message: errorMsg });
     } finally {
         setIsLoading(false);
     }
@@ -130,11 +139,17 @@ export default function DiagnosisPage() {
                 )}
               />
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex-col items-start gap-4">
               <Button type="submit" disabled={isLoading}>
                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                  Guardar en Firestore
               </Button>
+               <Alert variant={executionResult.status === 'Error' ? 'destructive' : 'default'}>
+                    <AlertTitle className="font-headline">Resultado de Ejecución: {executionResult.status}</AlertTitle>
+                    <AlertDescription className="font-mono text-xs">
+                        {executionResult.message}
+                    </AlertDescription>
+                </Alert>
             </CardFooter>
           </form>
         </Form>
