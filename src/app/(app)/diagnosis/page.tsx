@@ -229,44 +229,46 @@ export default function DiagnosisPage() {
         </CardFooter>
       </Card>
 
-      {(isAiLoading || aiDiagnosis) && (
-        <Card className="w-full max-w-2xl">
-            <CardHeader>
-                <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                    <BrainCircuit className="text-primary" />
-                    Diagnóstico por IA
-                </CardTitle>
-                <CardDescription>
-                    El asistente de IA ha analizado el error y sugiere los siguientes pasos.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                {isAiLoading ? (
-                    <div className="space-y-4">
-                        <Skeleton className="h-4 w-1/3" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-3/4" />
-                         <Skeleton className="h-4 w-1/3 mt-4" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-full" />
-                    </div>
-                ) : (
-                    aiDiagnosis && (
-                        <div className="space-y-4 text-sm">
-                            <div>
-                                <h4 className="font-semibold text-primary">Análisis del Problema</h4>
-                                <p className="text-muted-foreground">{aiDiagnosis.analysis}</p>
-                            </div>
-                             <div>
-                                <h4 className="font-semibold text-primary">Pasos Sugeridos</h4>
-                                <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: aiDiagnosis.suggestedSteps.replace(/\n/g, '<br />') }} />
-                            </div>
-                        </div>
-                    )
-                )}
-            </CardContent>
-        </Card>
-      )}
+      
+      <Card className="w-full max-w-2xl">
+          <CardHeader>
+              <CardTitle className="font-headline text-2xl flex items-center gap-2">
+                  <BrainCircuit className="text-primary" />
+                  Diagnóstico por IA
+              </CardTitle>
+              <CardDescription>
+                  Si la prueba de conexión falla, el asistente de IA analizará el error y sugerirá los siguientes pasos.
+              </CardDescription>
+          </CardHeader>
+          <CardContent>
+              {isAiLoading ? (
+                  <div className="space-y-4">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                       <Skeleton className="h-4 w-1/3 mt-4" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                  </div>
+              ) : aiDiagnosis ? (
+                  <div className="space-y-4 text-sm">
+                      <div>
+                          <h4 className="font-semibold text-primary">Análisis del Problema</h4>
+                          <p className="text-muted-foreground">{aiDiagnosis.analysis}</p>
+                      </div>
+                       <div>
+                          <h4 className="font-semibold text-primary">Pasos Sugeridos</h4>
+                          <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: aiDiagnosis.suggestedSteps.replace(/\n/g, '<br />') }} />
+                      </div>
+                  </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Esperando un error de conexión para iniciar el diagnóstico...
+                </div>
+              )}
+          </CardContent>
+      </Card>
+      
 
 
       <Card className="w-full max-w-2xl">
