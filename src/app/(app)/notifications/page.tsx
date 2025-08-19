@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, orderBy, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import {

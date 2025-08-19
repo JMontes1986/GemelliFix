@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import {
   Card,
@@ -617,5 +617,3 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     </div>
   );
 }
-
-    
