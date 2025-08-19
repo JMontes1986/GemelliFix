@@ -116,6 +116,7 @@ export default function TicketsPage() {
   React.useEffect(() => {
     if (!currentUser) {
         // Wait for user to be loaded
+        if (!auth.currentUser) setIsLoading(false); // If no auth at all, stop loading.
         return;
     }
     
@@ -124,10 +125,17 @@ export default function TicketsPage() {
         // Filter tickets for 'Servicios Generales'
         q = query(
             collection(db, 'tickets'), 
-            where('assignedTo', 'array-contains', currentUser.name),
+            where('assignedToIds', 'array-contains', currentUser.id),
             orderBy('createdAt', 'desc')
         );
-    } else {
+    } else if (['Docentes', 'Coordinadores', 'Administrativos'].includes(currentUser.role)) {
+        q = query(
+            collection(db, 'tickets'),
+            where('requesterId', '==', currentUser.id),
+            orderBy('createdAt', 'desc')
+        );
+    }
+    else {
         // Admins and other roles see all tickets
         q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
     }
@@ -150,10 +158,13 @@ export default function TicketsPage() {
           dueDate: data.dueDate?.toDate().toISOString() ?? new Date().toISOString(),
           assignedTo: data.assignedTo,
           requester: data.requester,
+          requesterId: data.requesterId,
+          assignedToIds: data.assignedToIds || [],
         });
       });
       setTickets(ticketsData);
       setIsLoading(false);
+      setError(null);
     }, (err) => {
       console.error("Error fetching tickets: ", err);
       setError("No se pudieron cargar las solicitudes. Por favor, revisa la conexión y los permisos de Firestore.");

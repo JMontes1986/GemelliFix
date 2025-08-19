@@ -92,10 +92,10 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
 // Hardcoded current user for permission checking
 const currentUser = users[0];
 
-async function createNotification(ticket: Ticket, assignedPersonnelNames: string[]) {
+async function createNotification(ticket: Ticket, assignedPersonnelIds: string[]) {
     try {
         const usersRef = collection(db, "users");
-        const q = query(usersRef, where("name", "in", assignedPersonnelNames));
+        const q = query(usersRef, where("id", "in", assignedPersonnelIds));
         const querySnapshot = await getDocs(q);
 
         const notificationPromises = querySnapshot.docs.map(userDoc => {
@@ -124,13 +124,13 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPersonnel, setSelectedPersonnel] = useState<string[]>([]);
+  const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
   const [isAssignPopoverOpen, setAssignPopoverOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (ticket?.assignedTo) {
-        setSelectedPersonnel(ticket.assignedTo);
+    if (ticket?.assignedToIds) {
+        setSelectedPersonnelIds(ticket.assignedToIds);
     }
   }, [ticket]);
 
@@ -159,6 +159,8 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 dueDate: data.dueDate?.toDate().toISOString(),
                 assignedTo: data.assignedTo || [],
                 requester: data.requester,
+                requesterId: data.requesterId,
+                assignedToIds: data.assignedToIds || [],
                 attachments: data.attachments || [],
             };
             setTicket(ticketData);
@@ -202,11 +204,14 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   
    const handleAssignPersonnel = async (personnel: Technician[]) => {
     if(!ticket) return;
+    const personnelIds = personnel.map(p => p.id);
     const personnelNames = personnel.map(p => p.name);
+    
+    await handleUpdate('assignedToIds', personnelIds);
     await handleUpdate('assignedTo', personnelNames);
-    const newStatus = personnelNames.length > 0 ? 'Asignado' : 'Abierto';
+    const newStatus = personnelIds.length > 0 ? 'Asignado' : 'Abierto';
     await handleUpdate('status', newStatus);
-    await createNotification(ticket, personnelNames);
+    await createNotification(ticket, personnelIds);
     toast({
         title: "Personal Asignado",
         description: `El ticket ha sido actualizado y se ha notificado al personal.`,
@@ -218,14 +223,19 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     setIsUpdating(true);
     setAssignPopoverOpen(false);
     const docRef = doc(db, "tickets", ticket.id);
+    
+    const selectedPersonnelDetails = technicians.filter(t => selectedPersonnelIds.includes(t.id));
+    const selectedPersonnelNames = selectedPersonnelDetails.map(t => t.name);
+    
     try {
       await updateDoc(docRef, { 
-          assignedTo: selectedPersonnel,
-          status: selectedPersonnel.length > 0 ? 'Asignado' : 'Abierto'
+          assignedToIds: selectedPersonnelIds,
+          assignedTo: selectedPersonnelNames,
+          status: selectedPersonnelIds.length > 0 ? 'Asignado' : 'Abierto'
       });
 
-      if (selectedPersonnel.length > 0) {
-        await createNotification(ticket, selectedPersonnel);
+      if (selectedPersonnelIds.length > 0) {
+        await createNotification(ticket, selectedPersonnelIds);
       }
 
       toast({
@@ -274,7 +284,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   }
   
   const assignedPersonnelDetails = technicians.filter(
-    (tech) => ticket.assignedTo?.includes(tech.name)
+    (tech) => ticket.assignedToIds?.includes(tech.id)
   );
   const isRequester = currentUser.name === ticket.requester;
 
@@ -470,12 +480,12 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                                     <div key={tech.id} className="flex items-center space-x-2">
                                         <Checkbox 
                                             id={`tech-${tech.id}`}
-                                            checked={selectedPersonnel.includes(tech.name)}
+                                            checked={selectedPersonnelIds.includes(tech.id)}
                                             onCheckedChange={(checked) => {
-                                                setSelectedPersonnel(prev => 
+                                                setSelectedPersonnelIds(prev => 
                                                     checked 
-                                                        ? [...prev, tech.name]
-                                                        : prev.filter(name => name !== tech.name)
+                                                        ? [...prev, tech.id]
+                                                        : prev.filter(id => id !== tech.id)
                                                 );
                                             }}
                                         />

@@ -43,7 +43,9 @@ export type Ticket = {
   createdAt: string;
   dueDate: string;
   assignedTo?: string[];
+  assignedToIds?: string[];
   requester: string;
+  requesterId: string;
   attachments?: Attachment[];
 };
 
@@ -81,4 +83,3 @@ export type ScheduleEvent = {
     
 
     
-
