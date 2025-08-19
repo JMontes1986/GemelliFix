@@ -103,10 +103,10 @@ const ticketsByZoneConfig = {
 } satisfies ChartConfig;
 
 const zoneColorMap: Record<string, string> = {
-    'Bloque A - Aulas': `var(--color-Bloque A - Aulas)`,
-    'Bloque B - Laboratorios': `var(--color-Bloque B - Laboratorios)`,
-    'Áreas Administrativas': `var(--color-Áreas Administrativas)`,
-    'Zonas Comunes': `var(--color-Zonas Comunes)`,
+    'Bloque A - Aulas': ticketsByZoneConfig['Bloque A - Aulas'].color,
+    'Bloque B - Laboratorios': ticketsByZoneConfig['Bloque B - Laboratorios'].color,
+    'Áreas Administrativas': ticketsByZoneConfig['Áreas Administrativas'].color,
+    'Zonas Comunes': ticketsByZoneConfig['Zonas Comunes'].color,
 };
 
 
@@ -204,7 +204,7 @@ export default function DashboardPage() {
   ).map(([zone, count]) => ({ 
       zone, 
       tickets: count, 
-      fill: zoneColorMap[zone] || `var(--color-Default)`
+      fill: zoneColorMap[zone] || ticketsByZoneConfig['Default'].color,
   }));
 
     const slaComplianceData = [
@@ -435,3 +435,5 @@ export default function DashboardPage() {
   );
 }
 
+
+    
