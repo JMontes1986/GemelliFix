@@ -123,6 +123,25 @@ export default function CreateTicketPage() {
       const zoneCode = zoneName ? zoneName.substring(0,4).toUpperCase().replace(/\s/g, '') : 'ZONA';
       const siteCode = siteName ? siteName.substring(0,4).toUpperCase().replace(/\s/g, '') : 'SITE';
       const ticketCode = `GEMMAN-${zoneCode}-${siteCode}-${Math.floor(1000 + Math.random() * 9000)}`;
+      
+      const now = new Date();
+      let dueDate = new Date(now);
+
+      switch(data.priority) {
+          case 'Urgente':
+              dueDate.setHours(dueDate.getHours() + 12);
+              break;
+          case 'Alta':
+              dueDate.setHours(dueDate.getHours() + 24);
+              break;
+          case 'Media':
+              dueDate.setHours(dueDate.getHours() + 36);
+              break;
+          case 'Baja':
+              dueDate.setHours(dueDate.getHours() + 48);
+              break;
+      }
+
 
       await addDoc(collection(db, 'tickets'), {
         code: ticketCode,
@@ -137,9 +156,9 @@ export default function CreateTicketPage() {
         requesterId: currentUser.uid,
         assignedTo: [],
         assignedToIds: [],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        dueDate: new Date(new Date().setDate(new Date().getDate() + 7)), 
+        createdAt: now,
+        updatedAt: now,
+        dueDate: dueDate, 
         attachments: attachmentUrls,
       });
 
@@ -353,7 +372,7 @@ export default function CreateTicketPage() {
                         <div className="space-y-1 text-center">
                             <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
                             <div className="flex text-sm text-muted-foreground">
-                                <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-ring">
+                                <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring">
                                     <span>Sube tus archivos</span>
                                     <input id="file-upload" type="file" className="sr-only" multiple onChange={handleFileChange} accept={ACCEPTED_FILE_TYPES.join(",")} />
                                 </label>
