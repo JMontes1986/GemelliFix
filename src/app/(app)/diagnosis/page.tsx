@@ -62,69 +62,78 @@ export default function DiagnosisPage() {
     return () => unsubscribe();
   }, []);
 
+  const runAiDiagnosis = async (params: { errorCode?: string, errorMessage?: string, symptom?: string }) => {
+      setIsAiLoading(true);
+      setAiDiagnosis(null);
+      try {
+        const diagnosis = await diagnoseFirebaseConnection(params);
+        setAiDiagnosis(diagnosis);
+      } catch (aiError) {
+        console.error('Error getting AI diagnosis:', aiError);
+        setAiDiagnosis({
+            analysis: "Error del Asistente de IA",
+            suggestedSteps: "No se pudo obtener una respuesta del asistente de IA. Por favor, revisa la consola del navegador para ver posibles errores de red."
+        });
+      } finally {
+        setIsAiLoading(false);
+      }
+  }
+
+
   const handleSimpleConnectionTest = async () => {
     setAiDiagnosis(null);
+    setIsLoading(true);
 
     if (isAuthLoading) {
-      const authWaitMsg = 'Esperando la confirmación de autenticación de Firebase... Por favor, inténtalo de nuevo en un segundo.';
+      const authWaitMsg = 'Esperando la confirmación de autenticación de Firebase...';
       setExecutionResult({ status: 'Verificando Auth...', message: authWaitMsg });
-      toast({
-        variant: 'default',
-        title: 'Un momento...',
-        description: authWaitMsg,
-      });
+      setIsLoading(false);
       return;
     }
     
     if (!currentUser) {
       const authErrorMsg = 'Debes iniciar sesión para realizar esta prueba. El sistema no detecta un usuario autenticado.';
-      toast({
-        variant: 'destructive',
-        title: 'Error de Autenticación',
-        description: authErrorMsg,
-      });
       setExecutionResult({ status: 'Error de Autenticación', message: authErrorMsg });
+      setIsLoading(false);
+      runAiDiagnosis({ errorCode: 'unauthenticated', errorMessage: authErrorMsg });
       return;
     }
 
-    setIsLoading(true);
     setExecutionResult({ status: 'Enviando...', message: `Intentando escribir en la colección \`diagnosis_logs\` como usuario ${currentUser.email}...` });
     
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Connection timeout')), 5000)
+    );
+
     try {
-      const docRef = await addDoc(collection(db, 'diagnosis_logs'), {
+      const writePromise = addDoc(collection(db, 'diagnosis_logs'), {
         test: 'simple_connection_test',
         user: currentUser.email,
         createdAt: serverTimestamp(),
       });
+
+      const docRef = await Promise.race([writePromise, timeoutPromise]) as typeof writePromise extends Promise<infer U> ? U : never;
+
       const successMsg = `¡Éxito! Se ha escrito un documento en Firestore con el ID: ${docRef.id}. La conexión es correcta y las reglas de seguridad lo permiten.`;
-      toast({
-        title: 'Conexión Exitosa',
-        description: 'Se ha verificado la escritura en Firestore.',
-      });
       setExecutionResult({ status: 'Éxito', message: successMsg });
     } catch (error: any) {
       console.error('Error en la prueba de conexión:', error);
       let errorMsg = `No se pudo escribir en Firestore. Código de error: ${error.code}. Detalles: ${error.message}`;
+
+      if (error.message === 'Connection timeout') {
+          errorMsg = "La conexión con Firestore ha tardado demasiado (más de 5 segundos) y ha sido cancelada. Esto usualmente indica que la base de datos no ha sido creada en la consola de Firebase o hay un problema de red.";
+          runAiDiagnosis({ symptom: "La conexión con Firestore se queda colgada y no responde (timeout)." });
+      } else {
+          runAiDiagnosis({ errorCode: error.code, errorMessage: error.message });
+      }
       
       setExecutionResult({ status: 'Error', message: errorMsg });
       toast({
         variant: 'destructive',
         title: 'Error de Conexión',
-        description: `No se pudo escribir en Firestore. Detalles: ${error.message}`,
+        description: error.message,
         duration: 9000,
       });
-       
-      // Call AI for diagnosis
-      setIsAiLoading(true);
-      try {
-        const diagnosis = await diagnoseFirebaseConnection({ errorCode: error.code, errorMessage: error.message });
-        setAiDiagnosis(diagnosis);
-      } catch (aiError) {
-        console.error('Error getting AI diagnosis:', aiError);
-        // Handle AI error silently or show a small notification
-      } finally {
-        setIsAiLoading(false);
-      }
 
     } finally {
         setIsLoading(false);
@@ -141,16 +150,7 @@ export default function DiagnosisPage() {
   });
 
   const onSubmit = async (data: DiagnosisFormValues) => {
-    if (isAuthLoading) {
-       toast({
-            variant: 'destructive',
-            title: 'Un momento...',
-            description: 'Verificando estado de autenticación.',
-        });
-        return;
-    }
-
-    if (!currentUser) {
+     if (!currentUser) {
         const errorMsg = 'Error de Autenticación: Debes iniciar sesión para enviar un diagnóstico.';
         toast({
             variant: 'destructive',
@@ -207,7 +207,7 @@ export default function DiagnosisPage() {
             {(isLoading || isAuthLoading) ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Verificando...
+                {isAuthLoading ? 'Verificando Auth...' : 'Verificando...'}
               </>
             ) : (
               <>
@@ -263,7 +263,7 @@ export default function DiagnosisPage() {
                   </div>
               ) : (
                 <div className="text-sm text-muted-foreground">
-                  Esperando un error de conexión para iniciar el diagnóstico...
+                  Esperando el resultado de la prueba de conexión para iniciar el diagnóstico...
                 </div>
               )}
           </CardContent>
@@ -288,7 +288,7 @@ export default function DiagnosisPage() {
                   <FormItem>
                     <FormLabel>Título de Prueba</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej: Prueba de conexión Firestore" {...field} />
+                      <Input placeholder="Ej: Prueba de conexión Firestore" {...field} disabled={isLoading || isAuthLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -306,6 +306,7 @@ export default function DiagnosisPage() {
                         placeholder="Describe la prueba que se está realizando."
                         className="min-h-[100px]"
                         {...field}
+                        disabled={isLoading || isAuthLoading}
                       />
                     </FormControl>
                     <FormMessage />
