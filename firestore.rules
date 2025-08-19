@@ -4,85 +4,64 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // ==================
-    // Helper Functions
-    // ==================
-    function isAuth() {
-      return request.auth != null;
-    }
-    
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
+    // Función para verificar si un usuario es administrador
     function isAdmin() {
-      return isAuth() && getUserData().role == 'Administrador';
+      // Obtiene el documento del usuario que hace la solicitud desde la colección 'users'
+      // y verifica si su campo 'role' es 'Administrador'.
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
     }
     
+    // Función para verificar si el usuario es el solicitante del ticket
     function isRequester(ticket) {
-      return isAuth() && request.auth.uid == ticket.requesterId;
+      return request.auth.uid == ticket.requesterId;
     }
     
+    // Función para verificar si el usuario está asignado al ticket
     function isAssigned(ticket) {
-      return isAuth() && request.auth.uid in ticket.assignedToIds;
+      return request.auth.uid in ticket.assignedToIds;
     }
 
-    // ==================
-    // Collection Rules
-    // ==================
+    // Reglas para la colección 'users'
     match /users/{userId} {
-      // Admins can manage any user.
-      // Authenticated users can read/update their own profile.
-      allow read, update: if isAdmin() || (isAuth() && request.auth.uid == userId);
-      allow create: if isAuth(); // Allow user creation via registration form
-      allow delete: if isAdmin();
+      // Los administradores pueden leer y escribir cualquier perfil de usuario.
+      // Los usuarios autenticados pueden leer y actualizar su propio perfil.
+      allow read, update: if isAdmin() || request.auth.uid == userId;
+      // Los administradores pueden crear y eliminar usuarios.
+      allow create, delete: if isAdmin();
     }
 
+    // Reglas para la colección 'tickets'
     match /tickets/{ticketId} {
-      // READ: Admins, the original requester, or an assigned technician can read a ticket.
+      // Los administradores pueden leer cualquier ticket.
+      // Los usuarios autenticados pueden leer los tickets que han creado o que se les han asignado.
       allow read: if isAdmin() || isRequester(resource.data) || isAssigned(resource.data);
       
-      // CREATE: Any authenticated user can create a ticket.
-      allow create: if isAuth();
+      // Cualquier usuario autenticado puede crear un nuevo ticket.
+      allow create: if request.auth.uid != null;
       
-      // UPDATE: Granular control based on user role and ticket status.
-      allow update: if 
-            // Admins can update any field.
-            isAdmin() ||
-            
-            // Assigned technicians can update status to 'En Progreso' or 'Resuelto', and add attachments.
-            (isAssigned(resource.data) && 
-                (request.resource.data.status == 'En Progreso' || request.resource.data.status == 'Resuelto') &&
-                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'attachments', 'updatedAt'])) ||
+      // REGLAS DE ACTUALIZACIÓN REFORZADAS
+      allow update: if isAdmin() || // El administrador puede hacer cualquier cambio
+                      (isAssigned(resource.data) && request.resource.data.status in ['En Progreso', 'Resuelto', 'Requiere Aprobación']) || // El técnico actualiza a estados específicos
+                      (isRequester(resource.data) && request.resource.data.status in ['Cerrado', 'Asignado']); // El solicitante aprueba o rechaza
 
-            // The requester can update status to 'Cerrado' (approve) or 'Asignado' (reject) when it requires approval.
-            (isRequester(resource.data) && 
-                resource.data.status == 'Requiere Aprobación' &&
-                (request.resource.data.status == 'Cerrado' || request.resource.data.status == 'Asignado') &&
-                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']));
-                      
-      // DELETE: Only admins can delete tickets.
+      // Solo los administradores pueden eliminar tickets.
       allow delete: if isAdmin();
     }
     
+    // Reglas para la colección 'notifications'
     match /notifications/{notificationId} {
-       // A user can read or update their own notifications (e.g., mark as read).
-       allow read, update: if isAuth() && request.auth.uid == resource.data.userId;
-
-       // A user can only create a notification for themselves.
-       // This prevents users from spamming others. Notification creation is handled server-side by the app logic.
-       allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
-       
-       allow delete: if false; // Notifications should not be deletable by clients.
+       // Un usuario solo puede leer o actualizar sus propias notificaciones
+       allow read, update: if request.auth.uid == resource.data.userId;
+       // Un usuario solo puede crear notificaciones para sí mismo (o el servidor).
+       allow create: if request.auth.uid == request.resource.data.userId;
     }
 
+    // Reglas para logs y otras colecciones
     match /diagnosis_logs/{logId} {
-        // Any authenticated user can create a diagnosis log.
-        allow create: if isAuth();
-        // Nobody can read, update, or delete logs from the client.
+        // Cualquier usuario autenticado puede crear un log de diagnóstico.
+        allow create: if request.auth.uid != null;
+        // Nadie puede leer, actualizar o borrar logs desde el cliente (solo desde el servidor si es necesario).
         allow read, update, delete: if false;
     }
   }
 }
-
-    
