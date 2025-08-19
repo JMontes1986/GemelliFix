@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import {
   Card,
   CardContent,
@@ -15,7 +15,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { technicians, users, categories } from '@/lib/data';
+import { technicians, users as staticUsers, categories } from '@/lib/data';
 import {
   File,
   User,
@@ -35,7 +35,7 @@ import {
   Loader2,
   Users,
 } from 'lucide-react';
-import type { Ticket, Technician } from '@/lib/types';
+import type { Ticket, Technician, User as CurrentUser } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AiSuggestion from './components/ai-suggestion';
 import AiStateSuggestion from './components/ai-state-suggestion';
@@ -47,6 +47,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { onAuthStateChanged } from 'firebase/auth';
 
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
@@ -89,9 +90,6 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
     }
 }
 
-// Hardcoded current user for permission checking
-const currentUser = users[0];
-
 async function createNotification(ticket: Ticket, assignedPersonnelIds: string[]) {
     try {
         const usersRef = collection(db, "users");
@@ -127,6 +125,20 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
   const [isAssignPopoverOpen, setAssignPopoverOpen] = useState(false);
   const { toast } = useToast();
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+                setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as CurrentUser);
+            }
+        }
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (ticket?.assignedToIds) {
@@ -178,7 +190,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
 }, [ticketId]);
 
 
-  const canEdit = currentUser.role === 'Administrador';
+  const canEdit = currentUser?.role === 'Administrador';
 
   const handleUpdate = async (field: keyof Ticket, value: any) => {
     if (!ticket) return;
@@ -254,8 +266,14 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     }
   }
 
+  const handleApproval = async (approve: boolean) => {
+    if (!ticket) return;
+    const newStatus = approve ? 'Cerrado' : 'Asignado'; // If rejected, it goes back to 'Assigned'
+    await handleUpdate('status', newStatus);
+  };
 
-  if (isLoading) {
+
+  if (isLoading || !currentUser) {
     return (
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
@@ -286,7 +304,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   const assignedPersonnelDetails = technicians.filter(
     (tech) => ticket.assignedToIds?.includes(tech.id)
   );
-  const isRequester = currentUser.name === ticket.requester;
+  const isRequester = currentUser.id === ticket.requesterId;
 
 
   return (
@@ -427,8 +445,8 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
             </CardContent>
             {isRequester && ticket.status === 'Requiere Aprobación' && (
               <CardFooter className="gap-4">
-                <Button className="w-full bg-green-600 hover:bg-green-700 text-white"><ThumbsUp /> Aprobar y Cerrar Ticket</Button>
-                <Button variant="destructive" className="w-full"><ThumbsDown /> Rechazar Solución</Button>
+                <Button className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApproval(true)} disabled={isUpdating}><ThumbsUp /> Aprobar y Cerrar Ticket</Button>
+                <Button variant="destructive" className="w-full" onClick={() => handleApproval(false)} disabled={isUpdating}><ThumbsDown /> Rechazar Solución</Button>
               </CardFooter>
             )}
           </Card>
@@ -599,3 +617,5 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     </div>
   );
 }
+
+    

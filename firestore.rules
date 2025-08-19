@@ -1,69 +1,88 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check user role from a custom claim
-    function getUserRole() {
-      return request.auth.token.role;
+  
+    // ==================
+    // Helper Functions
+    // ==================
+    function isAuth() {
+      return request.auth != null;
     }
     
-    // Helper function to check if the user is an admin
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
-      return getUserRole() == 'admin';
+      return isAuth() && getUserData().role == 'Administrador';
+    }
+    
+    function isRequester(ticket) {
+      return isAuth() && request.auth.uid == ticket.requesterId;
+    }
+    
+    function isAssigned(ticket) {
+      return isAuth() && request.auth.uid in ticket.assignedToIds;
     }
 
-    // Helper function to check if the user is a technician
-    function isTech() {
-        return getUserRole() == 'tech';
-    }
-
-    // Helper function to check if the user is a requester
-    function isRequester() {
-        return getUserRole() == 'requester';
-    }
-
-    // A user can see their own user data
+    // ==================
+    // Collection Rules
+    // ==================
     match /users/{userId} {
-      allow read: if request.auth.uid == userId || isAdmin();
-      allow create: if request.auth.uid != null; // Any authenticated user can create their profile
-      allow update: if request.auth.uid == userId || isAdmin();
-    }
-    
-    // Zones and Sites can be read by anyone, but only created/edited by admins
-    match /zones/{zoneId} {
-       allow read: if request.auth.uid != null; // Any authenticated user can read
-       allow write: if isAdmin();
+      // Admins can manage any user.
+      // Authenticated users can read/update their own profile.
+      allow read, update: if isAdmin() || (isAuth() && request.auth.uid == userId);
+      allow create: if isAuth(); // Allow user creation via registration form
+      allow delete: if isAdmin();
     }
 
-    match /sites/{siteId} {
-       allow read: if request.auth.uid != null; // Any authenticated user can read
-       allow write: if isAdmin();
-    }
-
-    // Tickets have more complex rules
     match /tickets/{ticketId} {
-      // READ:
-      // - Admins can read everything.
-      // - Requesters can read their own tickets.
-      // - Techs can read tickets assigned to them or in their assigned zones (future implementation).
-      allow read: if isAdmin() || 
-                    (isRequester() && resource.data.requesterId == request.auth.uid) ||
-                    (isTech() && resource.data.assignedToId == request.auth.uid);
-
-      // CREATE:
-      // - Requesters and Admins can create tickets.
-      // - Ensure the requesterId is set to the user's own UID.
-      allow create: if (isRequester() || isAdmin()) && request.resource.data.requesterId == request.auth.uid;
+      // READ: Admins, the original requester, or an assigned technician can read a ticket.
+      allow read: if isAdmin() || isRequester(resource.data) || isAssigned(resource.data);
       
-      // UPDATE:
-      // - Admins can edit anything.
-      // - Requesters can only edit their own tickets if they are still 'Abierto'.
-      // - Techs can update status and add attachments, but not change core details or close.
-      allow update: if isAdmin() ||
-                      (isRequester() && resource.data.requesterId == request.auth.uid && resource.data.status == 'Abierto') ||
-                      (isTech() && resource.data.assignedToId == request.auth.uid && !('priority' in request.resource.data)); // Techs can't change priority
+      // CREATE: Any authenticated user can create a ticket.
+      allow create: if isAuth();
+      
+      // UPDATE: Granular control based on user role and ticket status.
+      allow update: if 
+            // Admins can update any field.
+            isAdmin() ||
+            
+            // Assigned technicians can update status to 'En Progreso' or 'Resuelto', and add attachments.
+            (isAssigned(resource.data) && 
+                (request.resource.data.status == 'En Progreso' || request.resource.data.status == 'Resuelto') &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'attachments', 'updatedAt'])) ||
+
+            // The requester can update status to 'Cerrado' (approve) or 'Asignado' (reject) when it requires approval.
+            (isRequester(resource.data) && 
+                resource.data.status == 'Requiere Aprobación' &&
+                (request.resource.data.status == 'Cerrado' || request.resource.data.status == 'Asignado') &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']));
+                      
+      // DELETE: Only admins can delete tickets.
+      allow delete: if isAdmin();
     }
     
+    match /notifications/{notificationId} {
+       // A user can read or update their own notifications (e.g., mark as read).
+       allow read, update: if isAuth() && request.auth.uid == resource.data.userId;
+
+       // A user can only create a notification for themselves.
+       // This prevents users from spamming others. Notification creation is handled server-side by the app logic.
+       allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+       
+       allow delete: if false; // Notifications should not be deletable by clients.
+    }
+
+    match /diagnosis_logs/{logId} {
+        // Any authenticated user can create a diagnosis log.
+        allow create: if isAuth();
+        // Nobody can read, update, or delete logs from the client.
+        allow read, update, delete: if false;
+    }
   }
 }
+
+    
