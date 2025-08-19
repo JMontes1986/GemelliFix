@@ -323,6 +323,7 @@ export default function TicketDetailPage() {
     (tech) => ticket.assignedToIds?.includes(tech.id)
   );
   const isRequester = currentUser.id === ticket.requesterId;
+  const isAssignedToCurrentUser = ticket.assignedToIds?.includes(currentUser.id) ?? false;
   
 
   return (
@@ -380,7 +381,7 @@ export default function TicketDetailPage() {
                     <Tag className="w-4 h-4 text-muted-foreground" />
                     <strong>Estado:</strong>
                      <div className="flex items-center gap-1">
-                        {(canEdit || isRequester) ? (
+                        {(canEdit || isRequester || isAssignedToCurrentUser) ? (
                             <Select value={ticket.status} onValueChange={(value) => handleUpdate('status', value)} disabled={isUpdating}>
                                 <SelectTrigger className="w-[150px] h-8 text-xs">
                                     <SelectValue placeholder="Cambiar estado" />
@@ -389,7 +390,7 @@ export default function TicketDetailPage() {
                                     <SelectItem value="Abierto">Abierto</SelectItem>
                                     <SelectItem value="Asignado">Asignado</SelectItem>
                                     <SelectItem value="En Progreso">En Progreso</SelectItem>
-                                    {isRequester && <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>}
+                                    {(isRequester || canEdit) && <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>}
                                     <SelectItem value="Resuelto">Resuelto</SelectItem>
                                     <SelectItem value="Cancelado">Cancelado</SelectItem>
                                     <SelectItem value="Cerrado">Cerrado</SelectItem>
