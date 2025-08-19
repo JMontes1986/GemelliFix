@@ -53,7 +53,7 @@ The current date is ${new Date().toISOString()}.
 **Ticket Information:**
 - **Status:** {{ticket.status}}
 - **Due Date:** {{ticket.dueDate}}
-- **Assigned To:** {{#if ticket.assignedTo}}{{ticket.assignedTo.join ", "}}{{else}}Sin Asignar{{/if}}
+- **Assigned To:** {{#if ticket.assignedTo}}{{#each ticket.assignedTo}}{{.}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}Sin Asignar{{/if}}
 - **User Role:** {{currentUserRole}}
 
 **Your Analysis Task:**
@@ -63,7 +63,7 @@ The current date is ${new Date().toISOString()}.
 2.  **If the ticket is OVERDUE:**
     -   Your tone must be **urgent and direct**.
     -   **Analysis:** State clearly that the ticket is overdue and by how long.
-    -   **Recommendation:** Provide concrete, actionable steps. For example: "Contact the technician(s) '{{ticket.assignedTo.join ", "}}' immediately to get a status update," or "Consider reassigning this ticket to another technician due to the delay."
+    -   **Recommendation:** Provide concrete, actionable steps. For example: "Contact the technician(s) '{{#each ticket.assignedTo}}{{.}}{{#unless @last}}, {{/unless}}{{/each}}' immediately to get a status update," or "Consider reassigning this ticket to another technician due to the delay."
     -   Set \`isActionable\` to \`false\` as the primary action is investigation, not a simple state change.
 
 3.  **If the ticket is NOT overdue:**
