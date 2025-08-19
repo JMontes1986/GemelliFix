@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
   ChevronLeft,
@@ -38,7 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { scheduleEvents, tickets as unassignedTicketsData } from '@/lib/data';
+import { tickets as unassignedTicketsData } from '@/lib/data';
 import type { ScheduleEvent, Ticket, User } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -50,14 +50,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 const weekDays = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 
-const EventCard = ({ event, allTechnicians }: { event: ScheduleEvent, allTechnicians: User[] }) => {
-  const technician = allTechnicians.find(t => t.id === event.technicianId);
-  const eventDate = new Date(event.start);
+const EventCard = ({ event }: { event: ScheduleEvent }) => {
+  const eventStartDate = new Date(event.start);
+  const eventEndDate = new Date(event.end);
   
-  const startHour = eventDate.getHours();
-  const startMinutes = eventDate.getMinutes();
-  const endHour = event.end.getHours();
-  const endMinutes = event.end.getMinutes();
+  const startHour = eventStartDate.getHours();
+  const startMinutes = eventStartDate.getMinutes();
+  const endHour = eventEndDate.getHours();
+  const endMinutes = eventEndDate.getMinutes();
 
   const totalStartMinutes = (startHour - 8) * 60 + startMinutes;
   const totalEndMinutes = (endHour - 8) * 60 + endMinutes;
@@ -155,7 +155,7 @@ function AiAssignmentDialog({
     );
 }
 
-async function createCalendarNotification(technicianName: string, event: ScheduleEvent) {
+async function createCalendarNotification(technicianName: string, event: Omit<ScheduleEvent, 'id'>) {
     try {
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("name", "==", technicianName));
@@ -172,7 +172,7 @@ async function createCalendarNotification(technicianName: string, event: Schedul
         const newNotification = {
             userId: userId,
             title: 'Nueva Actividad en Calendario',
-            description: `Se te ha asignado: "${event.title}" para el ${event.start.toLocaleDateString()}`,
+            description: `Se te ha asignado: "${event.title}" para el ${new Date(event.start).toLocaleDateString()}`,
             createdAt: serverTimestamp(),
             read: false,
             type: 'schedule' as const,
@@ -187,13 +187,13 @@ async function createCalendarNotification(technicianName: string, event: Schedul
 
 export default function CalendarPage() {
     const [currentDate, setCurrentDate] = useState(new Date('2024-08-18T00:00:00'));
-    const [events, setEvents] = useState<ScheduleEvent[]>(scheduleEvents);
+    const [events, setEvents] = useState<ScheduleEvent[]>([]);
     const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>(unassignedTicketsData.filter(t => !t.assignedTo || t.assignedTo.length === 0));
     const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
     const [isLoadingAi, setIsLoadingAi] = useState(false);
     const [aiSuggestion, setAiSuggestion] = useState<SuggestCalendarAssignmentOutput | null>(null);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [isLoadingUser, setIsLoadingUser] = useState(true);
+    const [isLoadingData, setIsLoadingData] = useState(true);
     const { toast } = useToast();
     const [allTechnicians, setAllTechnicians] = useState<User[]>([]);
 
@@ -220,11 +220,27 @@ export default function CalendarPage() {
                      console.error("Error fetching user data:", error);
                 }
             }
-            setIsLoadingUser(false);
         });
 
-        return () => unsubscribe();
-    }, []);
+        const q = query(collection(db, 'scheduleEvents'));
+        const unsubscribeEvents = onSnapshot(q, (snapshot) => {
+            const fetchedEvents = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as ScheduleEvent));
+            setEvents(fetchedEvents);
+            setIsLoadingData(false);
+        }, (error) => {
+            console.error("Error fetching calendar events:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los eventos del calendario.' });
+            setIsLoadingData(false);
+        });
+
+        return () => {
+            unsubscribe();
+            unsubscribeEvents();
+        };
+    }, [toast]);
 
     const techniciansToDisplay = currentUser?.role === 'Servicios Generales' 
         ? allTechnicians.filter(t => t.id === currentUser.id)
@@ -271,28 +287,33 @@ export default function CalendarPage() {
     const handleConfirmAssignment = async (suggestion: SuggestCalendarAssignmentOutput) => {
         const { ticket, technician, suggestedTime } = suggestion;
         
-        const newEvent: ScheduleEvent = {
-            id: `evt-${Date.now()}`,
+        const newEvent: Omit<ScheduleEvent, 'id'> = {
             title: `Ticket: ${ticket.title}`,
             description: ticket.description,
-            start: new Date(suggestedTime),
-            end: new Date(new Date(suggestedTime).getTime() + 2 * 60 * 60 * 1000), // Assume 2 hour duration
+            start: new Date(suggestedTime).toISOString(),
+            end: new Date(new Date(suggestedTime).getTime() + 2 * 60 * 60 * 1000).toISOString(), // Assume 2 hour duration
             type: 'ticket',
             technicianId: technician.id,
             ticketId: ticket.id
         };
-
-        setEvents(prev => [...prev, newEvent]);
-        setUnassignedTickets(prev => prev.filter(t => t.id !== ticket.id));
         
-        await createCalendarNotification(technician.name, newEvent);
+        try {
+            await addDoc(collection(db, "scheduleEvents"), newEvent);
+            setUnassignedTickets(prev => prev.filter(t => t.id !== ticket.id));
+            
+            await createCalendarNotification(technician.name, newEvent);
 
-        toast({
-            title: '¡Evento Programado!',
-            description: `Se ha asignado el ticket a ${technician.name} y se le ha notificado.`
-        });
-        
-        setIsAiDialogOpen(false);
+            toast({
+                title: '¡Evento Programado!',
+                description: `Se ha asignado el ticket a ${technician.name} y se le ha notificado.`
+            });
+
+        } catch (error) {
+            console.error("Error saving event:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el evento en el calendario.' });
+        } finally {
+            setIsAiDialogOpen(false);
+        }
     };
     
     const startOfWeek = new Date(currentDate);
@@ -315,7 +336,7 @@ export default function CalendarPage() {
         return acc;
     }, {} as Record<string, Record<string, ScheduleEvent[]>>);
 
-  if (isLoadingUser || techniciansToDisplay.length === 0 && currentUser?.role !== 'Servicios Generales') {
+  if (isLoadingData) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -500,7 +521,7 @@ export default function CalendarPage() {
                                 >
                                     {/* Events for this technician on this day */}
                                     {(eventsByTechnicianAndDay[tech.id]?.[date.toDateString()] || []).map(event => (
-                                        <EventCard key={event.id} event={event} allTechnicians={allTechnicians} />
+                                        <EventCard key={event.id} event={event} />
                                     ))}
                                 </div>
                              ))}

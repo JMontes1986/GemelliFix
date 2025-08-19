@@ -75,8 +75,8 @@ export type ScheduleEvent = {
   id: string;
   title: string;
   description?: string;
-  start: Date;
-  end: Date;
+  start: string;
+  end: string;
   type: 'shift' | 'ticket' | 'task';
   technicianId?: string;
   ticketId?: string;
@@ -105,3 +105,4 @@ export type Log = {
 
 
     
+
