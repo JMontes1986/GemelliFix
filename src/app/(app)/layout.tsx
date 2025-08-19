@@ -18,10 +18,15 @@ import {
   PlusCircle,
   HeartPulse,
   Loader2,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { GemelliFixLogo } from '@/components/icons';
+import { cn } from '@/lib/utils';
+
 
 import {
   SidebarProvider,
@@ -34,6 +39,7 @@ import {
   SidebarFooter,
   SidebarTrigger,
   SidebarInset,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,6 +59,24 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import type { User } from '@/lib/types';
+
+function CollapseToggle() {
+    const { state, toggleSidebar } = useSidebar();
+    const isCollapsed = state === 'collapsed';
+    const Icon = isCollapsed ? ChevronsRight : ChevronsLeft;
+
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            className="w-full justify-center text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            onClick={toggleSidebar}
+        >
+            <Icon className="h-5 w-5" />
+            <span className="sr-only">{isCollapsed ? 'Expandir' : 'Colapsar'}</span>
+        </Button>
+    )
+}
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -109,10 +133,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader className="p-4">
+      <Sidebar collapsible="icon">
+        <SidebarHeader className="p-4 flex items-center justify-center">
           <Link href="/dashboard" className="flex items-center gap-2">
-            
+            <GemelliFixLogo className="w-32 group-data-[collapsible=icon]:hidden" />
           </Link>
         </SidebarHeader>
         <SidebarContent>
@@ -202,18 +226,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={isActive('/profile')} tooltip="Perfil">
-                <Link href="/profile">
-                  <UserIcon />
-                  <span>Mi Perfil</span>
-                </Link>
-              </SidebarMenuButton>
+                <CollapseToggle />
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
-                <Link href="/login">
+                <Link href="/login" onClick={async () => await auth.signOut()}>
                   <LogOut />
-                  <span>Cerrar Sesión</span>
+                  <span className="group-data-[collapsible=icon]:hidden">Cerrar Sesión</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -270,7 +289,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
+              <DropdownMenuItem asChild onClick={async () => await auth.signOut()}>
                 <Link href="/login">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Cerrar Sesión</span>
