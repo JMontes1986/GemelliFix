@@ -379,7 +379,7 @@ export default function DashboardPage() {
 
        <Card>
         <CardHeader>
-          <CardTitle className="font-headline">Tickets Urgentes y Recientes</CardTitle>
+          <CardTitle className="font-headline">Tickets</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -403,13 +403,11 @@ export default function DashboardPage() {
               ) : tickets.length === 0 ? (
                 <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
-                        No hay tickets urgentes o recientes.
+                        No hay tickets para mostrar.
                     </TableCell>
                 </TableRow>
               ) : (
                 tickets
-                    .filter(t => t.priority === 'Urgente' || t.priority === 'Alta')
-                    .slice(0, 5)
                     .map((ticket) => (
                     <TableRow key={ticket.id} className="cursor-pointer" onClick={() => window.location.href=`/tickets/${ticket.id}`}>
                     <TableCell>
@@ -422,7 +420,7 @@ export default function DashboardPage() {
                     <TableCell>
                         <Badge variant={ticket.priority === 'Urgente' ? 'destructive' : 'default'} className={ticket.priority === 'Alta' ? 'bg-orange-500 text-white' : ''}>{ticket.priority}</Badge>
                     </TableCell>
-                    <TableCell>{Array.isArray(ticket.assignedTo) ? ticket.assignedTo.join(', ') : 'Sin asignar'}</TableCell>
+                    <TableCell>{Array.isArray(ticket.assignedTo) && ticket.assignedTo.length > 0 ? ticket.assignedTo.join(', ') : 'Sin asignar'}</TableCell>
                     <TableCell className="text-right">
                         <ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
                     </TableCell>
@@ -437,4 +435,3 @@ export default function DashboardPage() {
   );
 }
 
-    
