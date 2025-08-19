@@ -144,6 +144,28 @@ async function createNotification(ticket: Ticket, assignedPersonnelIds: string[]
     }
 }
 
+const isStateChangeAllowed = (currentStatus: Ticket['status'], nextStatus: Ticket['status'], userRole: CurrentUser['role']): boolean => {
+    if (userRole === 'Administrador') {
+        return true; // Admins can change to any state
+    }
+    
+    // For general services, enforce state progression
+    if (userRole === 'Servicios Generales') {
+        const statusOrder: Ticket['status'][] = ['Abierto', 'Asignado', 'En Progreso', 'Requiere Aprobación', 'Resuelto', 'Cerrado'];
+        
+        // Cancelled is a final state, cannot be changed from it unless you are admin
+        if (currentStatus === 'Cancelado' || currentStatus === 'Cerrado') return false;
+
+        const currentIndex = statusOrder.indexOf(currentStatus);
+        const nextIndex = statusOrder.indexOf(nextStatus);
+        
+        // Can't go backwards. Can go from Asignado to En Progreso, etc.
+        return nextIndex >= currentIndex;
+    }
+    
+    return false; // Default to deny
+};
+
 export default function TicketDetailPage() {
   const params = useParams();
   const ticketId = params.id as string;
@@ -299,13 +321,23 @@ export default function TicketDetailPage() {
   const handleUpdate = async (field: keyof Ticket, value: any) => {
     if (!ticket || !currentUser) return;
 
-    if (field === 'status' && ticket.status !== 'Asignado' && value !== 'Asignado' && !comment.trim()) {
+    if (field === 'status') {
+      if (!isStateChangeAllowed(ticket.status, value, currentUser.role)) {
+          toast({
+              variant: "destructive",
+              title: "Cambio de Estado no Permitido",
+              description: "No puedes mover un ticket a un estado anterior.",
+          });
+          return;
+      }
+      if (ticket.status !== 'Asignado' && value !== 'Asignado' && !comment.trim()) {
         toast({
             variant: "destructive",
             title: "Comentario Requerido",
             description: "Debes agregar un comentario de progreso para cambiar el estado.",
         });
         return;
+      }
     }
 
     setIsUpdating(true);
