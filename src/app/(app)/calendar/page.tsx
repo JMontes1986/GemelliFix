@@ -208,7 +208,7 @@ export default function CalendarPage() {
     }, []);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
             if (firebaseUser) {
                 try {
                     const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -237,7 +237,7 @@ export default function CalendarPage() {
         });
 
         return () => {
-            unsubscribe();
+            unsubscribeAuth();
             unsubscribeEvents();
         };
     }, [toast]);
