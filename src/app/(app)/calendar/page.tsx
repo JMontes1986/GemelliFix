@@ -91,6 +91,9 @@ const UnassignedTicketCard = ({ ticket }: { ticket: Ticket }) => (
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("ticketId", ticket.id);
+        e.dataTransfer.setData("ticketTitle", ticket.title);
+        e.dataTransfer.setData("ticketDescription", ticket.description);
+        e.dataTransfer.setData("ticketCategory", ticket.category);
       }}
     >
       <p className="font-semibold text-sm">{ticket.code}</p>
@@ -185,7 +188,7 @@ async function createCalendarNotification(technicianName: string, event: Schedul
 export default function CalendarPage() {
     const [currentDate, setCurrentDate] = useState(new Date('2024-08-18T00:00:00'));
     const [events, setEvents] = useState<ScheduleEvent[]>(scheduleEvents);
-    const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>(unassignedTicketsData.filter(t => !t.assignedTo));
+    const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>(unassignedTicketsData.filter(t => !t.assignedTo || t.assignedTo.length === 0));
     const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
     const [isLoadingAi, setIsLoadingAi] = useState(false);
     const [aiSuggestion, setAiSuggestion] = useState<SuggestCalendarAssignmentOutput | null>(null);
@@ -224,23 +227,27 @@ export default function CalendarPage() {
     }, []);
 
     const techniciansToDisplay = currentUser?.role === 'Servicios Generales' 
-        ? allTechnicians.filter(t => t.name === currentUser.name)
+        ? allTechnicians.filter(t => t.id === currentUser.id)
         : allTechnicians;
 
-    const handleDrop = async (technicianId: string, day: Date, time: string, draggedTicketId: string) => {
-        const ticket = unassignedTickets.find(t => t.id === draggedTicketId);
-        if (!ticket) return;
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>, technicianId: string, day: Date, hour: number) => {
+        e.preventDefault();
+        const ticketId = e.dataTransfer.getData("ticketId");
+        const ticketTitle = e.dataTransfer.getData("ticketTitle");
+        const ticketDescription = e.dataTransfer.getData("ticketDescription");
+        const ticketCategory = e.dataTransfer.getData("ticketCategory");
+        
+        if (!ticketId) return;
 
-        const [hour] = time.split(':');
         const targetDate = new Date(day);
-        targetDate.setHours(parseInt(hour, 10));
+        targetDate.setHours(hour, 0, 0, 0); // Set time precisely
         
         setIsAiDialogOpen(true);
         setIsLoadingAi(true);
         setAiSuggestion(null);
 
         const input: SuggestCalendarAssignmentInput = {
-            ticket: { id: ticket.id, title: ticket.title, description: ticket.description, category: ticket.category },
+            ticket: { id: ticketId, title: ticketTitle, description: ticketDescription, category: ticketCategory },
             targetDate: targetDate.toISOString(),
             targetTechnicianId: technicianId,
         };
@@ -308,7 +315,7 @@ export default function CalendarPage() {
         return acc;
     }, {} as Record<string, Record<string, ScheduleEvent[]>>);
 
-  if (isLoadingUser) {
+  if (isLoadingUser || techniciansToDisplay.length === 0 && currentUser?.role !== 'Servicios Generales') {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -444,15 +451,17 @@ export default function CalendarPage() {
         </div>
 
         {/* Calendar Grid */}
-        <div className="flex-1 overflow-auto border rounded-lg bg-background">
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] sticky top-0 bg-background z-20 shadow-sm">
-            <div className="p-2 border-b border-r"></div>
-            {weekDates.map(date => (
-              <div key={date.toString()} className="p-2 text-center border-b border-r font-semibold">
-                  <p className="text-xs">{weekDays[date.getDay()]}</p>
-                  <p className="text-2xl font-bold">{date.getDate()}</p>
+        <div className="flex-1 overflow-auto border rounded-lg bg-background relative">
+          {/* Header */}
+          <div className="grid grid-cols-[60px_1fr] sticky top-0 bg-background z-20 shadow-sm">
+              <div className="p-2 border-b border-r"></div>
+              <div className="grid" style={{gridTemplateColumns: `repeat(${techniciansToDisplay.length}, 1fr)`}}>
+                {techniciansToDisplay.map((tech, index) => (
+                    <div key={tech.id} className={`p-2 text-center border-b ${index < techniciansToDisplay.length -1 ? 'border-r' : ''}`}>
+                         <p className="font-semibold text-sm truncate">{tech.name}</p>
+                    </div>
+                ))}
               </div>
-            ))}
           </div>
 
           <div className="grid grid-cols-[60px_1fr] h-full">
@@ -466,29 +475,30 @@ export default function CalendarPage() {
             </div>
             
             {/* Day columns */}
-            <div className={`grid h-full`} style={{ gridTemplateColumns: `repeat(${techniciansToDisplay.length > 0 ? techniciansToDisplay.length : 1}, 1fr)`}}>
-                 {weekDates.map((date) => (
-                    <div key={date.toString()} className="border-r relative" onDragOver={e => e.preventDefault()}>
-                         {hours.map((hour, hourIndex) => (
-                             <div 
-                                key={hourIndex} 
-                                className="h-16 border-b"
-                                onDrop={e => {
-                                    e.preventDefault();
-                                    const ticketId = e.dataTransfer.getData('ticketId');
-                                    // Drop logic needs to determine which technician's sub-column it was dropped into.
-                                    // This is a simplified placeholder.
-                                    const techId = techniciansToDisplay.length > 0 ? techniciansToDisplay[0].id : ''; 
-                                    if (ticketId && techId) {
-                                      handleDrop(techId, date, hour, ticketId);
-                                    }
-                                }} 
-                             />
+            <div className={`grid grid-cols-7 h-full`}>
+                 {weekDates.map((date, dayIndex) => (
+                    <div key={date.toDateString()} className={`relative ${dayIndex < weekDates.length - 1 ? 'border-r' : ''}`}>
+                         {/* Background Hour Lines */}
+                         {hours.map((hour) => (
+                            <div key={`${date.toDateString()}-${hour}`} className="h-16 border-b" />
                          ))}
-                         {/* Events for this day */}
+
+                         {/* Drop-target and Event Overlay */}
                          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${techniciansToDisplay.length}, 1fr)`}}>
-                             {techniciansToDisplay.map(tech => (
-                                <div key={tech.id} className="relative border-r last:border-r-0">
+                             {techniciansToDisplay.map((tech, techIndex) => (
+                                <div 
+                                    key={tech.id} 
+                                    className={`relative ${techIndex < techniciansToDisplay.length -1 ? 'border-r' : ''} h-full`}
+                                    onDragOver={e => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const y = e.clientY - rect.top;
+                                        const hourSlot = Math.floor(y / 64); // 64px = h-16
+                                        const hour = hourSlot + 8; // Starts at 8am
+                                        handleDrop(e, tech.id, date, hour);
+                                    }}
+                                >
+                                    {/* Events for this technician on this day */}
                                     {(eventsByTechnicianAndDay[tech.id]?.[date.toDateString()] || []).map(event => (
                                         <EventCard key={event.id} event={event} allTechnicians={allTechnicians} />
                                     ))}
@@ -504,3 +514,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
