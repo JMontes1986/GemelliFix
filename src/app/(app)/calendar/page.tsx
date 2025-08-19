@@ -76,6 +76,10 @@ const EventCard = ({ event }: { event: ScheduleEvent }) => {
       style={{
         top: `${top}px`,
         height: `${height}px`,
+        left: 0,
+        right: 0,
+        marginLeft: '2px',
+        marginRight: '2px',
       }}
     >
       <p className="font-bold truncate">{event.title}</p>
@@ -246,7 +250,6 @@ export default function CalendarPage() {
         const unsubscribeEvents = onSnapshot(q, (snapshot) => {
             const fetchedEvents = snapshot.docs.map(doc => {
                 const data = doc.data();
-                // Ensure dates are in a consistent, readable format for the component
                 return {
                     id: doc.id,
                     ...data,
@@ -282,7 +285,7 @@ export default function CalendarPage() {
         if (!ticketId) return;
 
         const targetDate = new Date(day);
-        targetDate.setHours(hour, 0, 0, 0); // Set time precisely
+        targetDate.setHours(hour, 0, 0, 0); 
         
         setIsAiDialogOpen(true);
         setIsLoadingAi(true);
@@ -384,7 +387,6 @@ export default function CalendarPage() {
 
             toast({ title: '¡Evento Creado!', description: 'La nueva tarea ha sido añadida al calendario.' });
 
-            // Reset form and close dialog
             setIsManualDialogOpen(false);
             setNewEventTitle('');
             setNewEventTechnicianId('');
@@ -555,20 +557,8 @@ export default function CalendarPage() {
         </div>
 
         {/* Calendar Grid */}
-        <div className="flex-1 overflow-auto border rounded-lg bg-background relative">
-          {/* Header */}
-          <div className="grid grid-cols-[60px_1fr] sticky top-0 bg-background z-20 shadow-sm">
-              <div className="p-2 border-b border-r"></div>
-              <div className="grid" style={{gridTemplateColumns: `repeat(${techniciansToDisplay.length}, 1fr)`}}>
-                {techniciansToDisplay.map((tech, index) => (
-                    <div key={tech.id} className={`p-2 text-center border-b ${index < techniciansToDisplay.length -1 ? 'border-r' : ''}`}>
-                         <p className="font-semibold text-sm truncate">{tech.name}</p>
-                    </div>
-                ))}
-              </div>
-          </div>
-
-          <div className="grid grid-cols-[60px_1fr] h-[calc(13*4rem)]">
+        <div className="flex-1 overflow-auto border rounded-lg bg-background">
+          <div className="grid grid-cols-[60px_1fr] h-full">
             {/* Hours Column */}
             <div className="border-r">
                 {hours.map(hour => (
@@ -578,41 +568,43 @@ export default function CalendarPage() {
                 ))}
             </div>
             
-            {/* Day columns */}
-            <div className={`grid h-full`} style={{gridTemplateColumns: `repeat(7, 1fr)`}}>
-                 {weekDates.map((date, dayIndex) => (
-                    <div key={date.toDateString()} className={`relative ${dayIndex < weekDates.length - 1 ? 'border-r' : ''}`}>
-                         {/* Background Hour Lines */}
-                         <div className="absolute inset-0">
-                            {hours.map((_, hourIndex) => (
-                                <div key={hourIndex} className={`h-16 ${hourIndex < hours.length - 1 ? 'border-b' : ''}`} />
-                            ))}
-                         </div>
+            {/* Days and Technicians Grid */}
+            <div className="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+              {weekDates.map((date, dayIndex) => (
+                <div key={date.toISOString()} className={cn("relative", dayIndex < weekDates.length - 1 && 'border-r')}>
+                  {/* Day Header Placeholder */}
+                  
+                  {/* Background Hour Lines */}
+                  <div className="absolute inset-0">
+                    {hours.map((_, hourIndex) => (
+                      <div key={hourIndex} className={cn("h-16", hourIndex < hours.length - 1 && 'border-b')} />
+                    ))}
+                  </div>
 
-                         {/* Drop-target and Event Overlay */}
-                         <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${techniciansToDisplay.length}, 1fr)`}}>
-                             {techniciansToDisplay.map((tech, techIndex) => (
-                                <div 
-                                    key={tech.id} 
-                                    className={`relative ${techIndex < techniciansToDisplay.length -1 ? 'border-r' : ''} h-full`}
-                                    onDragOver={e => e.preventDefault()}
-                                    onDrop={(e) => {
-                                        const rect = e.currentTarget.getBoundingClientRect();
-                                        const y = e.clientY - rect.top;
-                                        const hourSlot = Math.floor(y / 64); // 64px = h-16
-                                        const hour = hourSlot + 8; // Starts at 8am
-                                        handleDrop(e, tech.id, date, hour);
-                                    }}
-                                >
-                                    {/* Events for this technician on this day */}
-                                    {eventsByTechnicianAndDay(tech.id, date).map(event => (
-                                        <EventCard key={event.id} event={event} />
-                                    ))}
-                                </div>
-                             ))}
-                         </div>
-                    </div>
-                 ))}
+                  {/* Technician Columns for the Day */}
+                  <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${techniciansToDisplay.length}, 1fr)` }}>
+                    {techniciansToDisplay.map((tech, techIndex) => (
+                      <div
+                        key={tech.id}
+                        className={cn("relative h-full", techIndex < techniciansToDisplay.length - 1 && 'border-r')}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const y = e.clientY - rect.top;
+                            const hourSlot = Math.floor(y / 64);
+                            const hour = hourSlot + 8;
+                            handleDrop(e, tech.id, date, hour);
+                        }}
+                      >
+                        {/* Events for this technician on this day */}
+                        {eventsByTechnicianAndDay(tech.id, date).map(event => (
+                            <EventCard key={event.id} event={event} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -620,3 +612,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
