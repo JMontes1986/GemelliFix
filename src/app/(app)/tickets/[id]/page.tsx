@@ -163,6 +163,10 @@ export default function TicketDetailPage() {
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
+            // Convert Firestore Timestamps to ISO strings
+            const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
+            const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
+            
             const ticketData: Ticket = {
                 id: docSnap.id,
                 code: data.code,
@@ -173,8 +177,8 @@ export default function TicketDetailPage() {
                 category: data.category,
                 priority: data.priority,
                 status: data.status,
-                createdAt: data.createdAt?.toDate().toISOString(),
-                dueDate: data.dueDate?.toDate().toISOString(),
+                createdAt,
+                dueDate,
                 assignedTo: data.assignedTo || [],
                 requester: data.requester,
                 requesterId: data.requesterId,
@@ -608,7 +612,7 @@ export default function TicketDetailPage() {
                             <div className="flex-shrink-0"><ArrowRight className="w-5 h-5 text-blue-500" /></div>
                             <div>
                                 <p>Ticket asignado a <strong>{assignedPersonnelDetails.map(p => p.name).join(', ')}</strong> por <strong>Admin User</strong>.</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 3600000)} /></p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 3600000).toISOString()} /></p>
                             </div>
                         </div>
                      )}
@@ -622,7 +626,7 @@ export default function TicketDetailPage() {
                             </div>
                             <div>
                                 <p><strong>{assignedPersonnelDetails[0].name}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 7200000)} /></p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 7200000).toISOString()} /></p>
                             </div>
                         </div>
                      )}
@@ -631,7 +635,7 @@ export default function TicketDetailPage() {
                             <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
                             <div>
                                 <p>Ticket marcado como <strong>Resuelto</strong> por <strong>{ticket.assignedTo?.[0] || ''}</strong>.</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.dueDate).getTime() - 86400000)} /></p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.dueDate).getTime() - 86400000).toISOString()} /></p>
                             </div>
                         </div>
                      )}

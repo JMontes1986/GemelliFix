@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -282,7 +283,18 @@ export default function TicketsPage() {
     }
     
     const unsubscribeTickets = onSnapshot(q, (querySnapshot) => {
-      const ticketsData: Ticket[] = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticket));
+      const ticketsData: Ticket[] = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          // Convert Firestore Timestamps to ISO strings
+          const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
+          const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
+          return { 
+              id: doc.id,
+              ...data,
+              createdAt,
+              dueDate,
+          } as Ticket;
+      });
       setTickets(ticketsData);
       setIsLoading(false);
       setError(null);
