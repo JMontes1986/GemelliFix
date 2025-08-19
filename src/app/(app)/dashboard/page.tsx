@@ -96,7 +96,19 @@ const ticketsByZoneConfig = {
         label: 'Comunes',
         color: 'hsl(var(--chart-4))',
     },
+     'Default': {
+        label: 'Otra',
+        color: 'hsl(var(--chart-5))',
+    }
 } satisfies ChartConfig;
+
+const zoneColorMap: Record<string, string> = {
+    'Bloque A - Aulas': `var(--color-Bloque A - Aulas)`,
+    'Bloque B - Laboratorios': `var(--color-Bloque B - Laboratorios)`,
+    'Áreas Administrativas': `var(--color-Áreas Administrativas)`,
+    'Zonas Comunes': `var(--color-Zonas Comunes)`,
+};
+
 
 function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
     return (
@@ -145,7 +157,10 @@ export default function DashboardPage() {
       const ticketsData: Ticket[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        ticketsData.push({ ...data, id: doc.id } as Ticket);
+        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
+        const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
+
+        ticketsData.push({ ...data, id: doc.id, createdAt, dueDate } as Ticket);
       });
       setTickets(ticketsData);
       setIsLoading(false);
@@ -166,11 +181,15 @@ export default function DashboardPage() {
   
   const closedTickets = tickets.filter(t => t.status === 'Cerrado' || t.status === 'Resuelto');
   const slaCompliance = closedTickets.length > 0
-    ? Math.round((closedTickets.filter(t => new Date(t.dueDate) >= new Date(t.createdAt)).length / closedTickets.length) * 100)
+    ? Math.round((closedTickets.filter(t => new Date(t.resolvedAt || t.dueDate) <= new Date(t.dueDate)).length / closedTickets.length) * 100)
     : 100;
 
   const resolutionTimes = closedTickets
-    .map(t => new Date(t.createdAt).getTime() - new Date(t.dueDate).getTime())
+    .map(t => {
+        const resolvedAt = t.resolvedAt ? new Date(t.resolvedAt).getTime() : new Date().getTime();
+        const createdAt = new Date(t.createdAt).getTime();
+        return resolvedAt - createdAt;
+    })
     .filter(time => !isNaN(time));
     
   const averageResolutionTime = resolutionTimes.length > 0 ? resolutionTimes.reduce((a, b) => a + b, 0) / resolutionTimes.length : 0;
@@ -182,11 +201,15 @@ export default function DashboardPage() {
       acc[ticket.zone] = (acc[ticket.zone] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
-  ).map(([zone, count]) => ({ zone, tickets: count, fill: `var(--color-${zone.split(' ')[0].toLowerCase()})` }));
+  ).map(([zone, count]) => ({ 
+      zone, 
+      tickets: count, 
+      fill: zoneColorMap[zone] || `var(--color-Default)`
+  }));
 
     const slaComplianceData = [
-      { status: 'en_tiempo', count: closedTickets.filter(t => new Date(t.dueDate) >= new Date(t.createdAt)).length, fill: 'var(--color-en_tiempo)' },
-      { status: 'vencido', count: closedTickets.filter(t => new Date(t.dueDate) < new Date(t.createdAt)).length, fill: 'var(--color-vencido)' },
+      { status: 'en_tiempo', count: closedTickets.filter(t => new Date(t.resolvedAt || t.dueDate) <= new Date(t.dueDate)).length, fill: 'var(--color-en_tiempo)' },
+      { status: 'vencido', count: closedTickets.filter(t => new Date(t.resolvedAt || t.dueDate) > new Date(t.dueDate)).length, fill: 'var(--color-vencido)' },
     ];
 
 
@@ -305,7 +328,10 @@ export default function DashboardPage() {
                   tickLine={false}
                   tickMargin={10}
                   axisLine={false}
-                  tickFormatter={(value) => value.slice(0, 15)}
+                  tickFormatter={(value) => {
+                      const config = ticketsByZoneConfig[value as keyof typeof ticketsByZoneConfig];
+                      return config ? config.label : value;
+                  }}
                   />
                 <XAxis dataKey="tickets" type="number" hide />
                 <ChartTooltip
@@ -314,7 +340,7 @@ export default function DashboardPage() {
                 />
                 <Bar dataKey="tickets" radius={5}>
                     {ticketsByZoneData.map((entry) => (
-                        <Cell key={`cell-${entry.zone}`} fill={entry.fill || 'hsl(var(--chart-1))'} />
+                        <Cell key={`cell-${entry.zone}`} fill={entry.fill} />
                     ))}
                 </Bar>
               </BarChart>
@@ -385,7 +411,7 @@ export default function DashboardPage() {
                     .filter(t => t.priority === 'Urgente' || t.priority === 'Alta')
                     .slice(0, 5)
                     .map((ticket) => (
-                    <TableRow key={ticket.id} className="cursor-pointer">
+                    <TableRow key={ticket.id} className="cursor-pointer" onClick={() => window.location.href=`/tickets/${ticket.id}`}>
                     <TableCell>
                         <Link href={`/tickets/${ticket.id}`} className="font-medium text-primary hover:underline">{ticket.code}</Link>
                     </TableCell>
@@ -410,3 +436,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

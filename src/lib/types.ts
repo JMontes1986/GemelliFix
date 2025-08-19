@@ -42,6 +42,7 @@ export type Ticket = {
   status: 'Abierto' | 'Asignado' | 'En Progreso' | 'Requiere Aprobación' | 'Resuelto' | 'Cerrado' | 'Cancelado';
   createdAt: string;
   dueDate: string;
+  resolvedAt?: string;
   assignedTo?: string[];
   assignedToIds?: string[];
   requester: string;
@@ -99,3 +100,4 @@ export type Log = {
 
     
 
+    
