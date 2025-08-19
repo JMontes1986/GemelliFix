@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import {
@@ -116,8 +117,9 @@ async function createNotification(ticket: Ticket, assignedPersonnelIds: string[]
     }
 }
 
-export default function TicketDetailPage({ params }: { params: { id: string } }) {
-  const ticketId = params.id;
+export default function TicketDetailPage() {
+  const params = useParams();
+  const ticketId = params.id as string;
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -617,3 +619,5 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     </div>
   );
 }
+
+    
