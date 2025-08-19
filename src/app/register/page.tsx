@@ -21,6 +21,9 @@ import { GemelliFixLogo } from '@/components/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import type { User } from '@/lib/types';
+
+const userRoles: User['role'][] = ['Administrador', 'Servicios Generales', 'Docentes', 'Coordinadores', 'Administrativos'];
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -28,7 +31,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('');
+  const [role, setRole] = useState<User['role'] | ''>('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -125,16 +128,12 @@ export default function RegisterPage() {
             </div>
              <div className="grid gap-2">
                 <Label htmlFor="role">Rol de Usuario</Label>
-                <Select onValueChange={setRole} value={role} disabled={isLoading}>
+                <Select onValueChange={(value: User['role']) => setRole(value)} value={role} disabled={isLoading}>
                     <SelectTrigger>
                         <SelectValue placeholder="Selecciona un rol" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="Administrador">Administrador</SelectItem>
-                        <SelectItem value="Servicios Generales">Servicios Generales</SelectItem>
-                        <SelectItem value="Docentes">Docentes</SelectItem>
-                        <SelectItem value="Coordinadores">Coordinadores</SelectItem>
-                        <SelectItem value="Administrativos">Administrativos</SelectItem>
+                        {userRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>

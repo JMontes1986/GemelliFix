@@ -2,10 +2,11 @@
 
 export type User = {
   id: string;
+  uid?: string;
   name: string;
   email: string;
   avatar: string;
-  role: 'Docentes' | 'Coordinadores' | 'Administrativos' | 'Servicios Generales' | 'Administrador';
+  role: 'Administrador' | 'Servicios Generales' | 'Docentes' | 'Coordinadores' | 'Administrativos';
 };
 
 export type Zone = {

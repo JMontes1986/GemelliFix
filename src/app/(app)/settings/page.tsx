@@ -4,14 +4,6 @@
 
 import * as React from 'react';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   Tabs,
   TabsContent,
   TabsList,
@@ -53,7 +45,10 @@ import { collection, onSnapshot, doc, updateDoc, query, where } from 'firebase/f
 import { db } from '@/lib/firebase';
 import type { User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import Link from 'next/link';
+import LogsPage from './logs/page';
+
+const userRoles: User['role'][] = ['Administrador', 'Servicios Generales', 'Docentes', 'Coordinadores', 'Administrativos'];
+
 
 export default function SettingsPage() {
     const [allUsers, setAllUsers] = React.useState<User[]>([]);
@@ -162,11 +157,7 @@ export default function SettingsPage() {
                                 <SelectValue placeholder="Selecciona un rol" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="Administrador">Administrador</SelectItem>
-                                <SelectItem value="Servicios Generales">Servicios Generales</SelectItem>
-                                <SelectItem value="Docentes">Docentes</SelectItem>
-                                <SelectItem value="Coordinadores">Coordinadores</SelectItem>
-                                <SelectItem value="Administrativos">Administrativos</SelectItem>
+                                {userRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
@@ -483,17 +474,7 @@ export default function SettingsPage() {
             </Card>
         </TabsContent>
          <TabsContent value="logs">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="font-headline">Logs del Sistema</CardTitle>
-                    <CardDescription>
-                        Registro de auditoría de las acciones importantes en la plataforma.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p>Para ver los logs, por favor navega a la página de <Link href="/settings/logs" className="text-primary underline">Logs del Sistema</Link>.</p>
-                </CardContent>
-            </Card>
+            <LogsPage />
         </TabsContent>
 
       </Tabs>

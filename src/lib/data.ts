@@ -1,5 +1,5 @@
 
-import type { Zone, Site, Technician, Ticket, Notification, User, ScheduleEvent, Category } from '@/lib/types';
+import type { Zone, Site, Ticket, Notification, User, ScheduleEvent, Category } from '@/lib/types';
 
 export const users: User[] = [
   { id: 'user-1', uid:'user-1', name: 'Admin User', email: 'sistemas@colgemelli.edu.co', avatar: 'https://firebasestorage.googleapis.com/v0/b/gemellifix.firebasestorage.app/o/Logo.png?alt=media&token=3c91d664-c1d3-43b0-b81f-2b21a7cf2c05', role: 'Administrador' },
