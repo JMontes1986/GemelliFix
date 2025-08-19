@@ -60,7 +60,19 @@ export default function CreateTicketPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isAuthLoading, setIsAuthLoading] = React.useState(true);
   
+  React.useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      if (user) {
+        setIsAuthLoading(false);
+      } else {
+        router.push('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
+
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketSchema),
     defaultValues: {
@@ -83,8 +95,9 @@ export default function CreateTicketPage() {
         toast({
             variant: 'destructive',
             title: 'Error de Autenticación',
-            description: 'Debes iniciar sesión para crear un ticket.',
+            description: 'Debes iniciar sesión para crear un ticket. Serás redirigido.',
         });
+        router.push('/login');
         return;
     }
     setIsLoading(true);
@@ -98,6 +111,7 @@ export default function CreateTicketPage() {
       const filesToUpload: File[] = data.attachments || [];
 
       if (filesToUpload.length > 0) {
+        toast({ title: 'Subiendo archivos...', description: 'Por favor, espera un momento.' });
         for (const file of filesToUpload) {
           const storageRef = ref(storage, `ticket-attachments/${Date.now()}-${file.name}`);
           const snapshot = await uploadBytes(storageRef, file);
@@ -120,8 +134,10 @@ export default function CreateTicketPage() {
         category: data.category,
         status: 'Abierto',
         requester: requesterName,
+        requesterId: currentUser.uid,
         assignedTo: '',
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         dueDate: new Date(new Date().setDate(new Date().getDate() + 7)), 
         attachments: attachmentUrls,
       });
@@ -131,12 +147,12 @@ export default function CreateTicketPage() {
         description: 'Tu solicitud de mantenimiento ha sido registrada con éxito.',
       });
       router.push('/tickets');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creando ticket:', error);
       toast({
         variant: 'destructive',
         title: 'Error al crear el ticket',
-        description: 'Hubo un problema al guardar tu solicitud. Revisa los permisos de Firestore.',
+        description: `Hubo un problema al guardar tu solicitud: ${error.message}`,
       });
     } finally {
         setIsLoading(false);
@@ -398,9 +414,9 @@ export default function CreateTicketPage() {
               </Alert>
 
               <div className="flex justify-end pt-4">
-                <Button type="submit" disabled={isLoading}>
-                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                   Enviar Solicitud
+                <Button type="submit" disabled={isLoading || isAuthLoading}>
+                   {(isLoading || isAuthLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                   {isAuthLoading ? 'Verificando...' : 'Enviar Solicitud'}
                 </Button>
               </div>
             </form>
@@ -410,5 +426,3 @@ export default function CreateTicketPage() {
     </div>
   );
 }
-
-    
