@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
   ChevronLeft,
@@ -152,8 +152,38 @@ function AiAssignmentDialog({
     );
 }
 
+async function createCalendarNotification(technicianName: string, event: ScheduleEvent) {
+    try {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("name", "==", technicianName));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            console.warn(`User not found for technician: ${technicianName}`);
+            return;
+        }
+
+        const userDoc = querySnapshot.docs[0];
+        const userId = userDoc.data().id;
+
+        const newNotification = {
+            userId: userId,
+            title: 'Nueva Actividad en Calendario',
+            description: `Se te ha asignado: "${event.title}" para el ${event.start.toLocaleDateString()}`,
+            createdAt: serverTimestamp(),
+            read: false,
+            type: 'schedule' as const,
+            linkTo: `/calendar`,
+        };
+        await addDoc(collection(db, "notifications"), newNotification);
+
+    } catch (error) {
+        console.error("Error creating calendar notification:", error);
+    }
+}
+
 export default function CalendarPage() {
-    const [currentDate, setCurrentDate] = useState(new Date('2024-08-18'));
+    const [currentDate, setCurrentDate] = useState(new Date('2024-08-18T00:00:00'));
     const [events, setEvents] = useState<ScheduleEvent[]>(scheduleEvents);
     const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>(unassignedTicketsData.filter(t => !t.assignedTo));
     const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
@@ -220,7 +250,7 @@ export default function CalendarPage() {
         }
     };
 
-    const handleConfirmAssignment = (suggestion: SuggestCalendarAssignmentOutput) => {
+    const handleConfirmAssignment = async (suggestion: SuggestCalendarAssignmentOutput) => {
         const { ticket, technician, suggestedTime } = suggestion;
         
         const newEvent: ScheduleEvent = {
@@ -236,10 +266,12 @@ export default function CalendarPage() {
 
         setEvents(prev => [...prev, newEvent]);
         setUnassignedTickets(prev => prev.filter(t => t.id !== ticket.id));
+        
+        await createCalendarNotification(technician.name, newEvent);
 
         toast({
             title: '¡Evento Programado!',
-            description: `Se ha asignado el ticket a ${technician.name}.`
+            description: `Se ha asignado el ticket a ${technician.name} y se le ha notificado.`
         });
         
         setIsAiDialogOpen(false);

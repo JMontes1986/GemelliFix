@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   Card,
@@ -92,6 +92,32 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
 // Hardcoded current user for permission checking
 const currentUser = users[0];
 
+async function createNotification(ticket: Ticket, assignedPersonnelNames: string[]) {
+    try {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("name", "in", assignedPersonnelNames));
+        const querySnapshot = await getDocs(q);
+
+        const notificationPromises = querySnapshot.docs.map(userDoc => {
+            const userData = userDoc.data();
+            const newNotification = {
+                userId: userData.id,
+                title: 'Nuevo Ticket Asignado',
+                description: `Se te ha asignado el ticket: "${ticket.title}" (${ticket.code})`,
+                createdAt: serverTimestamp(),
+                read: false,
+                type: 'ticket' as const,
+                linkTo: `/tickets/${ticket.id}`,
+            };
+            return addDoc(collection(db, "notifications"), newNotification);
+        });
+
+        await Promise.all(notificationPromises);
+    } catch (error) {
+        console.error("Error creating notifications:", error);
+    }
+}
+
 export default function TicketDetailPage({ params }: { params: { id: string } }) {
   const ticketId = params.id;
   const [ticket, setTicket] = useState<Ticket | null>(null);
@@ -175,13 +201,15 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   }
   
    const handleAssignPersonnel = async (personnel: Technician[]) => {
+    if(!ticket) return;
     const personnelNames = personnel.map(p => p.name);
     await handleUpdate('assignedTo', personnelNames);
     const newStatus = personnelNames.length > 0 ? 'Asignado' : 'Abierto';
     await handleUpdate('status', newStatus);
+    await createNotification(ticket, personnelNames);
     toast({
         title: "Personal Asignado",
-        description: `El ticket ha sido actualizado.`,
+        description: `El ticket ha sido actualizado y se ha notificado al personal.`,
     });
   }
 
@@ -195,9 +223,14 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
           assignedTo: selectedPersonnel,
           status: selectedPersonnel.length > 0 ? 'Asignado' : 'Abierto'
       });
+
+      if (selectedPersonnel.length > 0) {
+        await createNotification(ticket, selectedPersonnel);
+      }
+
       toast({
         title: "Personal Actualizado",
-        description: `Se ha actualizado la asignación del ticket.`,
+        description: `Se ha actualizado la asignación del ticket y notificado al personal.`,
       });
     } catch (error: any) {
       console.error("Error updating assignment: ", error);

@@ -57,11 +57,13 @@ export type Technician = {
 
 export type Notification = {
   id:string;
+  userId: string;
   title: string;
   description: string;
-  createdAt: string;
+  createdAt: any;
   read: boolean;
   type: 'ticket' | 'sla' | 'schedule';
+  linkTo: string;
 };
 
 export type ScheduleEvent = {
