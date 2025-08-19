@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { collection, onSnapshot, query, where, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import { File, ListFilter, MoreHorizontal } from 'lucide-react';
@@ -136,7 +136,9 @@ export default function TicketsPage() {
     }
     
     let q;
-    if (currentUser.role === 'Servicios Generales') {
+    if (currentUser.role === 'Administrador') {
+        q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
+    } else if (currentUser.role === 'Servicios Generales') {
         // Filter tickets for 'Servicios Generales'
         q = query(
             collection(db, 'tickets'), 
@@ -149,10 +151,12 @@ export default function TicketsPage() {
             where('requesterId', '==', currentUser.id),
             orderBy('createdAt', 'desc')
         );
-    }
-    else {
-        // Admins and other roles see all tickets
-        q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
+    } else {
+        // Fallback for any other roles, though should not happen with defined roles.
+        // Show no tickets by default for unknown roles.
+        setTickets([]);
+        setIsLoading(false);
+        return;
     }
     
     const unsubscribeTickets = onSnapshot(q, (querySnapshot) => {
@@ -391,7 +395,7 @@ export default function TicketsPage() {
                                 <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                 <DropdownMenuItem asChild><Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link></DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>Asignar</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>Asignar</Link></DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                             </TableCell>
