@@ -209,7 +209,7 @@ export default function DiagnosisPage() {
             Usa este botón para realizar una prueba de escritura simple y directa a Firestore. Esto ayuda a verificar rápidamente si las reglas de seguridad y la configuración del proyecto son correctas.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <Button onClick={handleSimpleConnectionTest} disabled={isLoading || isAuthLoading} className="w-full">
             {(isLoading || isAuthLoading) ? (
               <>
@@ -223,8 +223,6 @@ export default function DiagnosisPage() {
               </>
             )}
           </Button>
-        </CardContent>
-        <CardFooter className="flex-col items-start gap-4">
             <Alert variant={executionResult.status === 'Error' || executionResult.status === 'Error de Autenticación' ? 'destructive' : (executionResult.status === 'Éxito' ? 'default' : 'default')}
                 className={executionResult.status === 'Éxito' ? 'border-green-500' : ''}
             >
@@ -233,7 +231,7 @@ export default function DiagnosisPage() {
                     {executionResult.message}
                 </AlertDescription>
             </Alert>
-        </CardFooter>
+        </CardContent>
       </Card>
 
       
