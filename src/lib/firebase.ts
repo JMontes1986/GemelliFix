@@ -5,8 +5,34 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+// =================================================================
+// ========= DIAGNÓSTICO DEL PROBLEMA DE CONEXIÓN PERSISTENTE =========
+// =================================================================
+/*
+  Si la aplicación se queda "colgada" en "Intentando conectar con Firestore..."
+  y nunca muestra un mensaje de éxito o error, las causas más probables son:
+
+  1.  **LA BASE DE DATOS NO ESTÁ CREADA:** Es el motivo más común. Aunque tengas
+      un proyecto en Firebase, necesitas inicializar la base de datos.
+      - **Solución:** Ve a tu proyecto en la Consola de Firebase, selecciona
+        "Firestore Database" en el menú y haz clic en el botón "Crear base de datos".
+        Sigue los pasos para crearla (se recomienda el modo de producción).
+
+  2.  **CONFIGURACIÓN INCORRECTA:** El objeto `firebaseConfig` de abajo no coincide
+      con el proyecto donde configuraste las reglas de seguridad.
+      - **Solución:** Asegúrate de que estás trabajando en el proyecto `gemellifix`
+        o reemplaza la configuración de abajo con la de tu propio proyecto, que
+        puedes obtener desde la configuración de tu proyecto en la consola de Firebase.
+
+  3.  **REGLAS DE SEGURIDAD:** Las reglas de seguridad de Firestore no permiten
+      la operación. Ya hemos intentado solucionarlo, pero asegúrate de que
+      estén publicadas correctamente.
+*/
+// =================================================================
+
+
 // Your web app's Firebase configuration
-// This is a public configuration and is safe to be exposed.
+// This configuration points to a known-good Firebase project to ensure correctness.
 const firebaseConfig = {
   "projectId": "gemellifix",
   "appId": "1:431414897003:web:12ca75d6bd98572a50c42e",
@@ -15,46 +41,6 @@ const firebaseConfig = {
   "authDomain": "gemellifix.firebaseapp.com",
   "messagingSenderId": "431414897003"
 };
-
-// =================================================================
-// ========= REGLAS DE SEGURIDAD DE FIRESTORE (COPIAR Y PEGAR) =========
-// =================================================================
-/*
-  Para que la aplicación funcione correctamente, debes actualizar las reglas 
-  de seguridad de tu base de datos de Firestore en la Consola de Firebase.
-
-  1. Ve a tu proyecto en https://console.firebase.google.com/
-  2. En el menú de la izquierda, ve a Compilación -> Firestore Database.
-  3. Haz clic en la pestaña "Reglas".
-  4. Reemplaza TODO el contenido con las siguientes reglas y haz clic en "Publicar".
-
-  rules_version = '2';
-
-  service cloud.firestore {
-    match /databases/{database}/documents {
-
-      // Los usuarios autenticados pueden leer y escribir sus propios datos de perfil
-      match /users/{userId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      // Los usuarios autenticados pueden leer y crear tickets.
-      // Solo el creador o un admin pueden actualizar o borrar.
-      // (Esta es una regla básica, se puede refinar más adelante).
-      match /tickets/{ticketId} {
-         allow read, create: if request.auth != null;
-         allow update, delete: if request.auth != null; // Simplificado para desarrollo inicial
-      }
-
-      // Los usuarios autenticados pueden crear logs de diagnóstico
-      match /diagnosis_logs/{logId} {
-         allow create: if request.auth != null;
-      }
-
-    }
-  }
-*/
-// =================================================================
 
 
 // Initialize Firebase
