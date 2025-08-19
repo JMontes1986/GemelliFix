@@ -285,7 +285,6 @@ export default function TicketsPage() {
     const unsubscribeTickets = onSnapshot(q, (querySnapshot) => {
       const ticketsData: Ticket[] = querySnapshot.docs.map(doc => {
           const data = doc.data();
-          // Convert Firestore Timestamps to ISO strings
           const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
           const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
           return { 
@@ -309,26 +308,43 @@ export default function TicketsPage() {
 
   const handleUpdate = async (ticketId: string, field: keyof Ticket, value: any) => {
     if (!currentUser) return;
-    setIsUpdating(true);
-    const docRef = doc(db, "tickets", ticketId);
-    
+  
     const ticketToUpdate = tickets.find(t => t.id === ticketId);
     if (!ticketToUpdate) {
-        setIsUpdating(false);
+        toast({ variant: "destructive", title: "Error", description: "No se pudo encontrar el ticket." });
         return;
     }
+
+    setIsUpdating(true);
+    const docRef = doc(db, "tickets", ticketId);
     const oldValue = ticketToUpdate[field];
+    let updates: { [key: string]: any } = { [field]: value };
+    let logDetails: any = { ticket: ticketToUpdate, oldValue, newValue: value };
+
+    if (field === 'priority') {
+        const createdAt = new Date(ticketToUpdate.createdAt);
+        let newDueDate = new Date(createdAt);
+
+        switch(value) {
+            case 'Urgente': newDueDate.setHours(createdAt.getHours() + 12); break;
+            case 'Alta': newDueDate.setHours(createdAt.getHours() + 24); break;
+            case 'Media': newDueDate.setHours(createdAt.getHours() + 36); break;
+            case 'Baja': newDueDate.setHours(createdAt.getHours() + 48); break;
+        }
+        updates.dueDate = newDueDate;
+        logDetails.newValue = `${value} (vence: ${newDueDate.toLocaleDateString()})`;
+    }
 
     try {
-      await updateDoc(docRef, { [field]: value });
+      await updateDoc(docRef, updates);
 
       if (field === 'status' || field === 'priority') {
-          await createLog(currentUser, `update_${field}`, { ticket: ticketToUpdate, oldValue, newValue: value });
+          await createLog(currentUser, `update_${field}`, logDetails);
       }
 
       toast({
         title: "Ticket Actualizado",
-        description: `El campo ha sido cambiado.`,
+        description: `El campo ${field} ha sido cambiado.`,
       });
     } catch (error: any) {
       console.error("Error updating ticket: ", error);

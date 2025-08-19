@@ -163,7 +163,6 @@ export default function TicketDetailPage() {
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
-            // Convert Firestore Timestamps to ISO strings
             const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
             const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
             
@@ -204,16 +203,30 @@ export default function TicketDetailPage() {
 
   const handleUpdate = async (field: keyof Ticket, value: any) => {
     if (!ticket || !currentUser) return;
-
-    const oldValue = ticket[field];
-
     setIsUpdating(true);
     const docRef = doc(db, "tickets", ticket.id);
+    const oldValue = ticket[field];
+    let updates: { [key: string]: any } = { [field]: value };
+    let logDetails: any = { ticket, oldValue, newValue: value };
+
+    if (field === 'priority') {
+        const createdAt = new Date(ticket.createdAt);
+        let newDueDate = new Date(createdAt);
+        switch(value) {
+            case 'Urgente': newDueDate.setHours(createdAt.getHours() + 12); break;
+            case 'Alta': newDueDate.setHours(createdAt.getHours() + 24); break;
+            case 'Media': newDueDate.setHours(createdAt.getHours() + 36); break;
+            case 'Baja': newDueDate.setHours(createdAt.getHours() + 48); break;
+        }
+        updates.dueDate = newDueDate;
+        logDetails.newValue = `${value} (vence: ${newDueDate.toLocaleDateString()})`;
+    }
+    
     try {
-      await updateDoc(docRef, { [field]: value });
+      await updateDoc(docRef, updates);
 
       if (field === 'status' || field === 'priority') {
-        await createLog(currentUser, `update_${field}`, { ticket, oldValue, newValue: value });
+        await createLog(currentUser, `update_${field}`, logDetails);
       }
 
       toast({
