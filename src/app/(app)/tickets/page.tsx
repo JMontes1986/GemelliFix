@@ -102,7 +102,9 @@ interface TicketsTableProps {
     error: string | null;
     isUpdating: boolean;
     currentUser: User | null;
+    technicians: User[];
     handleUpdate: (ticketId: string, field: keyof Ticket, value: any) => void;
+    handleAssign: (ticketId: string, technician: User) => void;
 }
 
 const TicketsTable: React.FC<TicketsTableProps> = ({
@@ -111,7 +113,9 @@ const TicketsTable: React.FC<TicketsTableProps> = ({
     error,
     isUpdating,
     currentUser,
+    technicians,
     handleUpdate,
+    handleAssign,
 }) => {
     const router = useRouter();
     
@@ -205,7 +209,29 @@ const TicketsTable: React.FC<TicketsTableProps> = ({
                                         <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
                                     )}
                                 </TableCell>
-                                <TableCell>{(Array.isArray(ticket.assignedTo) && ticket.assignedTo.length > 0) ? ticket.assignedTo.join(', ') : 'Sin Asignar'}</TableCell>
+                                <TableCell>
+                                    {currentUser?.role === 'Administrador' ? (
+                                        <Select
+                                            value={ticket.assignedToIds?.[0] || ''}
+                                            onValueChange={(value) => {
+                                                const tech = technicians.find(t => t.id === value);
+                                                if (tech) handleAssign(ticket.id, tech);
+                                            }}
+                                            disabled={isUpdating}
+                                        >
+                                            <SelectTrigger className="w-[180px] h-8 text-xs">
+                                                <SelectValue placeholder="Sin Asignar" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {technicians.map(tech => (
+                                                    <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        (Array.isArray(ticket.assignedTo) && ticket.assignedTo.length > 0) ? ticket.assignedTo.join(', ') : 'Sin Asignar'
+                                    )}
+                                </TableCell>
                                 <TableCell className="hidden md:table-cell"><ClientFormattedDate date={ticket.createdAt} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} /></TableCell>
                                 <TableCell className="hidden md:table-cell"><ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} /></TableCell>
                                 <TableCell>
@@ -238,6 +264,7 @@ export default function TicketsPage() {
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const [technicians, setTechnicians] = React.useState<User[]>([]);
   const { toast } = useToast();
   
   React.useEffect(() => {
@@ -267,6 +294,15 @@ export default function TicketsPage() {
     if (!currentUser) {
         if (!auth.currentUser) setIsLoading(false);
         return;
+    }
+
+    if (currentUser.role === 'Administrador') {
+        const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
+            const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+            setTechnicians(techData);
+        });
+        // Remember to unsubscribe
     }
     
     let q;
@@ -357,6 +393,45 @@ export default function TicketsPage() {
         setIsUpdating(false);
     }
   };
+
+  const handleAssign = async (ticketId: string, technician: User) => {
+    if (!currentUser) return;
+
+    const ticketToUpdate = tickets.find(t => t.id === ticketId);
+    if (!ticketToUpdate) {
+        toast({ variant: "destructive", title: "Error", description: "No se pudo encontrar el ticket." });
+        return;
+    }
+
+    setIsUpdating(true);
+    const docRef = doc(db, "tickets", ticketId);
+    const oldValue = ticketToUpdate.assignedTo || [];
+    const newValue = [technician.name];
+
+    try {
+        await updateDoc(docRef, {
+            assignedTo: newValue,
+            assignedToIds: [technician.id],
+            status: 'Asignado',
+        });
+
+        await createLog(currentUser, 'update_assignment', { ticket: ticketToUpdate, oldValue: oldValue.join(', '), newValue: newValue.join(', ') });
+        
+        toast({
+            title: "Ticket Asignado",
+            description: `El ticket ha sido asignado a ${technician.name}.`
+        });
+    } catch (error: any) {
+        console.error("Error assigning ticket: ", error);
+        toast({
+            variant: "destructive",
+            title: "Error al Asignar",
+            description: `No se pudo asignar el ticket. ${error.message}`,
+        });
+    } finally {
+        setIsUpdating(false);
+    }
+  };
   
   const statuses: Ticket['status'][] = ['Abierto', 'Asignado', 'Requiere Aprobación', 'En Progreso', 'Resuelto', 'Cancelado', 'Cerrado'];
   const filteredTickets = (status: Ticket['status']) => tickets.filter(t => t.status === status);
@@ -387,11 +462,11 @@ export default function TicketsPage() {
           </CardHeader>
           <CardContent>
             <TabsContent value="all">
-                <TicketsTable tickets={tickets} isLoading={isLoading} error={error} isUpdating={isUpdating} currentUser={currentUser} handleUpdate={handleUpdate} />
+                <TicketsTable tickets={tickets} isLoading={isLoading} error={error} isUpdating={isUpdating} currentUser={currentUser} technicians={technicians} handleUpdate={handleUpdate} handleAssign={handleAssign} />
             </TabsContent>
             {statuses.map(status => (
                 <TabsContent key={status} value={status}>
-                    <TicketsTable tickets={filteredTickets(status)} isLoading={isLoading} error={error} isUpdating={isUpdating} currentUser={currentUser} handleUpdate={handleUpdate} />
+                    <TicketsTable tickets={filteredTickets(status)} isLoading={isLoading} error={error} isUpdating={isUpdating} currentUser={currentUser} technicians={technicians} handleUpdate={handleUpdate} handleAssign={handleAssign} />
                 </TabsContent>
             ))}
           </CardContent>
