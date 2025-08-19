@@ -27,10 +27,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap } from 'lucide-react';
+import { Loader2, Zap, BrainCircuit } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { User as FirebaseAuthUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
+import { diagnoseFirebaseConnection, type FirebaseDiagnosisOutput } from '@/ai/flows/diagnose-firebase-connection';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 // Esquema de validación simple para el formulario de diagnóstico
@@ -44,7 +46,9 @@ type DiagnosisFormValues = z.infer<typeof diagnosisSchema>;
 export default function DiagnosisPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isAiLoading, setIsAiLoading] = React.useState(false);
   const [executionResult, setExecutionResult] = React.useState<{status: string, message: string}>({ status: 'Pendiente', message: 'Aún no se ha intentado ninguna operación.' });
+  const [aiDiagnosis, setAiDiagnosis] = React.useState<FirebaseDiagnosisOutput | null>(null);
   const [currentUser, setCurrentUser] = React.useState<FirebaseAuthUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = React.useState(true);
   
@@ -59,6 +63,8 @@ export default function DiagnosisPage() {
   }, []);
 
   const handleSimpleConnectionTest = async () => {
+    setAiDiagnosis(null);
+
     if (isAuthLoading) {
       const authWaitMsg = 'Esperando la confirmación de autenticación de Firebase... Por favor, inténtalo de nuevo en un segundo.';
       setExecutionResult({ status: 'Verificando Auth...', message: authWaitMsg });
@@ -100,21 +106,26 @@ export default function DiagnosisPage() {
       console.error('Error en la prueba de conexión:', error);
       let errorMsg = `No se pudo escribir en Firestore. Código de error: ${error.code}. Detalles: ${error.message}`;
       
-      if (error.code === 'permission-denied') {
-        errorMsg += "\n\nDIAGNÓSTICO: Este error significa que las Reglas de Seguridad de Firestore están bloqueando la escritura. Asegúrate de que las reglas para la ruta `/diagnosis_logs/{logId}` permitan la creación de documentos por parte de usuarios autenticados. Ejemplo: `allow create: if request.auth != null;`";
-      } else if (error.code === 'unauthenticated') {
-        errorMsg += "\n\nDIAGNÓSTICO: El servidor de Firebase rechazó la solicitud por falta de autenticación, aunque la app creía que el usuario estaba conectado. Esto puede indicar un problema con el token de autenticación.";
-      } else {
-        errorMsg += "\n\nDIAGNÓSTICO: Este es un error inesperado. Verifica tu conexión a internet y que la configuración de tu proyecto de Firebase (apiKey, projectId, etc.) en `src/lib/firebase.ts` sea correcta.";
-      }
-
+      setExecutionResult({ status: 'Error', message: errorMsg });
       toast({
         variant: 'destructive',
         title: 'Error de Conexión',
         description: `No se pudo escribir en Firestore. Detalles: ${error.message}`,
         duration: 9000,
       });
-       setExecutionResult({ status: 'Error', message: errorMsg });
+       
+      // Call AI for diagnosis
+      setIsAiLoading(true);
+      try {
+        const diagnosis = await diagnoseFirebaseConnection({ errorCode: error.code, errorMessage: error.message });
+        setAiDiagnosis(diagnosis);
+      } catch (aiError) {
+        console.error('Error getting AI diagnosis:', aiError);
+        // Handle AI error silently or show a small notification
+      } finally {
+        setIsAiLoading(false);
+      }
+
     } finally {
         setIsLoading(false);
     }
@@ -206,13 +217,63 @@ export default function DiagnosisPage() {
             )}
           </Button>
         </CardContent>
+        <CardFooter className="flex-col items-start gap-4">
+            <Alert variant={executionResult.status === 'Error' || executionResult.status === 'Error de Autenticación' ? 'destructive' : (executionResult.status === 'Éxito' ? 'default' : 'default')}
+                className={executionResult.status === 'Éxito' ? 'border-green-500' : ''}
+            >
+                <AlertTitle className="font-headline">Resultado de Ejecución: {executionResult.status}</AlertTitle>
+                <AlertDescription className="font-mono text-xs whitespace-pre-wrap">
+                    {executionResult.message}
+                </AlertDescription>
+            </Alert>
+        </CardFooter>
       </Card>
+
+      {(isAiLoading || aiDiagnosis) && (
+        <Card className="w-full max-w-2xl">
+            <CardHeader>
+                <CardTitle className="font-headline text-2xl flex items-center gap-2">
+                    <BrainCircuit className="text-primary" />
+                    Diagnóstico por IA
+                </CardTitle>
+                <CardDescription>
+                    El asistente de IA ha analizado el error y sugiere los siguientes pasos.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isAiLoading ? (
+                    <div className="space-y-4">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
+                         <Skeleton className="h-4 w-1/3 mt-4" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full" />
+                    </div>
+                ) : (
+                    aiDiagnosis && (
+                        <div className="space-y-4 text-sm">
+                            <div>
+                                <h4 className="font-semibold text-primary">Análisis del Problema</h4>
+                                <p className="text-muted-foreground">{aiDiagnosis.analysis}</p>
+                            </div>
+                             <div>
+                                <h4 className="font-semibold text-primary">Pasos Sugeridos</h4>
+                                <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: aiDiagnosis.suggestedSteps.replace(/\n/g, '<br />') }} />
+                            </div>
+                        </div>
+                    )
+                )}
+            </CardContent>
+        </Card>
+      )}
+
 
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">Diagnóstico de Conexión a Firestore</CardTitle>
+          <CardTitle className="font-headline text-2xl">Formulario de Prueba Completo</CardTitle>
           <CardDescription>
-            Esta tarjeta permite verificar la conexión con la base de datos 'gemellifix' en Firestore. Al enviar este formulario, se intentará crear una colección de prueba para confirmar que todo funciona correctamente.
+            Si la prueba rápida funciona, utiliza este formulario para simular la creación de un ticket y verificar que todos los datos se guardan correctamente.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -253,16 +314,8 @@ export default function DiagnosisPage() {
             <CardFooter className="flex-col items-start gap-4">
               <Button type="submit" disabled={isLoading || isAuthLoading}>
                  {(isLoading || isAuthLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                 {isAuthLoading ? 'Verificando Auth...' : 'Crear Colección de Prueba'}
+                 {isAuthLoading ? 'Verificando Auth...' : 'Guardar en Firestore'}
               </Button>
-               <Alert variant={executionResult.status === 'Error' || executionResult.status === 'Error de Autenticación' ? 'destructive' : (executionResult.status === 'Éxito' ? 'default' : 'default')}
-                 className={executionResult.status === 'Éxito' ? 'border-green-500' : ''}
-               >
-                    <AlertTitle className="font-headline">Resultado de Ejecución: {executionResult.status}</AlertTitle>
-                    <AlertDescription className="font-mono text-xs whitespace-pre-wrap">
-                        {executionResult.message}
-                    </AlertDescription>
-                </Alert>
             </CardFooter>
           </form>
         </Form>
