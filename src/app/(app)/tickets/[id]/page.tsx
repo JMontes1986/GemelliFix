@@ -330,7 +330,8 @@ export default function TicketDetailPage() {
           });
           return;
       }
-      if (ticket.status !== 'Asignado' && value !== 'Asignado' && !comment.trim()) {
+      // This check should only apply to technicians updating progress
+      if (currentUser.role === 'Servicios Generales' && ticket.status !== 'Asignado' && value !== 'Asignado' && !comment.trim()) {
         toast({
             variant: "destructive",
             title: "Comentario Requerido",
