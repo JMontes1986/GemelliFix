@@ -76,6 +76,7 @@ The current date is ${new Date().toISOString()}.
         -   If status is 'En Progreso': The next step is 'Resuelto'.
         -   If status is 'Resuelto': The next step is 'Cerrado'.
         -   If status is 'Requiere Aprobación': The next step for the requester is to approve it ('Cerrado') or reject it.
+        -   If status is 'Cerrado' or 'Cancelado': There are no further actions. State this clearly.
     -   Set \`isActionable\` to \`true\` if you are suggesting a direct state change.
 
 Provide your response in Spanish.
@@ -100,3 +101,4 @@ const suggestTicketStateChangeFlow = ai.defineFlow(
   }
 );
     
+

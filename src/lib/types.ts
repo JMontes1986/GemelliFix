@@ -39,7 +39,7 @@ export type Ticket = {
   site: string;
   category: string;
   priority: 'Baja' | 'Media' | 'Alta' | 'Urgente';
-  status: 'Abierto' | 'Asignado' | 'En Progreso' | 'Requiere Aprobación' | 'Resuelto' | 'Cerrado';
+  status: 'Abierto' | 'Asignado' | 'En Progreso' | 'Requiere Aprobación' | 'Resuelto' | 'Cerrado' | 'Cancelado';
   createdAt: string;
   dueDate: string;
   assignedTo?: string[];

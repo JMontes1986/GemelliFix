@@ -77,6 +77,7 @@ const getStatusBadgeVariant = (status: Ticket['status']) => {
     case 'Requiere Aprobación': return 'default';
     case 'Resuelto': return 'default';
     case 'Cerrado': return 'secondary';
+    case 'Cancelado': return 'secondary';
     default: return 'default';
   }
 };
@@ -87,6 +88,7 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
       case 'En Progreso': return 'bg-yellow-500 text-black';
       case 'Requiere Aprobación': return 'bg-purple-500 text-white';
       case 'Resuelto': return 'bg-green-600 text-white';
+      case 'Cancelado': return 'bg-gray-400 text-black';
       default: return '';
     }
 }
@@ -375,6 +377,7 @@ export default function TicketDetailPage() {
                                     <SelectItem value="En Progreso">En Progreso</SelectItem>
                                     {isRequester && <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>}
                                     <SelectItem value="Resuelto">Resuelto</SelectItem>
+                                    <SelectItem value="Cancelado">Cancelado</SelectItem>
                                     <SelectItem value="Cerrado">Cerrado</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -619,5 +622,3 @@ export default function TicketDetailPage() {
     </div>
   );
 }
-
-    
