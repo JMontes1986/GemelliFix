@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot, updateDoc, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
   ChevronLeft,
@@ -38,7 +38,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { tickets as unassignedTicketsData } from '@/lib/data';
 import type { ScheduleEvent, Ticket, User } from '@/lib/types';
 import { cn, createLog } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -61,8 +60,8 @@ const generateColorFromString = (str: string): string => {
 
 
 const EventCard = ({ event, color }: { event: ScheduleEvent, color: string }) => {
-  const eventStartDate = new Date(event.start);
-  const eventEndDate = new Date(event.end);
+  const eventStartDate = event.start;
+  const eventEndDate = event.end;
   
   const startHour = eventStartDate.getHours();
   const startMinutes = eventStartDate.getMinutes();
@@ -73,7 +72,7 @@ const EventCard = ({ event, color }: { event: ScheduleEvent, color: string }) =>
   const totalEndMinutes = (endHour - 8) * 60 + endMinutes;
   const durationMinutes = totalEndMinutes - totalStartMinutes;
 
-  const top = (totalStartMinutes / 60) * 64; 
+  const top = Math.max(0, (totalStartMinutes / 60) * 64); 
   const height = (durationMinutes / 60) * 64;
 
   const hsl = color.match(/\d+/g)?.map(Number);
@@ -190,7 +189,7 @@ async function createCalendarNotification(technicianName: string, event: Omit<Sc
         const newNotification = {
             userId: userId,
             title: 'Nueva Actividad en Calendario',
-            description: `Se te ha asignado: "${event.title}" para el ${new Date(event.start).toLocaleDateString()}`,
+            description: `Se te ha asignado: "${event.title}" para el ${event.start.toLocaleDateString()}`,
             createdAt: serverTimestamp(),
             read: false,
             type: 'schedule' as const,
@@ -204,7 +203,7 @@ async function createCalendarNotification(technicianName: string, event: Omit<Sc
 }
 
 export default function CalendarPage() {
-    const [currentDate, setCurrentDate] = useState(new Date('2024-08-18T00:00:00'));
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [events, setEvents] = useState<ScheduleEvent[]>([]);
     const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>([]);
     const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
@@ -264,11 +263,13 @@ export default function CalendarPage() {
         const unsubscribeEvents = onSnapshot(q, (snapshot) => {
             const fetchedEvents = snapshot.docs.map(doc => {
                 const data = doc.data();
+                const start = data.start?.toDate ? data.start.toDate() : new Date(data.start);
+                const end = data.end?.toDate ? data.end.toDate() : new Date(data.end);
                 return {
                     id: doc.id,
                     ...data,
-                    start: new Date(data.start).toISOString(),
-                    end: new Date(data.end).toISOString(),
+                    start,
+                    end
                 } as ScheduleEvent;
             });
             setEvents(fetchedEvents);
@@ -330,18 +331,25 @@ export default function CalendarPage() {
     const handleConfirmAssignment = async (suggestion: SuggestCalendarAssignmentOutput) => {
         const { ticket, technician, suggestedTime } = suggestion;
         
+        const newEventStart = new Date(suggestedTime);
+        const newEventEnd = new Date(newEventStart.getTime() + 2 * 60 * 60 * 1000); // Assume 2 hour duration
+
         const newEvent: Omit<ScheduleEvent, 'id'> = {
             title: `Ticket: ${ticket.title}`,
             description: ticket.description,
-            start: new Date(suggestedTime).toISOString(),
-            end: new Date(new Date(suggestedTime).getTime() + 2 * 60 * 60 * 1000).toISOString(), // Assume 2 hour duration
+            start: newEventStart,
+            end: newEventEnd,
             type: 'ticket',
             technicianId: technician.id,
             ticketId: ticket.id
         };
         
         try {
-            await addDoc(collection(db, "scheduleEvents"), newEvent);
+            await addDoc(collection(db, "scheduleEvents"), {
+                ...newEvent,
+                start: Timestamp.fromDate(newEvent.start),
+                end: Timestamp.fromDate(newEvent.end)
+            });
             
             const ticketRef = doc(db, "tickets", ticket.id);
             await updateDoc(ticketRef, {
@@ -386,13 +394,17 @@ export default function CalendarPage() {
             const newEvent: Omit<ScheduleEvent, 'id'> = {
                 title: newEventTitle,
                 description: `Tarea: ${newEventTitle}`,
-                start: startDateTime.toISOString(),
-                end: endDateTime.toISOString(),
+                start: startDateTime,
+                end: endDateTime,
                 type: newEventType,
                 technicianId: newEventTechnicianId,
             };
 
-            await addDoc(collection(db, 'scheduleEvents'), newEvent);
+            await addDoc(collection(db, 'scheduleEvents'), {
+                ...newEvent,
+                start: Timestamp.fromDate(startDateTime),
+                end: Timestamp.fromDate(endDateTime)
+            });
             
             const tech = allTechnicians.find(t => t.id === newEventTechnicianId);
             if (tech) {
@@ -427,7 +439,8 @@ export default function CalendarPage() {
 
     const eventsByTechnicianAndDay = (technicianId: string, day: Date) => {
         return events.filter(e => {
-            const eventDate = new Date(e.start);
+            if (!e.technicianId) return false;
+            const eventDate = e.start;
             return e.technicianId === technicianId && eventDate.toDateString() === day.toDateString();
         });
     };
@@ -459,10 +472,10 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => new Date(d.setDate(d.getDate() - 7)))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => new Date(d.setDate(d.getDate() + 7)))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Dialog open={isManualDialogOpen} onOpenChange={setIsManualDialogOpen}>
