@@ -1,41 +1,35 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // Reglas para los ARCHIVOS ADJUNTOS subidos al crear un ticket.
-    match /ticket-attachments/{fileName} {
-      // PERMITIR ESCRITURA (CREATE)
-      // 1. El usuario debe estar autenticado.
-      // 2. El tamaño del archivo debe ser menor a 5MB.
-      // 3. El tipo de archivo debe ser una imagen o un PDF.
-      allow create: if request.auth != null &&
-                       request.resource.size < 5 * 1024 * 1024 &&
-                       (request.resource.contentType.matches('image/.*') || request.resource.contentType.matches('application/pdf'));
-
-      // PERMITIR LECTURA (GET)
-      // La seguridad real se basa en que las URLs de descarga solo son conocidas
-      // por aquellos con acceso al documento del ticket en Firestore.
-      allow get: if request.auth != null;
-
-      // No permitir actualizaciones o eliminaciones.
-      allow update, delete: if false;
+    // Regla por defecto: denegar todo
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
 
-    // Reglas para los archivos de EVIDENCIA subidos al resolver un ticket.
+    // Permitir la lectura pública de avatares para que se puedan mostrar en la app
+    match /avatars/{userId}/{fileName} {
+      allow read: if true;
+      // Permitir la escritura solo si el usuario está autenticado y es el dueño de esa carpeta
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+     // Permitir la lectura pública de adjuntos de tickets
+    match /ticket-attachments/{ticketId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null; // Permitir que cualquier usuario autenticado suba adjuntos
+    }
+
+     // Permitir la lectura pública de evidencia de tickets
     match /ticket-evidence/{ticketId}/{fileName} {
-      // PERMITIR ESCRITURA (CREATE)
-      // Mismas condiciones que los adjuntos: usuario autenticado, tamaño y tipo de archivo.
-       allow create: if request.auth != null &&
-                       request.resource.size < 5 * 1024 * 1024 &&
-                       (request.resource.contentType.matches('image/.*') || request.resource.contentType.matches('application/pdf'));
+      allow read: if true;
+      allow write: if request.auth != null; // Permitir que cualquier usuario autenticado suba evidencia
+    }
 
-      // PERMITIR LECTURA (GET)
-      // Permitir la lectura a cualquier usuario autenticado.
-      allow get: if request.auth != null;
-
-      // No permitir actualizaciones o eliminaciones.
-      allow update, delete: if false;
+    // Regla para el logo, hacerlo público para lectura
+    match /Logo.png {
+      allow read: if true;
     }
   }
 }
