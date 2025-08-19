@@ -2,11 +2,16 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow read and write access for any file if the user is authenticated.
-    // The security is handled by the unguessable download URLs, which are only
-    // accessible to users who have access to the corresponding ticket in Firestore.
-    match /{allPaths=**} {
+    // Rules for ticket attachments and evidence
+    // Allow any authenticated user to upload attachments and evidence
+    match /{folder}/{ticketId}/{fileName}
+      where folder == 'ticket-attachments' || folder == 'ticket-evidence' {
       allow read, write: if request.auth != null;
+    }
+
+     // Public read for the logo
+    match /Logo.png {
+      allow read;
     }
   }
 }
