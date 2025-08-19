@@ -139,14 +139,20 @@ export default function TicketDetailPage() {
 
 
   useEffect(() => {
-    const fetchTechnicians = async () => {
-        const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-        const querySnapshot = await getDocs(techQuery);
+    const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+    const unsubscribe = onSnapshot(techQuery, (querySnapshot) => {
         const techData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CurrentUser));
         setTechnicians(techData);
-    };
-    fetchTechnicians();
-  }, []);
+    }, (error) => {
+        console.error("Error fetching technicians: ", error);
+        toast({
+            variant: "destructive",
+            title: "Error al Cargar Personal",
+            description: "No se pudo obtener la lista de personal de servicios generales.",
+        });
+    });
+    return () => unsubscribe();
+  }, [toast]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -712,6 +718,3 @@ export default function TicketDetailPage() {
     </div>
   );
 }
-
-
-    
