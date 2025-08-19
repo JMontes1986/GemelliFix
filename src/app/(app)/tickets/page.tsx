@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -50,6 +51,7 @@ import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { createLog } from '@/lib/utils';
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
   switch (priority) {
@@ -210,8 +212,12 @@ const TicketsTable: React.FC<TicketsTableProps> = ({
                                         <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Toggle menu</span></Button></DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                            <DropdownMenuItem asChild><Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link></DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>Asignar</DropdownMenuItem>
+                                            <DropdownMenuItem asChild>
+                                              <Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>
+                                              Asignar
+                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>
@@ -290,10 +296,24 @@ export default function TicketsPage() {
   }, [currentUser]);
 
   const handleUpdate = async (ticketId: string, field: keyof Ticket, value: any) => {
+    if (!currentUser) return;
     setIsUpdating(true);
     const docRef = doc(db, "tickets", ticketId);
+    
+    const ticketToUpdate = tickets.find(t => t.id === ticketId);
+    if (!ticketToUpdate) {
+        setIsUpdating(false);
+        return;
+    }
+    const oldValue = ticketToUpdate[field];
+
     try {
       await updateDoc(docRef, { [field]: value });
+
+      if (field === 'status' || field === 'priority') {
+          await createLog(currentUser, `update_${field}`, { ticket: ticketToUpdate, oldValue, newValue: value });
+      }
+
       toast({
         title: "Ticket Actualizado",
         description: `El campo ha sido cambiado.`,

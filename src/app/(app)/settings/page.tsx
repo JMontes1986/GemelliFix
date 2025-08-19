@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -52,6 +53,7 @@ import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function SettingsPage() {
     const [users, setUsers] = React.useState<User[]>([]);
@@ -166,12 +168,13 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="technicians">Servicios Generales</TabsTrigger>
           <TabsTrigger value="locations">Zonas y Sitios</TabsTrigger>
           <TabsTrigger value="categories">Categorías</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
+          <TabsTrigger value="logs">Logs del Sistema</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -450,6 +453,19 @@ export default function SettingsPage() {
                 <CardFooter>
                   <Button>Guardar Cambios</Button>
                 </CardFooter>
+            </Card>
+        </TabsContent>
+         <TabsContent value="logs">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline">Logs del Sistema</CardTitle>
+                    <CardDescription>
+                        Registro de auditoría de las acciones importantes en la plataforma.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p>Para ver los logs, por favor navega a la página de <Link href="/settings/logs" className="text-primary underline">Logs del Sistema</Link>.</p>
+                </CardContent>
             </Card>
         </TabsContent>
 

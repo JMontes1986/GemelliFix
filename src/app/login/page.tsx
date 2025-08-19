@@ -1,11 +1,13 @@
 
+
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -30,6 +32,8 @@ import { Label } from '@/components/ui/label';
 import { GemelliFixLogo } from '@/components/icons';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { createLog } from '@/lib/utils';
+import type { User } from '@/lib/types';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,6 +52,15 @@ export default function LoginPage() {
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      const userDocRef = doc(db, 'users', userCredential.user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+          const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+          await createLog(userData, 'login');
+      }
+
       toast({
         title: '¡Bienvenido de nuevo!',
         description: 'Has iniciado sesión correctamente.',

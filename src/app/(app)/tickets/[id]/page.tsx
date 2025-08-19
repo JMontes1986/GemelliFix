@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -49,6 +50,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged } from 'firebase/auth';
+import { createLog } from '@/lib/utils';
 
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
@@ -197,11 +199,19 @@ export default function TicketDetailPage() {
   const canEdit = currentUser?.role === 'Administrador';
 
   const handleUpdate = async (field: keyof Ticket, value: any) => {
-    if (!ticket) return;
+    if (!ticket || !currentUser) return;
+
+    const oldValue = ticket[field];
+
     setIsUpdating(true);
     const docRef = doc(db, "tickets", ticket.id);
     try {
       await updateDoc(docRef, { [field]: value });
+
+      if (field === 'status' || field === 'priority') {
+        await createLog(currentUser, `update_${field}`, { ticket, oldValue, newValue: value });
+      }
+
       toast({
         title: "Ticket Actualizado",
         description: `El campo ${field} ha sido cambiado.`,
@@ -219,7 +229,10 @@ export default function TicketDetailPage() {
   }
   
    const handleAssignPersonnel = async (personnel: Technician[]) => {
-    if(!ticket) return;
+    if(!ticket || !currentUser) return;
+
+    const oldValue = ticket.assignedTo || [];
+
     const personnelIds = personnel.map(p => p.id);
     const personnelNames = personnel.map(p => p.name);
     
@@ -227,6 +240,9 @@ export default function TicketDetailPage() {
     await handleUpdate('assignedTo', personnelNames);
     const newStatus = personnelIds.length > 0 ? 'Asignado' : 'Abierto';
     await handleUpdate('status', newStatus);
+
+    await createLog(currentUser, 'update_assignment', { ticket, oldValue, newValue: personnelNames });
+    
     await createNotification(ticket, personnelIds);
     toast({
         title: "Personal Asignado",
@@ -235,7 +251,10 @@ export default function TicketDetailPage() {
   }
 
   const handleApplyPersonnelChange = async () => {
-    if (!ticket) return;
+    if (!ticket || !currentUser) return;
+
+    const oldValue = ticket.assignedTo || [];
+
     setIsUpdating(true);
     setAssignPopoverOpen(false);
     const docRef = doc(db, "tickets", ticket.id);
@@ -249,6 +268,8 @@ export default function TicketDetailPage() {
           assignedTo: selectedPersonnelNames,
           status: selectedPersonnelIds.length > 0 ? 'Asignado' : 'Abierto'
       });
+
+      await createLog(currentUser, 'update_assignment', { ticket, oldValue, newValue: selectedPersonnelNames });
 
       if (selectedPersonnelIds.length > 0) {
         await createNotification(ticket, selectedPersonnelIds);

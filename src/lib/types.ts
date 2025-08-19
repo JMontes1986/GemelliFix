@@ -80,6 +80,22 @@ export type ScheduleEvent = {
   ticketId?: string;
 };
 
+export type Log = {
+    id: string;
+    userEmail: string;
+    userName: string;
+    action: 'login' | 'update_status' | 'update_priority' | 'update_assignment';
+    timestamp: any;
+    details: {
+        ticketId?: string;
+        ticketCode?: string;
+        field?: 'status' | 'priority' | 'assignedTo';
+        oldValue?: any;
+        newValue?: any;
+        description?: string;
+    }
+}
     
 
     
+
