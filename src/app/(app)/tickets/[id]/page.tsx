@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -17,7 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { users as staticUsers, categories } from '@/lib/data';
+import { categories } from '@/lib/data';
 import {
   File,
   User,
@@ -38,7 +37,7 @@ import {
   Users,
   Download,
 } from 'lucide-react';
-import type { Ticket, Technician, User as CurrentUser } from '@/lib/types';
+import type { Ticket, User as CurrentUser } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AiSuggestion from './components/ai-suggestion';
 import AiStateSuggestion from './components/ai-state-suggestion';
@@ -620,7 +619,7 @@ export default function TicketDetailPage() {
                     </PopoverContent>
                 </Popover>
 
-              <AiSuggestion ticket={ticket} onAssign={(tech) => handleAssignPersonnel([tech])} />
+              <AiSuggestion ticket={ticket} technicians={technicians} onAssign={(tech) => handleAssignPersonnel([tech])} />
             </CardFooter>
           )}
         </Card>
@@ -714,3 +713,5 @@ export default function TicketDetailPage() {
   );
 }
 
+
+    
