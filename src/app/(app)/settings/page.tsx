@@ -56,7 +56,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 export default function SettingsPage() {
-    const [users, setUsers] = React.useState<User[]>([]);
+    const [allUsers, setAllUsers] = React.useState<User[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
     const [technicians, setTechnicians] = React.useState<User[]>([]);
     const [isLoadingTechnicians, setIsLoadingTechnicians] = React.useState(true);
@@ -72,7 +72,7 @@ export default function SettingsPage() {
             querySnapshot.forEach((doc) => {
                 fetchedUsers.push({ id: doc.id, ...doc.data() } as User);
             });
-            setUsers(fetchedUsers);
+            setAllUsers(fetchedUsers);
             setIsLoadingUsers(false);
         }, (error) => {
             console.error("Error fetching users:", error);
@@ -84,8 +84,8 @@ export default function SettingsPage() {
     }, [toast]);
     
     React.useEffect(() => {
-        const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
             const fetchedTechnicians: User[] = [];
             querySnapshot.forEach((doc) => {
                 fetchedTechnicians.push({ id: doc.id, ...doc.data() } as User);
@@ -98,7 +98,7 @@ export default function SettingsPage() {
             setIsLoadingTechnicians(false);
         });
 
-        return () => unsubscribe();
+        return () => unsubscribe_technicians();
     }, [toast]);
 
 
@@ -232,7 +232,7 @@ export default function SettingsPage() {
                         </TableCell>
                     </TableRow>
                   ) : (
-                    users.map((user) => (
+                    allUsers.map((user) => (
                         <TableRow key={user.id}>
                         <TableCell>
                             <Avatar>
