@@ -143,8 +143,8 @@ export default function TicketDetailPage() {
 
 
   useEffect(() => {
-    const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-    const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
+    const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const fetchedTechnicians: CurrentUser[] = [];
         querySnapshot.forEach((doc) => {
             fetchedTechnicians.push({ id: doc.id, ...doc.data() } as CurrentUser);
@@ -155,7 +155,7 @@ export default function TicketDetailPage() {
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
     });
 
-    return () => unsubscribe_technicians();
+    return () => unsubscribe();
   }, [toast]);
 
 
@@ -301,20 +301,27 @@ export default function TicketDetailPage() {
   const handleMarkAsResolved = async () => {
     if (!ticket) return;
 
+    if (filesToUpload.length === 0) {
+        toast({
+            variant: "destructive",
+            title: "Evidencia Requerida",
+            description: "Se requiere evidencia para marcar un ticket como resuelto.",
+        });
+        return;
+    }
+
     setIsUpdating(true);
     let uploadedEvidence: Attachment[] = [];
 
     try {
-        if (filesToUpload.length > 0) {
-            toast({ title: 'Subiendo evidencia...', description: 'Por favor, espera un momento.' });
-            const uploadPromises = filesToUpload.map(async (file) => {
-                const storageRef = ref(storage, `ticket-evidence/${ticket.id}/${Date.now()}-${file.name}`);
-                const snapshot = await uploadBytes(storageRef, file);
-                const downloadURL = await getDownloadURL(snapshot.ref);
-                return { url: downloadURL, description: file.name };
-            });
-            uploadedEvidence = await Promise.all(uploadPromises);
-        }
+        toast({ title: 'Subiendo evidencia...', description: 'Por favor, espera un momento.' });
+        const uploadPromises = filesToUpload.map(async (file) => {
+            const storageRef = ref(storage, `ticket-evidence/${ticket.id}/${Date.now()}-${file.name}`);
+            const snapshot = await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            return { url: downloadURL, description: file.name };
+        });
+        uploadedEvidence = await Promise.all(uploadPromises);
         
         await handleUpdate('status', 'Resuelto', uploadedEvidence);
         setFilesToUpload([]); // Clear files after successful upload
