@@ -1,13 +1,11 @@
 
+'use client';
 
 import * as React from 'react';
 import Link from 'next/link';
-import {
-  File,
-  ListFilter,
-  MoreHorizontal,
-} from 'lucide-react';
-
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { File, ListFilter, MoreHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,15 +37,15 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { tickets } from '@/lib/data';
 import type { Ticket } from '@/lib/types';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
   switch (priority) {
     case 'Urgente': return 'destructive';
-    case 'Alta': return 'default'; // Should be orange, handled with className
-    case 'Media': return 'secondary'; // Should be yellow, handled with className
+    case 'Alta': return 'default';
+    case 'Media': return 'secondary';
     case 'Baja': return 'outline';
     default: return 'default';
   }
@@ -84,6 +82,43 @@ const getPriorityBadgeClassName = (priority: Ticket['priority']) => {
 }
 
 export default function TicketsPage() {
+  const [tickets, setTickets] = React.useState<Ticket[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const ticketsData: Ticket[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        ticketsData.push({
+          id: doc.id,
+          code: data.code,
+          title: data.title,
+          description: data.description,
+          zone: data.zone,
+          site: data.site,
+          category: data.category,
+          priority: data.priority,
+          status: data.status,
+          createdAt: data.createdAt?.toDate().toISOString() ?? new Date().toISOString(),
+          dueDate: data.dueDate?.toDate().toISOString() ?? new Date().toISOString(),
+          assignedTo: data.assignedTo,
+          requester: data.requester,
+        });
+      });
+      setTickets(ticketsData);
+      setIsLoading(false);
+    }, (err) => {
+      console.error("Error fetching tickets: ", err);
+      setError("No se pudieron cargar las solicitudes. Por favor, revisa la conexión y los permisos de Firestore.");
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const groupedTickets = tickets.reduce((acc, ticket) => {
     const { zone } = ticket;
     if (!acc[zone]) {
@@ -93,7 +128,6 @@ export default function TicketsPage() {
     return acc;
   }, {} as Record<string, Ticket[]>);
 
-  const hasTickets = tickets.length > 0;
 
   return (
     <Tabs defaultValue="all">
@@ -158,7 +192,31 @@ export default function TicketsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {hasTickets ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="h-24 text-center">
+                       <div className="flex justify-center items-center">
+                          <div className="space-y-2 w-full">
+                            <Skeleton className="h-8 w-full" />
+                            <Skeleton className="h-8 w-full" />
+                            <Skeleton className="h-8 w-full" />
+                          </div>
+                       </div>
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                   <TableRow>
+                    <TableCell colSpan={9} className="h-24 text-center text-red-500">
+                        {error}
+                    </TableCell>
+                  </TableRow>
+                ) : tickets.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={9} className="h-24 text-center">
+                            No hay solicitudes de mantenimiento registradas.
+                        </TableCell>
+                    </TableRow>
+                ) : (
                     Object.entries(groupedTickets).map(([zone, ticketsInZone]) => (
                     <React.Fragment key={zone}>
                         <TableRow className="bg-muted/50">
@@ -181,7 +239,7 @@ export default function TicketsPage() {
                             <TableCell>
                             <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
                             </TableCell>
-                            <TableCell>{ticket.assignedTo ?? 'Sin Asignar'}</TableCell>
+                            <TableCell>{ticket.assignedTo || 'Sin Asignar'}</TableCell>
                             <TableCell className="hidden md:table-cell">
                             <ClientFormattedDate date={ticket.createdAt} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
                             </TableCell>
@@ -202,7 +260,7 @@ export default function TicketsPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link></DropdownMenuItem>
                                 <DropdownMenuItem>Asignar</DropdownMenuItem>
                                 <DropdownMenuItem>Cambiar Estado</DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -212,12 +270,6 @@ export default function TicketsPage() {
                         ))}
                     </React.Fragment>
                     ))
-                ) : (
-                    <TableRow>
-                        <TableCell colSpan={9} className="h-24 text-center">
-                            No hay solicitudes de mantenimiento registradas.
-                        </TableCell>
-                    </TableRow>
                 )}
               </TableBody>
             </Table>

@@ -1,7 +1,9 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import {
   Card,
   CardContent,
@@ -13,8 +15,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { tickets, technicians, users, categories } from '@/lib/data';
-import { notFound } from 'next/navigation';
+import { technicians, users, categories } from '@/lib/data';
 import {
   File,
   User,
@@ -31,6 +32,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Briefcase,
+  Loader2,
 } from 'lucide-react';
 import type { Ticket, Technician } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -45,6 +47,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
@@ -91,77 +94,135 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
 const currentUser = users[0];
 
 export default function TicketDetailPage({ params }: { params: { id: string } }) {
-  // NOTE: This will be replaced with a real-time Firestore listener
-  const initialTicket = tickets.find((t) => t.id === params.id);
-  
-  const [currentTicket, setCurrentTicket] = useState(initialTicket);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  
-  if (!currentTicket) {
-    // In a real app, you might fetch from DB here as a fallback
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Ticket no encontrado</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p>El ticket que buscas no existe o ha sido eliminado. En una aplicación real, los datos se cargarían desde Firestore.</p>
-            </CardContent>
-        </Card>
-    );
-  }
 
-  const [ticketStatus, setTicketStatus] = useState<Ticket['status']>(currentTicket.status);
-  const [ticketPriority, setTicketPriority] = useState<Ticket['priority']>(currentTicket.priority);
-  const [ticketCategory, setTicketCategory] = useState<Ticket['category']>(currentTicket.category);
-  const [assignedTechnician, setAssignedTechnician] = useState(() => technicians.find(
-    (tech) => tech.name === currentTicket.assignedTo
-  ));
+  useEffect(() => {
+    if (!params.id) {
+        setError("No se proporcionó un ID de ticket.");
+        setIsLoading(false);
+        return;
+    }
+
+    const docRef = doc(db, "tickets", params.id);
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const ticketData: Ticket = {
+                id: docSnap.id,
+                code: data.code,
+                title: data.title,
+                description: data.description,
+                zone: data.zone,
+                site: data.site,
+                category: data.category,
+                priority: data.priority,
+                status: data.status,
+                createdAt: data.createdAt?.toDate().toISOString(),
+                dueDate: data.dueDate?.toDate().toISOString(),
+                assignedTo: data.assignedTo,
+                requester: data.requester,
+                attachments: data.attachments || [],
+            };
+            setTicket(ticketData);
+        } else {
+            setError("No se pudo encontrar el ticket especificado.");
+        }
+        setIsLoading(false);
+    }, (err) => {
+        console.error("Error fetching ticket:", err);
+        setError("Error al cargar el ticket. Verifique su conexión y permisos.");
+        setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+}, [params.id]);
 
 
   const canEdit = currentUser.role === 'Administrador';
-  const isRequester = currentUser.name === currentTicket.requester;
-  
-  const handleStatusChange = (newStatus: Ticket['status']) => {
-    setTicketStatus(newStatus);
-    const updatedTicket = { ...currentTicket, status: newStatus };
-    setCurrentTicket(updatedTicket);
-    toast({
-        title: "Estado Actualizado",
-        description: `El estado del ticket ha sido cambiado a "${newStatus}".`,
-    });
-  }
 
-  const handlePriorityChange = (newPriority: Ticket['priority']) => {
-    setTicketPriority(newPriority);
-    const updatedTicket = { ...currentTicket, priority: newPriority };
-    setCurrentTicket(updatedTicket);
-    toast({
-        title: "Prioridad Actualizada",
-        description: `La prioridad del ticket ha sido cambiada a "${newPriority}".`,
-    });
+  const handleUpdate = async (field: keyof Ticket, value: any) => {
+    if (!ticket) return;
+    setIsUpdating(true);
+    const docRef = doc(db, "tickets", ticket.id);
+    try {
+      await updateDoc(docRef, { [field]: value });
+      toast({
+        title: "Ticket Actualizado",
+        description: `El campo ${field} ha sido cambiado a "${value}".`,
+      });
+    } catch (error: any) {
+      console.error("Error updating ticket: ", error);
+      toast({
+        variant: "destructive",
+        title: "Error al Actualizar",
+        description: `No se pudo actualizar el ticket. ${error.message}`,
+      });
+    } finally {
+        setIsUpdating(false);
+    }
   }
   
-  const handleCategoryChange = (newCategory: Ticket['category']) => {
-    setTicketCategory(newCategory);
-    const updatedTicket = { ...currentTicket, category: newCategory };
-    setCurrentTicket(updatedTicket);
-    toast({
-        title: "Categoría Actualizada",
-        description: `La categoría del ticket ha sido cambiada a "${newCategory}".`,
-    });
-  }
-
-  const handleAssignTechnician = (technician: Technician) => {
-    setAssignedTechnician(technician);
-    const updatedTicket = { ...currentTicket, assignedTo: technician.name, status: 'Asignado' as Ticket['status'] };
-    setCurrentTicket(updatedTicket);
-    setTicketStatus('Asignado');
-     toast({
+   const handleAssignTechnician = async (technician: Technician) => {
+    if (!ticket) return;
+    setIsUpdating(true);
+    const docRef = doc(db, "tickets", ticket.id);
+    try {
+      await updateDoc(docRef, { 
+          assignedTo: technician.name,
+          status: 'Asignado' 
+      });
+      toast({
         title: "Técnico Asignado",
         description: `El ticket ha sido asignado a ${technician.name}.`,
-    });
+      });
+    } catch (error: any) {
+       console.error("Error assigning technician: ", error);
+      toast({
+        variant: "destructive",
+        title: "Error al Asignar",
+        description: `No se pudo asignar el técnico. ${error.message}`,
+      });
+    } finally {
+        setIsUpdating(false);
+    }
   }
+
+  if (isLoading) {
+    return (
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
+            <Card>
+                <CardHeader><Skeleton className="h-8 w-3/4" /></CardHeader>
+                <CardContent className="space-y-4">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                </CardContent>
+            </Card>
+        </div>
+        <div>
+            <Card><CardContent className="p-6"><Skeleton className="h-24 w-full" /></CardContent></Card>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return <Card><CardHeader><CardTitle>Error</CardTitle></CardHeader><CardContent><p className="text-red-500">{error}</p></CardContent></Card>
+  }
+  
+  if (!ticket) {
+     return <Card><CardHeader><CardTitle>Ticket no encontrado</CardTitle></CardHeader><CardContent><p>El ticket que buscas no existe o ha sido eliminado.</p></CardContent></Card>
+  }
+  
+  const assignedTechnician = technicians.find(
+    (tech) => tech.name === ticket.assignedTo
+  );
+  const isRequester = currentUser.name === ticket.requester;
 
 
   return (
@@ -171,11 +232,11 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
           <CardHeader>
             <div className="flex justify-between items-start">
               <div>
-                <CardDescription>{currentTicket.code}</CardDescription>
-                <CardTitle className="font-headline text-2xl mt-1">{currentTicket.title}</CardTitle>
+                <CardDescription>{ticket.code}</CardDescription>
+                <CardTitle className="font-headline text-2xl mt-1">{ticket.title}</CardTitle>
               </div>
               {canEdit ? (
-                <Select value={ticketPriority} onValueChange={handlePriorityChange}>
+                <Select value={ticket.priority} onValueChange={(value) => handleUpdate('priority', value)} disabled={isUpdating}>
                     <SelectTrigger className="w-[180px] h-9 text-sm">
                         <SelectValue placeholder="Cambiar prioridad" />
                     </SelectTrigger>
@@ -187,8 +248,8 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                     </SelectContent>
                 </Select>
               ) : (
-                <Badge variant={getPriorityBadgeVariant(ticketPriority)} className={`text-sm ${getPriorityBadgeClassName(ticketPriority)}`}>
-                    {ticketPriority}
+                <Badge variant={getPriorityBadgeVariant(ticket.priority)} className={`text-sm ${getPriorityBadgeClassName(ticket.priority)}`}>
+                    {ticket.priority}
                 </Badge>
               )}
             </div>
@@ -196,30 +257,30 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
           <CardContent className="space-y-6">
             <div>
               <h3 className="font-semibold mb-2 text-primary">Descripción</h3>
-              <p className="text-muted-foreground">{currentTicket.description}</p>
+              <p className="text-muted-foreground">{ticket.description}</p>
             </div>
             <Separator />
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
                     <strong>Zona:</strong>
-                    <span>{currentTicket.zone}</span>
+                    <span>{ticket.zone}</span>
                 </div>
                  <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
                     <strong>Sitio:</strong>
-                    <span>{currentTicket.site}</span>
+                    <span>{ticket.site}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-muted-foreground" />
                     <strong>Solicitante:</strong>
-                    <span>{currentTicket.requester}</span>
+                    <span>{ticket.requester}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <Tag className="w-4 h-4 text-muted-foreground" />
                     <strong>Estado:</strong>
                     {canEdit || isRequester ? (
-                        <Select value={ticketStatus} onValueChange={handleStatusChange}>
+                        <Select value={ticket.status} onValueChange={(value) => handleUpdate('status', value)} disabled={isUpdating}>
                             <SelectTrigger className="w-[180px] h-8 text-xs">
                                 <SelectValue placeholder="Cambiar estado" />
                             </SelectTrigger>
@@ -233,25 +294,25 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                             </SelectContent>
                         </Select>
                     ) : (
-                         <Badge variant={getStatusBadgeVariant(ticketStatus)} className={getStatusBadgeClassName(ticketStatus)}>{ticketStatus}</Badge>
+                         <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
                     )}
                    
                 </div>
                 <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <strong>Creado:</strong>
-                    <span><ClientFormattedDate date={currentTicket.createdAt} /></span>
+                    <span><ClientFormattedDate date={ticket.createdAt} /></span>
                 </div>
                 <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
                     <strong>Vencimiento:</strong>
-                    <span><ClientFormattedDate date={currentTicket.dueDate} /></span>
+                    <span><ClientFormattedDate date={ticket.dueDate} /></span>
                 </div>
                 <div className="flex items-center gap-2">
                     <Briefcase className="w-4 h-4 text-muted-foreground" />
                     <strong>Categoría:</strong>
                      {canEdit ? (
-                        <Select value={ticketCategory} onValueChange={handleCategoryChange}>
+                        <Select value={ticket.category} onValueChange={(value) => handleUpdate('category', value)} disabled={isUpdating}>
                             <SelectTrigger className="w-[180px] h-8 text-xs">
                                 <SelectValue placeholder="Cambiar categoría" />
                             </SelectTrigger>
@@ -262,35 +323,42 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                             </SelectContent>
                         </Select>
                     ) : (
-                        <span>{ticketCategory}</span>
+                        <span>{ticket.category}</span>
                     )}
                 </div>
             </div>
-            <Separator />
-             <div>
-                <h3 className="font-semibold mb-2 text-primary flex items-center gap-2"><Paperclip className="w-4 h-4" /> Adjuntos Iniciales</h3>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm"><File className="w-4 h-4 mr-2"/> evidencia_1.jpg</Button>
-                    <Button variant="outline" size="sm"><File className="w-4 h-4 mr-2"/> plano_area.pdf</Button>
-                </div>
-            </div>
+             {ticket.attachments && ticket.attachments.length > 0 && (
+                <>
+                    <Separator />
+                    <div>
+                        <h3 className="font-semibold mb-2 text-primary flex items-center gap-2"><Paperclip className="w-4 h-4" /> Adjuntos Iniciales</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {ticket.attachments.map((file, index) => (
+                                <a key={index} href={file.url} target="_blank" rel="noopener noreferrer">
+                                    <Button variant="outline" size="sm"><File className="w-4 h-4 mr-2"/> {file.description}</Button>
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                </>
+             )}
           </CardContent>
         </Card>
 
-        {currentTicket.attachments && currentTicket.attachments.length > 0 && (
+        {ticket.attachments && ticket.attachments.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="font-headline text-lg flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500" /> Evidencia de Resolución</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {currentTicket.attachments.map((att, index) => (
+              {ticket.attachments.map((att, index) => (
                 <div key={index} className="space-y-2">
                   <Image src={att.url} alt={att.description} width={400} height={300} className="rounded-md object-cover aspect-video" data-ai-hint="repair evidence"/>
                   <p className="text-sm text-muted-foreground italic">{att.description}</p>
                 </div>
               ))}
             </CardContent>
-            {isRequester && ticketStatus === 'Requiere Aprobación' && (
+            {isRequester && ticket.status === 'Requiere Aprobación' && (
               <CardFooter className="gap-4">
                 <Button className="w-full bg-green-600 hover:bg-green-700 text-white"><ThumbsUp /> Aprobar y Cerrar Ticket</Button>
                 <Button variant="destructive" className="w-full"><ThumbsDown /> Rechazar Solución</Button>
@@ -306,7 +374,8 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
             <CardTitle className="font-headline text-lg">Técnico Asignado</CardTitle>
           </CardHeader>
           <CardContent>
-            {assignedTechnician ? (
+            {isUpdating && <Loader2 className="animate-spin" />}
+            {!isUpdating && assignedTechnician ? (
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16">
                   <AvatarImage src={assignedTechnician.avatar} />
@@ -318,32 +387,32 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 </div>
               </div>
             ) : (
-              <div className='text-muted-foreground'>Sin asignar</div>
+              !isUpdating && <div className='text-muted-foreground'>Sin asignar</div>
             )}
           </CardContent>
           {canEdit && (
             <CardFooter className="flex-col items-stretch space-y-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
+                    <Button variant="outline" disabled={isUpdating}>
                       {assignedTechnician ? 'Reasignar Técnico' : 'Asignar Técnico'}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     {technicians.map(tech => (
-                        <DropdownMenuItem key={tech.id} onClick={() => handleAssignTechnician(tech)}>
+                        <DropdownMenuItem key={tech.id} onClick={() => handleAssignTechnician(tech)} disabled={isUpdating}>
                             {tech.name}
                         </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-              <AiSuggestion ticket={currentTicket} onAssign={handleAssignTechnician} />
+              <AiSuggestion ticket={ticket} onAssign={handleAssignTechnician} />
             </CardFooter>
           )}
         </Card>
 
-        {assignedTechnician && ['Asignado', 'En Progreso'].includes(ticketStatus) && (
+        {assignedTechnician && ['Asignado', 'En Progreso'].includes(ticket.status) && (
             <Card className="mb-6">
                  <CardHeader>
                     <CardTitle className="font-headline text-lg flex items-center gap-2"><Edit className="w-5 h-5" /> Actualizar Progreso</CardTitle>
@@ -373,7 +442,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                     </div>
                  </CardContent>
                  <CardFooter>
-                    <Button className="w-full">Marcar como Resuelto</Button>
+                    <Button className="w-full" onClick={() => handleUpdate('status', 'Resuelto')}>Marcar como Resuelto</Button>
                  </CardFooter>
             </Card>
         )}
@@ -387,8 +456,8 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                     <div className="flex gap-3">
                         <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
                         <div>
-                            <p>Ticket creado por <strong>{currentTicket.requester}</strong>.</p>
-                            <p className="text-xs text-muted-foreground"><ClientFormattedDate date={currentTicket.createdAt} /></p>
+                            <p>Ticket creado por <strong>{ticket.requester}</strong>.</p>
+                            <p className="text-xs text-muted-foreground"><ClientFormattedDate date={ticket.createdAt} /></p>
                         </div>
                     </div>
                      {assignedTechnician && (
@@ -396,11 +465,11 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                             <div className="flex-shrink-0"><ArrowRight className="w-5 h-5 text-blue-500" /></div>
                             <div>
                                 <p>Ticket asignado a <strong>{assignedTechnician.name}</strong> por <strong>Admin User</strong>.</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(currentTicket.createdAt).getTime() + 3600000)} /></p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 3600000)} /></p>
                             </div>
                         </div>
                      )}
-                     {currentTicket.status !== 'Abierto' && currentTicket.status !== 'Asignado' && assignedTechnician && (
+                     {ticket.status !== 'Abierto' && ticket.status !== 'Asignado' && assignedTechnician && (
                         <div className="flex gap-3">
                             <div className="flex-shrink-0">
                                 <Avatar className="h-5 w-5">
@@ -410,16 +479,16 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                             </div>
                             <div>
                                 <p><strong>{assignedTechnician.name}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(currentTicket.createdAt).getTime() + 7200000)} /></p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 7200000)} /></p>
                             </div>
                         </div>
                      )}
-                     {ticketStatus === 'Resuelto' || ticketStatus === 'Cerrado' || ticketStatus === 'Requiere Aprobación' && (
+                     {(ticket.status === 'Resuelto' || ticket.status === 'Cerrado' || ticket.status === 'Requiere Aprobación') && (
                          <div className="flex gap-3">
                             <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
                             <div>
-                                <p>Ticket marcado como <strong>Resuelto</strong> por <strong>{currentTicket.assignedTo}</strong>.</p>
-                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(currentTicket.dueDate).getTime() - 86400000)} /></p>
+                                <p>Ticket marcado como <strong>Resuelto</strong> por <strong>{ticket.assignedTo}</strong>.</p>
+                                <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.dueDate).getTime() - 86400000)} /></p>
                             </div>
                         </div>
                      )}
