@@ -54,7 +54,15 @@ const ticketSchema = z.object({
   attachments: z.any().optional()
 });
 
-type TicketFormValues = z.infer<typeof ticketSchema>
+type TicketFormValues = {
+  title: string;
+  description: string;
+  zoneId: string;
+  siteId: string;
+  priority: 'Baja' | 'Media' | 'Alta' | 'Urgente';
+  category: string;
+  attachments?: any;
+};
 
 export default function CreateTicketPage() {
   const router = useRouter();
@@ -410,5 +418,3 @@ export default function CreateTicketPage() {
     </div>
   );
 }
-
-    
