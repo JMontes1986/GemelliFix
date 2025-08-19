@@ -153,7 +153,7 @@ function AiAssignmentDialog({
 }
 
 export default function CalendarPage() {
-    const [currentDate, setCurrentDate] = useState(new Date('2025-05-19'));
+    const [currentDate, setCurrentDate] = useState(new Date('2024-08-18'));
     const [events, setEvents] = useState<ScheduleEvent[]>(scheduleEvents);
     const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>(unassignedTicketsData.filter(t => !t.assignedTo));
     const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
