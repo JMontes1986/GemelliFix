@@ -32,12 +32,19 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: '¡Bienvenido de nuevo!',
         description: 'Has iniciado sesión correctamente.',
       });
-      router.push('/dashboard');
+      
+      // Redirect based on user email
+      if (userCredential.user.email === 'sistemas@colgemelli.edu.co') {
+        router.push('/dashboard');
+      } else {
+        router.push('/tickets');
+      }
+
     } catch (error: any) {
       console.error("Error de inicio de sesión:", error);
       toast({

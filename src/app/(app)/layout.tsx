@@ -66,14 +66,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setIsMounted(true);
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
         if (firebaseUser) {
-            const userDocRef = doc(db, 'users', firebaseUser.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists()) {
-                setCurrentUser(userDocSnap.data() as User);
-            } else {
-                // Handle case where user exists in Auth but not in Firestore
-                console.warn("User data not found in Firestore, redirecting to login.");
-                router.push('/login');
+            try {
+                const userDocRef = doc(db, 'users', firebaseUser.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
+                } else {
+                    console.warn("User data not found in Firestore, logging out.");
+                    await auth.signOut();
+                    router.push('/login');
+                }
+            } catch (error) {
+                 console.error("Error fetching user data:", error);
+                 await auth.signOut();
+                 router.push('/login');
             }
         } else {
             router.push('/login');
@@ -111,8 +117,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {currentUser.role === 'Administrador' && (
-              <>
+            {currentUser.email === 'sistemas@colgemelli.edu.co' && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
@@ -125,6 +130,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+            )}
+             {currentUser.role === 'Administrador' && (
+              <>
                  <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
@@ -142,7 +150,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                isActive={isActive('/tickets')}
+                isActive={isActive('/tickets') || pathname.startsWith('/tickets/')}
                 tooltip="Solicitudes"
               >
                 <Link href="/tickets">
