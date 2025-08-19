@@ -34,6 +34,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { diagnoseFirebaseConnection, type FirebaseDiagnosisOutput } from '@/ai/flows/diagnose-firebase-connection';
 import { diagnoseCalendarCreation } from '@/ai/flows/diagnose-calendar-creation';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Calendar } from '@/components/ui/calendar';
+import { addDays } from 'date-fns';
 
 
 // Esquema de validación simple para el formulario de diagnóstico
@@ -53,6 +55,11 @@ export default function DiagnosisPage() {
   const [currentUser, setCurrentUser] = React.useState<FirebaseAuthUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = React.useState(true);
   
+  // State for isolated calendar test
+  const [isolatedDate, setIsolatedDate] = React.useState<Date | undefined>(new Date());
+  const [isolatedTitle, setIsolatedTitle] = React.useState('');
+
+
   React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
@@ -196,6 +203,41 @@ export default function DiagnosisPage() {
     }
   };
 
+    const handleIsolatedCalendarTest = async () => {
+        if (!isolatedDate || !isolatedTitle) {
+            toast({ variant: 'destructive', title: 'Campos requeridos', description: 'Por favor, selecciona una fecha y escribe un título.' });
+            return;
+        }
+        if (!currentUser) {
+            toast({ variant: 'destructive', title: 'No autenticado', description: 'Debes iniciar sesión para esta prueba.' });
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const startDateTime = new Date(isolatedDate);
+            startDateTime.setHours(9, 0, 0); // Set to 9am
+            const endDateTime = addDays(startDateTime, 1);
+
+            const testEvent = {
+                title: isolatedTitle,
+                description: 'Evento de prueba aislado',
+                start: startDateTime.toISOString(),
+                end: endDateTime.toISOString(),
+                type: 'task' as const,
+                technicianId: currentUser.uid
+            };
+
+            const docRef = await addDoc(collection(db, 'scheduleEvents'), testEvent);
+            toast({ title: '¡Evento de Prueba Creado!', description: `El evento se guardó en Firestore con el ID: ${docRef.id}.` });
+        } catch (error: any) {
+            console.error("Error en la prueba de calendario aislada:", error);
+            toast({ variant: 'destructive', title: 'Error al Crear Evento', description: error.message });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
 
   const form = useForm<DiagnosisFormValues>({
     resolver: zodResolver(diagnosisSchema),
@@ -315,6 +357,36 @@ export default function DiagnosisPage() {
         </CardContent>
       </Card>
 
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+            <CardTitle className="font-headline text-2xl">Prueba de Creación de Evento (Aislada)</CardTitle>
+            <CardDescription>
+                Esta prueba guarda un evento directamente en Firestore para verificar el guardado, aislando la lógica de la página del calendario principal.
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col md:flex-row gap-4 items-center">
+            <Calendar
+                mode="single"
+                selected={isolatedDate}
+                onSelect={setIsolatedDate}
+                className="rounded-md border"
+                disabled={isLoading}
+            />
+            <div className="w-full space-y-4">
+                <Input 
+                    placeholder="Título del evento de prueba" 
+                    value={isolatedTitle}
+                    onChange={(e) => setIsolatedTitle(e.target.value)}
+                    disabled={isLoading}
+                />
+                <Button onClick={handleIsolatedCalendarTest} disabled={isLoading || isAuthLoading} className="w-full">
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Crear Evento de Prueba
+                </Button>
+            </div>
+        </CardContent>
+      </Card>
+
 
       <Card className="w-full max-w-2xl">
         <CardHeader>
@@ -423,3 +495,5 @@ export default function DiagnosisPage() {
     </div>
   );
 }
+
+    
