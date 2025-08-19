@@ -135,9 +135,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader className="p-4 flex items-center justify-center">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <GemelliFixLogo className="w-32 group-data-[collapsible=icon]:hidden" />
-          </Link>
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>

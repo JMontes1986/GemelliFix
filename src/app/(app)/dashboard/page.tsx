@@ -55,6 +55,7 @@ import {
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Ticket } from '@/lib/types';
+import { GemelliFixLogo } from '@/components/icons';
 
 
 const slaComplianceConfig = {
@@ -245,6 +246,9 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-4">
       <AiAnalysisDialog open={isAnalysisOpen} onOpenChange={setAnalysisOpen} analysis={analysisResult} isLoading={isLoadingAnalysis} />
+      <div className="flex justify-center mb-4">
+        <GemelliFixLogo className="w-48" />
+      </div>
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-headline font-bold tracking-tight">
           Dashboard de Líder
@@ -434,6 +438,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
-    
