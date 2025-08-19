@@ -34,13 +34,14 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { zones, sites, categories } from '@/lib/data';
 import { db, storage, auth } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UploadCloud, File as FileIcon, X } from 'lucide-react';
+import { Loader2, UploadCloud, File as FileIcon, X, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createLog } from '@/lib/utils';
-import type { User } from '@/lib/types';
+import type { User, Ticket } from '@/lib/types';
+import { suggestTicketDetails } from '@/ai/flows/suggest-ticket-details';
 
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -64,6 +65,7 @@ export default function CreateTicketPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   const [isAuthLoading, setIsAuthLoading] = React.useState(true);
+  const [isAiLoading, setIsAiLoading] = React.useState(false);
   
   React.useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(user => {
@@ -91,7 +93,42 @@ export default function CreateTicketPage() {
 
   const attachedFiles = form.watch('attachments') || [];
   const selectedZoneId = form.watch('zoneId');
+  const ticketTitle = form.watch('title');
+  const ticketDescription = form.watch('description');
   
+  const handleAiSuggestions = async () => {
+    if (!ticketTitle || !ticketDescription) {
+        toast({
+            variant: 'destructive',
+            title: 'Datos insuficientes',
+            description: 'Por favor, escribe un título y una descripción antes de usar la IA.',
+        });
+        return;
+    }
+    setIsAiLoading(true);
+    try {
+        const result = await suggestTicketDetails({
+            title: ticketTitle,
+            description: ticketDescription,
+        });
+        form.setValue('category', result.category);
+        form.setValue('priority', result.priority);
+        toast({
+            title: 'Sugerencias de la IA aplicadas',
+            description: result.reasoning,
+        });
+    } catch (error) {
+        console.error('Error getting AI suggestions:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Error de IA',
+            description: 'No se pudieron obtener las sugerencias de la IA.',
+        });
+    } finally {
+        setIsAiLoading(false);
+    }
+  };
+
   const onSubmit = async (data: TicketFormValues) => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -105,15 +142,15 @@ export default function CreateTicketPage() {
     }
     setIsLoading(true);
     try {
-      const requesterName = currentUser.displayName || currentUser.email || 'Usuario Desconocido';
-      const userRole = 'Docentes'; // This should be fetched from user's profile
-      const userObject: User = {
-          id: currentUser.uid,
-          name: requesterName,
-          email: currentUser.email || 'unknown',
-          role: userRole,
-          avatar: currentUser.photoURL || '',
-      };
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists()) {
+        throw new Error("User data not found in Firestore.");
+      }
+      
+      const userObject = userDocSnap.data() as User;
+      const requesterName = userObject.name;
 
       const zoneName = zones.find((z) => z.id === data.zoneId)?.name;
       const siteName = sites.find((s) => s.id === data.siteId)?.name;
@@ -154,7 +191,7 @@ export default function CreateTicketPage() {
       }
 
 
-      const docRef = await addDoc(collection(db, 'tickets'), {
+      const newTicketData: Omit<Ticket, 'id'> = {
         code: ticketCode,
         title: data.title,
         description: data.description,
@@ -167,14 +204,19 @@ export default function CreateTicketPage() {
         requesterId: currentUser.uid,
         assignedTo: [],
         assignedToIds: [],
-        createdAt: now,
-        updatedAt: now,
-        dueDate: dueDate, 
+        createdAt: now.toISOString(),
+        dueDate: dueDate.toISOString(),
         attachments: attachmentUrls,
+      };
+
+      const docRef = await addDoc(collection(db, 'tickets'), {
+          ...newTicketData,
+          createdAt: serverTimestamp(),
+          dueDate,
       });
 
-      const newTicket = { id: docRef.id, code: ticketCode, ...data };
-      await createLog(userObject, 'create_ticket', { ticket: newTicket });
+      const newTicketForLog = { id: docRef.id, ...newTicketData };
+      await createLog(userObject, 'create_ticket', { ticket: newTicketForLog });
 
       toast({
         title: '¡Ticket Creado!',
@@ -230,7 +272,7 @@ export default function CreateTicketPage() {
         <CardHeader>
           <CardTitle className="font-headline text-2xl">Crear Nueva Solicitud en GemelliFix</CardTitle>
           <CardDescription>
-            Completa el formulario para reportar una incidencia.
+            Completa el formulario para reportar una incidencia. Usa la IA para obtener sugerencias.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -324,6 +366,14 @@ export default function CreateTicketPage() {
                   </FormItem>
                 )}
               />
+              
+              <div className="flex justify-end">
+                <Button type="button" variant="outline" onClick={handleAiSuggestions} disabled={isAiLoading}>
+                    {isAiLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                    Analizar con IA
+                </Button>
+              </div>
+
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
@@ -332,7 +382,7 @@ export default function CreateTicketPage() {
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>Categoría</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                             <SelectTrigger>
                             <SelectValue placeholder="Selecciona la categoría del problema" />
@@ -356,7 +406,7 @@ export default function CreateTicketPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Prioridad</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecciona la prioridad de la solicitud" />
@@ -464,5 +514,3 @@ export default function CreateTicketPage() {
     </div>
   );
 }
-
-    
