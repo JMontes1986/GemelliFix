@@ -98,10 +98,10 @@ export default function DiagnosisPage() {
         createdAt: serverTimestamp(),
       });
       
-      const successMsg = `El registro de diagnóstico ha sido guardado en Firestore con el ID: ${docRef.id}`;
+      const successMsg = `El registro de diagnóstico ha sido guardado en Firestore con el ID: ${docRef.id}. La colección 'diagnosis_logs' fue creada o actualizada en la base de datos 'gemellifix'.`;
       toast({
         title: 'Diagnóstico Enviado',
-        description: successMsg,
+        description: 'La conexión con Firestore y la base de datos \'gemellifix\' es exitosa.',
       });
       setExecutionResult({ status: 'Éxito', message: successMsg });
       form.reset(); // Limpia el formulario después de enviar
@@ -123,9 +123,9 @@ export default function DiagnosisPage() {
     <div className="flex justify-center items-start py-8">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">Página de Diagnóstico de Firestore</CardTitle>
+          <CardTitle className="font-headline text-2xl">Diagnóstico de Conexión a Firestore</CardTitle>
           <CardDescription>
-            Usa este formulario para verificar que la escritura en la base de datos funciona correctamente.
+            Esta tarjeta permite verificar la conexión con la base de datos 'gemellifix' en Firestore. Al enviar este formulario, se intentará crear una colección de prueba para confirmar que todo funciona correctamente.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -166,7 +166,7 @@ export default function DiagnosisPage() {
             <CardFooter className="flex-col items-start gap-4">
               <Button type="submit" disabled={isLoading || isAuthLoading}>
                  {(isLoading || isAuthLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                 {isAuthLoading ? 'Verificando Auth...' : 'Guardar en Firestore'}
+                 {isAuthLoading ? 'Verificando Auth...' : 'Crear Colección de Prueba'}
               </Button>
                <Alert variant={executionResult.status === 'Error' ? 'destructive' : (executionResult.status === 'Éxito' ? 'default' : 'default')}
                  className={executionResult.status === 'Éxito' ? 'border-green-500' : ''}
