@@ -50,7 +50,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 const weekDays = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 
-const EventCard = ({ event }: { event: ScheduleEvent }) => {
+const generateColorFromString = (str: string): string => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const h = hash % 360;
+    return `hsl(${h}, 50%, 60%)`;
+};
+
+
+const EventCard = ({ event, color }: { event: ScheduleEvent, color: string }) => {
   const eventStartDate = new Date(event.start);
   const eventEndDate = new Date(event.end);
   
@@ -63,15 +73,16 @@ const EventCard = ({ event }: { event: ScheduleEvent }) => {
   const totalEndMinutes = (endHour - 8) * 60 + endMinutes;
   const durationMinutes = totalEndMinutes - totalStartMinutes;
 
-  // Each hour slot is 64px (h-16) high
   const top = (totalStartMinutes / 60) * 64; 
   const height = (durationMinutes / 60) * 64;
+
+  const hsl = color.match(/\d+/g)?.map(Number);
+  const textColor = (hsl && hsl[2] > 50) ? 'black' : 'white';
 
   return (
     <div
       className={cn(
-        'absolute w-full p-2 rounded-lg border text-xs shadow-sm cursor-pointer hover:shadow-md transition-all z-10',
-         'bg-secondary text-secondary-foreground'
+        'absolute w-full p-2 rounded-lg border text-xs shadow-sm cursor-pointer hover:shadow-md transition-all z-10'
       )}
       style={{
         top: `${top}px`,
@@ -80,6 +91,9 @@ const EventCard = ({ event }: { event: ScheduleEvent }) => {
         right: 0,
         marginLeft: '2px',
         marginRight: '2px',
+        backgroundColor: color,
+        borderColor: color,
+        color: textColor,
       }}
     >
       <p className="font-bold truncate">{event.title}</p>
@@ -541,7 +555,7 @@ export default function CalendarPage() {
                 <CardContent className="p-2 flex-1 overflow-y-auto">
                   {techniciansToDisplay.length > 0 ? techniciansToDisplay.map(tech => (
                     <div key={tech.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-background/80">
-                         <Avatar className="h-10 w-10">
+                         <Avatar className="h-10 w-10 border-2" style={{ borderColor: generateColorFromString(tech.id) }}>
                             <AvatarImage src={tech.avatar} alt={tech.name} />
                             <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
                         </Avatar>
@@ -561,6 +575,7 @@ export default function CalendarPage() {
           <div className="grid grid-cols-[60px_1fr] h-full">
             {/* Hours Column */}
             <div className="border-r">
+                <div className="h-8 border-b grid grid-cols-1"></div>
                 {hours.map(hour => (
                     <div key={hour} className="h-16 border-b text-right pr-2">
                         <span className="text-xs text-muted-foreground relative -top-2">{hour}</span>
@@ -569,20 +584,23 @@ export default function CalendarPage() {
             </div>
             
             {/* Days and Technicians Grid */}
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+            <div className="grid" style={{ gridTemplateColumns: `repeat(${weekDates.length}, 1fr)` }}>
               {weekDates.map((date, dayIndex) => (
                 <div key={date.toISOString()} className={cn("relative", dayIndex < weekDates.length - 1 && 'border-r')}>
-                  {/* Day Header Placeholder */}
+                  {/* Day Header */}
+                   <div className="h-8 border-b text-center text-sm font-medium sticky top-0 bg-background z-20">
+                     {weekDays[date.getDay()]} {date.getDate()}
+                   </div>
                   
                   {/* Background Hour Lines */}
-                  <div className="absolute inset-0">
+                  <div className="absolute inset-x-0 top-8">
                     {hours.map((_, hourIndex) => (
                       <div key={hourIndex} className={cn("h-16", hourIndex < hours.length - 1 && 'border-b')} />
                     ))}
                   </div>
 
                   {/* Technician Columns for the Day */}
-                  <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${techniciansToDisplay.length}, 1fr)` }}>
+                  <div className="absolute inset-0 top-8 grid" style={{ gridTemplateColumns: `repeat(${techniciansToDisplay.length}, 1fr)` }}>
                     {techniciansToDisplay.map((tech, techIndex) => (
                       <div
                         key={tech.id}
@@ -598,7 +616,7 @@ export default function CalendarPage() {
                       >
                         {/* Events for this technician on this day */}
                         {eventsByTechnicianAndDay(tech.id, date).map(event => (
-                            <EventCard key={event.id} event={event} />
+                            <EventCard key={event.id} event={event} color={generateColorFromString(tech.id)} />
                         ))}
                       </div>
                     ))}
@@ -612,3 +630,4 @@ export default function CalendarPage() {
     </div>
   );
 }
+
