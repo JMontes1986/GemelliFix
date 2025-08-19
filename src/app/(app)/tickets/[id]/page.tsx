@@ -53,6 +53,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged } from 'firebase/auth';
 import { createLog } from '@/lib/utils';
 import Link from 'next/link';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import PdfViewer from '@/components/ui/pdf-viewer';
 
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
@@ -352,39 +354,7 @@ export default function TicketDetailPage() {
     (tech) => ticket.assignedToIds?.includes(tech.id)
   );
   const isRequester = currentUser.id === ticket.requesterId;
-  const allEvidence = [...(ticket.attachments || []), ...(ticket.evidence || [])];
-
-  const renderEvidence = (att: { url: string, description: string }) => {
-    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(att.url);
-    const isPdf = /\.pdf$/i.test(att.url);
-
-    return (
-      <div className="group relative space-y-2 border rounded-lg p-2">
-        {isImage ? (
-          <Image src={att.url} alt={att.description} width={400} height={300} className="rounded-md object-cover aspect-video" data-ai-hint="repair evidence"/>
-        ) : isPdf ? (
-           <div className="aspect-video bg-gray-100 flex flex-col items-center justify-center rounded-md">
-              <File className="h-16 w-16 text-red-500" />
-              <p className="mt-2 text-sm font-semibold">Archivo PDF</p>
-           </div>
-        ) : (
-          <div className="aspect-video bg-gray-100 flex flex-col items-center justify-center rounded-md">
-            <File className="h-16 w-16 text-gray-500" />
-            <p className="mt-2 text-sm font-semibold">Archivo</p>
-          </div>
-        )}
-         <p className="text-sm text-muted-foreground truncate" title={att.description}>{att.description}</p>
-         <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <Link href={att.url} target="_blank" rel="noopener noreferrer">
-              <Button>
-                {isPdf ? "Ver PDF" : "Ver Imagen"}
-              </Button>
-            </Link>
-         </div>
-      </div>
-    );
-  };
-
+  
 
   return (
     <div className="grid md:grid-cols-3 gap-6">
@@ -527,18 +497,32 @@ export default function TicketDetailPage() {
                                     <Image src={att.url} alt={att.description} width={400} height={300} className="w-full h-auto object-cover aspect-video" data-ai-hint="repair evidence"/>
                                 ) : (
                                     <div className="aspect-video bg-muted flex flex-col items-center justify-center p-4">
-                                        {isPdf ? <File className="w-12 h-12 text-red-500"/> : <File className="w-12 h-12 text-muted-foreground"/>}
+                                        <File className={cn("w-12 h-12", isPdf ? "text-red-500" : "text-muted-foreground")}/>
                                         <p className="mt-2 text-center text-sm text-muted-foreground">{att.description}</p>
                                     </div>
                                 )}
                             </CardContent>
                             <CardFooter className="p-2 bg-background/50">
-                                <a href={att.url} target="_blank" rel="noopener noreferrer" className="w-full">
-                                    <Button variant="secondary" className="w-full">
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Descargar/Ver
-                                    </Button>
-                                </a>
+                                {isPdf ? (
+                                     <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button variant="secondary" className="w-full">
+                                                <File className="mr-2 h-4 w-4" />
+                                                Ver PDF
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-4xl h-[90vh]">
+                                           <PdfViewer fileUrl={att.url} fileName={att.description} />
+                                        </DialogContent>
+                                    </Dialog>
+                                ) : (
+                                    <a href={att.url} target="_blank" rel="noopener noreferrer" className="w-full">
+                                        <Button variant="secondary" className="w-full">
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Descargar/Ver
+                                        </Button>
+                                    </a>
+                                )}
                             </CardFooter>
                         </Card>
                     )
