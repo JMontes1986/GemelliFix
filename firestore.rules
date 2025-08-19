@@ -1,68 +1,52 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // =================================
-    // Users Collection
-    // =================================
+
+    // Helper function to check for Admin role
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
+    }
+
+    // Helper function to check if the user is the requester of a ticket
+    function isRequester(ticket) {
+      return request.auth.uid == ticket.requesterId;
+    }
+
+    // Helper function to check if the user is assigned to a ticket
+    function isAssigned(ticket) {
+      return request.auth.uid in ticket.assignedToIds;
+    }
+
+    // Users can read public profiles, but only edit their own.
     match /users/{userId} {
-      // Anyone can read user profiles (for names, avatars, roles)
-      allow read: if true;
-      // Only the authenticated user can create or update their own document
-      allow create, update: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // =================================
-    // Tickets Collection
-    // =================================
-    match /tickets/{ticketId} {
-      // Allow any authenticated user to create a ticket
+      allow read;
       allow create: if request.auth != null;
+      allow update: if request.auth.uid == userId;
+    }
 
-      // Allow read/write based on roles and ownership
-      allow read, update: if 
-          request.auth != null && (
-            // The user who created the ticket
-            resource.data.requesterId == request.auth.uid ||
-            // A technician assigned to the ticket
-            (resource.data.assignedToIds != null && request.auth.uid in resource.data.assignedToIds) ||
-            // An administrator
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador'
-          );
+    // Tickets have specific rules based on roles
+    match /tickets/{ticketId} {
+      allow create: if request.auth != null;
+      allow read, update: if isAdmin() || isRequester(resource.data) || isAssigned(resource.data);
     }
     
-    // =================================
-    // Notifications Collection
-    // =================================
-    match /notifications/{notificationId} {
-        // Allow a user to read/update their own notifications
-        allow read, update, create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-        // Admins can read all notifications for auditing
-        allow list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
-    }
-
-    // =================================
-    // Logs Collection
-    // =================================
+    // Logs are write-only for authenticated users to maintain integrity.
     match /logs/{logId} {
-        // Only authenticated users can create logs
         allow create: if request.auth != null;
-        // Nobody can update or delete logs to ensure audit trail integrity
-        allow update, delete: if false;
-        // Only admins can read the logs
-        allow read, list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
+        allow read, update, delete: if false; // Nobody can alter logs
     }
     
-    // =================================
-    // Diagnosis Logs (for testing)
-    // =================================
-    match /diagnosis_logs/{logId} {
-        // Allow any authenticated user to create test logs
-        allow create: if request.auth != null;
-        // These are for testing, so allow read for admins if needed
-        allow read: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
+    // Notifications can be read and updated (to be marked as read) by the target user.
+    match /notifications/{notificationId} {
+        allow create: if isAdmin(); // Only admins/system can create notifications
+        allow read, update: if request.auth.uid == resource.data.userId;
+        allow delete: if false;
+    }
+    
+    // Default deny for any other collections
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
