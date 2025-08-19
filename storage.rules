@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Permite la escritura (subida) de archivos en la carpeta 'ticket-attachments'
+    // solo si el usuario está autenticado.
+    // Se añade una restricción de tamaño (máx 5MB) para evitar abusos.
+    match /ticket-attachments/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Regla para Avatares de Perfil (si se implementa en el futuro)
+    match /avatars/{userId}/{fileName} {
+      allow read;
+      allow write: if request.auth.uid == userId;
+    }
+  }
+}

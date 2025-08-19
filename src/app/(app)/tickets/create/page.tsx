@@ -150,10 +150,14 @@ export default function CreateTicketPage() {
       router.push('/tickets');
     } catch (error: any) {
       console.error('Error creando ticket:', error);
+      let errorDescription = `Hubo un problema al guardar tu solicitud: ${error.message}`;
+      if (error.code === 'storage/unauthorized') {
+        errorDescription = "Error de permisos al subir archivos. Asegúrate de que las reglas de Firebase Storage están configuradas correctamente.";
+      }
       toast({
         variant: 'destructive',
         title: 'Error al crear el ticket',
-        description: `Hubo un problema al guardar tu solicitud: ${error.message}`,
+        description: errorDescription,
       });
     } finally {
         setIsLoading(false);
@@ -428,4 +432,3 @@ export default function CreateTicketPage() {
   );
 }
 
-    
