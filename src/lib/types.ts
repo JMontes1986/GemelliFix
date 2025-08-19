@@ -41,7 +41,7 @@ export type Ticket = {
   status: 'Abierto' | 'Asignado' | 'En Progreso' | 'Requiere Aprobación' | 'Resuelto' | 'Cerrado';
   createdAt: string;
   dueDate: string;
-  assignedTo?: string;
+  assignedTo?: string[];
   requester: string;
   attachments?: Attachment[];
 };

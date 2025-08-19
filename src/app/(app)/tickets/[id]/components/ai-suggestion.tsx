@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState } from 'react';
@@ -95,7 +96,7 @@ export default function AiSuggestion({ ticket, onAssign }: AiSuggestionProps) {
             Sugerencia de Asignación
           </DialogTitle>
           <DialogDescription>
-            El asistente de IA ha analizado la carga de trabajo y las habilidades, y recomienda al siguiente personal.
+            El asistente de IA ha analizado la carga de trabajo y las habilidades, y recomienda al siguiente personal. Puedes añadir más si es necesario.
           </DialogDescription>
         </DialogHeader>
         {isLoading && (
@@ -120,5 +121,3 @@ export default function AiSuggestion({ ticket, onAssign }: AiSuggestionProps) {
     </Dialog>
   );
 }
-
-    

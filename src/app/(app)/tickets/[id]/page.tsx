@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -33,7 +34,7 @@ import {
   ThumbsDown,
   Briefcase,
   Loader2,
-  Sparkles,
+  Users,
 } from 'lucide-react';
 import type { Ticket, Technician } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -43,12 +44,9 @@ import Image from 'next/image';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 
 
@@ -101,7 +99,15 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPersonnel, setSelectedPersonnel] = useState<string[]>([]);
+  const [isAssignPopoverOpen, setAssignPopoverOpen] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (ticket?.assignedTo) {
+        setSelectedPersonnel(ticket.assignedTo);
+    }
+  }, [ticket]);
 
   useEffect(() => {
     if (!ticketId) {
@@ -126,7 +132,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 status: data.status,
                 createdAt: data.createdAt?.toDate().toISOString(),
                 dueDate: data.dueDate?.toDate().toISOString(),
-                assignedTo: data.assignedTo,
+                assignedTo: data.assignedTo || [],
                 requester: data.requester,
                 attachments: data.attachments || [],
             };
@@ -155,7 +161,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
       await updateDoc(docRef, { [field]: value });
       toast({
         title: "Ticket Actualizado",
-        description: `El campo ${field} ha sido cambiado a "${value}".`,
+        description: `El campo ${field} ha sido cambiado.`,
       });
     } catch (error: any) {
       console.error("Error updating ticket: ", error);
@@ -169,30 +175,43 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     }
   }
   
-   const handleAssignTechnician = async (technician: Technician) => {
+   const handleAssignPersonnel = async (personnel: Technician[]) => {
+    const personnelNames = personnel.map(p => p.name);
+    await handleUpdate('assignedTo', personnelNames);
+    const newStatus = personnelNames.length > 0 ? 'Asignado' : 'Abierto';
+    await handleUpdate('status', newStatus);
+    toast({
+        title: "Personal Asignado",
+        description: `El ticket ha sido actualizado.`,
+    });
+  }
+
+  const handleApplyPersonnelChange = async () => {
     if (!ticket) return;
     setIsUpdating(true);
+    setAssignPopoverOpen(false);
     const docRef = doc(db, "tickets", ticket.id);
     try {
       await updateDoc(docRef, { 
-          assignedTo: technician.name,
-          status: 'Asignado' 
+          assignedTo: selectedPersonnel,
+          status: selectedPersonnel.length > 0 ? 'Asignado' : 'Abierto'
       });
       toast({
-        title: "Personal Asignado",
-        description: `El ticket ha sido asignado a ${technician.name}.`,
+        title: "Personal Actualizado",
+        description: `Se ha actualizado la asignación del ticket.`,
       });
     } catch (error: any) {
-       console.error("Error assigning technician: ", error);
+      console.error("Error updating assignment: ", error);
       toast({
         variant: "destructive",
         title: "Error al Asignar",
-        description: `No se pudo asignar el personal. ${error.message}`,
+        description: `No se pudo actualizar la asignación. ${error.message}`,
       });
     } finally {
-        setIsUpdating(false);
+      setIsUpdating(false);
     }
   }
+
 
   if (isLoading) {
     return (
@@ -222,8 +241,8 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
      return <Card><CardHeader><CardTitle>Ticket no encontrado</CardTitle></CardHeader><CardContent><p>El ticket que buscas no existe o ha sido eliminado.</p></CardContent></Card>
   }
   
-  const assignedTechnician = technicians.find(
-    (tech) => tech.name === ticket.assignedTo
+  const assignedPersonnel = technicians.filter(
+    (tech) => ticket.assignedTo?.includes(tech.name)
   );
   const isRequester = currentUser.name === ticket.requester;
 
@@ -377,48 +396,80 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
       <div>
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="font-headline text-lg">Personal Asignado</CardTitle>
+            <CardTitle className="font-headline text-lg flex items-center gap-2"><Users className="w-5 h-5" />Personal Asignado</CardTitle>
           </CardHeader>
-          <CardContent>
-            {isUpdating && <Loader2 className="animate-spin" />}
-            {!isUpdating && assignedTechnician ? (
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src={assignedTechnician.avatar} />
-                  <AvatarFallback>{assignedTechnician.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h4 className="font-semibold">{assignedTechnician.name}</h4>
-                  <p className="text-sm text-muted-foreground">{assignedTechnician.skills.join(', ')}</p>
-                </div>
-              </div>
+          <CardContent className="space-y-4">
+            {isUpdating && <div className="flex justify-center"><Loader2 className="animate-spin" /></div>}
+            {!isUpdating && assignedPersonnel.length > 0 ? (
+                assignedPersonnel.map(person => (
+                    <div key={person.id} className="flex items-center gap-4">
+                        <Avatar className="h-12 w-12">
+                        <AvatarImage src={person.avatar} />
+                        <AvatarFallback>{person.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                        <h4 className="font-semibold">{person.name}</h4>
+                        <p className="text-sm text-muted-foreground">{person.skills.join(', ')}</p>
+                        </div>
+                    </div>
+                ))
             ) : (
-              !isUpdating && <div className='text-muted-foreground'>Sin asignar</div>
+              !isUpdating && <div className='text-sm text-muted-foreground'>Sin asignar</div>
             )}
           </CardContent>
           {canEdit && (
             <CardFooter className="flex-col items-stretch space-y-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" disabled={isUpdating}>
-                      {assignedTechnician ? 'Reasignar Personal' : 'Asignar Personal'}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {technicians.map(tech => (
-                        <DropdownMenuItem key={tech.id} onClick={() => handleAssignTechnician(tech)} disabled={isUpdating}>
-                            {tech.name}
-                        </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Popover open={isAssignPopoverOpen} onOpenChange={setAssignPopoverOpen}>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" disabled={isUpdating}>
+                         {assignedPersonnel.length > 0 ? 'Reasignar Personal' : 'Asignar Personal'}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                        <div className="grid gap-4">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Asignar Personal</h4>
+                                <p className="text-sm text-muted-foreground">
+                                    Selecciona una o más personas para este ticket.
+                                </p>
+                            </div>
+                            <div className="grid gap-2 max-h-64 overflow-y-auto">
+                                {technicians.map(tech => (
+                                    <div key={tech.id} className="flex items-center space-x-2">
+                                        <Checkbox 
+                                            id={`tech-${tech.id}`}
+                                            checked={selectedPersonnel.includes(tech.name)}
+                                            onCheckedChange={(checked) => {
+                                                setSelectedPersonnel(prev => 
+                                                    checked 
+                                                        ? [...prev, tech.name]
+                                                        : prev.filter(name => name !== tech.name)
+                                                );
+                                            }}
+                                        />
+                                        <Label htmlFor={`tech-${tech.id}`} className="flex items-center gap-2 font-normal">
+                                             <Avatar className="h-8 w-8">
+                                                <AvatarImage src={tech.avatar} />
+                                                <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            {tech.name}
+                                        </Label>
+                                    </div>
+                                ))}
+                            </div>
+                            <Button onClick={handleApplyPersonnelChange} disabled={isUpdating}>
+                                {isUpdating ? <Loader2 className="animate-spin" /> : 'Aplicar Cambios'}
+                            </Button>
+                        </div>
+                    </PopoverContent>
+                </Popover>
 
-              <AiSuggestion ticket={ticket} onAssign={handleAssignTechnician} />
+              <AiSuggestion ticket={ticket} onAssign={(tech) => handleAssignPersonnel([tech])} />
             </CardFooter>
           )}
         </Card>
 
-        {assignedTechnician && ['Asignado', 'En Progreso'].includes(ticket.status) && (
+        {assignedPersonnel.length > 0 && ['Asignado', 'En Progreso'].includes(ticket.status) && (
             <Card className="mb-6">
                  <CardHeader>
                     <CardTitle className="font-headline text-lg flex items-center gap-2"><Edit className="w-5 h-5" /> Actualizar Progreso</CardTitle>
@@ -466,25 +517,25 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                             <p className="text-xs text-muted-foreground"><ClientFormattedDate date={ticket.createdAt} /></p>
                         </div>
                     </div>
-                     {assignedTechnician && (
+                     {assignedPersonnel.length > 0 && (
                         <div className="flex gap-3">
                             <div className="flex-shrink-0"><ArrowRight className="w-5 h-5 text-blue-500" /></div>
                             <div>
-                                <p>Ticket asignado a <strong>{assignedTechnician.name}</strong> por <strong>Admin User</strong>.</p>
+                                <p>Ticket asignado a <strong>{assignedPersonnel.map(p => p.name).join(', ')}</strong> por <strong>Admin User</strong>.</p>
                                 <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 3600000)} /></p>
                             </div>
                         </div>
                      )}
-                     {ticket.status !== 'Abierto' && ticket.status !== 'Asignado' && assignedTechnician && (
+                     {ticket.status !== 'Abierto' && ticket.status !== 'Asignado' && assignedPersonnel.length > 0 && (
                         <div className="flex gap-3">
                             <div className="flex-shrink-0">
                                 <Avatar className="h-5 w-5">
-                                    <AvatarImage src={assignedTechnician.avatar} />
-                                    <AvatarFallback>{assignedTechnician.name.charAt(0)}</AvatarFallback>
+                                    <AvatarImage src={assignedPersonnel[0].avatar} />
+                                    <AvatarFallback>{assignedPersonnel[0].name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                             </div>
                             <div>
-                                <p><strong>{assignedTechnician.name}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
+                                <p><strong>{assignedPersonnel[0].name}</strong>: "Iniciando diagnóstico del proyector. Parece un fallo en la fuente de poder."</p>
                                 <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.createdAt).getTime() + 7200000)} /></p>
                             </div>
                         </div>
@@ -493,7 +544,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                          <div className="flex gap-3">
                             <div className="flex-shrink-0"><CheckCircle className="w-5 h-5 text-green-500" /></div>
                             <div>
-                                <p>Ticket marcado como <strong>Resuelto</strong> por <strong>{ticket.assignedTo}</strong>.</p>
+                                <p>Ticket marcado como <strong>Resuelto</strong> por <strong>{ticket.assignedTo?.[0] || ''}</strong>.</p>
                                 <p className="text-xs text-muted-foreground"><ClientFormattedDate date={new Date(new Date(ticket.dueDate).getTime() - 86400000)} /></p>
                             </div>
                         </div>
@@ -505,12 +556,4 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
       </div>
     </div>
   );
-    
-
-    
-
-
-
-    
-
-    
+}
