@@ -93,6 +93,137 @@ const getPriorityBadgeClassName = (priority: Ticket['priority']) => {
     }
 };
 
+interface TicketsTableProps {
+    tickets: Ticket[];
+    isLoading: boolean;
+    error: string | null;
+    isUpdating: boolean;
+    currentUser: User | null;
+    handleUpdate: (ticketId: string, field: keyof Ticket, value: any) => void;
+}
+
+const TicketsTable: React.FC<TicketsTableProps> = ({
+    tickets,
+    isLoading,
+    error,
+    isUpdating,
+    currentUser,
+    handleUpdate,
+}) => {
+    const router = useRouter();
+    
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <div className="space-y-2 w-full">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return <div className="h-24 text-center text-red-500 flex items-center justify-center">{error}</div>;
+    }
+
+    if (tickets.length === 0) {
+        return <div className="h-24 text-center flex items-center justify-center">No hay solicitudes en este estado.</div>;
+    }
+
+    const groupedTickets = tickets.reduce((acc, ticket) => {
+        const { zone } = ticket;
+        if (!acc[zone]) {
+            acc[zone] = [];
+        }
+        acc[zone].push(ticket);
+        return acc;
+    }, {} as Record<string, Ticket[]>);
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead className='w-[180px]'>Código Ticket</TableHead>
+                    <TableHead>Sitio</TableHead>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Prioridad</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Asignado a</TableHead>
+                    <TableHead className="hidden md:table-cell">Creado</TableHead>
+                    <TableHead className="hidden md:table-cell">Vence</TableHead>
+                    <TableHead><span className="sr-only">Acciones</span></TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {Object.entries(groupedTickets).map(([zone, ticketsInZone]) => (
+                    <React.Fragment key={zone}>
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={9} className="font-bold font-headline text-primary">{zone}</TableCell>
+                        </TableRow>
+                        {ticketsInZone.map((ticket) => (
+                            <TableRow key={ticket.id}>
+                                <TableCell className="font-medium">
+                                    <Link href={`/tickets/${ticket.id}`} className="text-primary hover:underline">{ticket.code}</Link>
+                                </TableCell>
+                                <TableCell>{ticket.site}</TableCell>
+                                <TableCell>{ticket.title}</TableCell>
+                                <TableCell>
+                                    {currentUser?.role === 'Administrador' ? (
+                                        <Select value={ticket.priority} onValueChange={(value) => handleUpdate(ticket.id, 'priority', value)} disabled={isUpdating}>
+                                            <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue placeholder="Prioridad" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Baja">Baja</SelectItem>
+                                                <SelectItem value="Media">Media</SelectItem>
+                                                <SelectItem value="Alta">Alta</SelectItem>
+                                                <SelectItem value="Urgente">Urgente</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <Badge variant={getPriorityBadgeVariant(ticket.priority)} className={getPriorityBadgeClassName(ticket.priority)}>{ticket.priority}</Badge>
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    {currentUser?.role === 'Administrador' ? (
+                                        <Select value={ticket.status} onValueChange={(value) => handleUpdate(ticket.id, 'status', value)} disabled={isUpdating}>
+                                            <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Abierto">Abierto</SelectItem>
+                                                <SelectItem value="Asignado">Asignado</SelectItem>
+                                                <SelectItem value="En Progreso">En Progreso</SelectItem>
+                                                <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>
+                                                <SelectItem value="Resuelto">Resuelto</SelectItem>
+                                                <SelectItem value="Cancelado">Cancelado</SelectItem>
+                                                <SelectItem value="Cerrado">Cerrado</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
+                                    )}
+                                </TableCell>
+                                <TableCell>{(Array.isArray(ticket.assignedTo) && ticket.assignedTo.length > 0) ? ticket.assignedTo.join(', ') : 'Sin Asignar'}</TableCell>
+                                <TableCell className="hidden md:table-cell"><ClientFormattedDate date={ticket.createdAt} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} /></TableCell>
+                                <TableCell className="hidden md:table-cell"><ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} /></TableCell>
+                                <TableCell>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Toggle menu</span></Button></DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                            <DropdownMenuItem asChild><Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link></DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>Asignar</DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </React.Fragment>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
 
 export default function TicketsPage() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
@@ -101,8 +232,7 @@ export default function TicketsPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const { toast } = useToast();
-  const router = useRouter();
-
+  
   React.useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
         if (firebaseUser) {
@@ -120,18 +250,15 @@ export default function TicketsPage() {
                  setIsLoading(false);
             }
         } else {
-            // No user is signed in.
             setIsLoading(false);
         }
     });
-
     return () => unsubscribeAuth();
   }, []);
 
   React.useEffect(() => {
     if (!currentUser) {
-        // Wait for user to be loaded
-        if (!auth.currentUser) setIsLoading(false); // If no auth at all, stop loading.
+        if (!auth.currentUser) setIsLoading(false);
         return;
     }
     
@@ -139,48 +266,17 @@ export default function TicketsPage() {
     if (currentUser.role === 'Administrador') {
         q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
     } else if (currentUser.role === 'Servicios Generales') {
-        // Filter tickets for 'Servicios Generales'
-        q = query(
-            collection(db, 'tickets'), 
-            where('assignedToIds', 'array-contains', currentUser.id),
-            orderBy('createdAt', 'desc')
-        );
+        q = query(collection(db, 'tickets'), where('assignedToIds', 'array-contains', currentUser.id), orderBy('createdAt', 'desc'));
     } else if (['Docentes', 'Coordinadores', 'Administrativos'].includes(currentUser.role)) {
-        q = query(
-            collection(db, 'tickets'),
-            where('requesterId', '==', currentUser.id),
-            orderBy('createdAt', 'desc')
-        );
+        q = query(collection(db, 'tickets'), where('requesterId', '==', currentUser.id), orderBy('createdAt', 'desc'));
     } else {
-        // Fallback for any other roles, though should not happen with defined roles.
-        // Show no tickets by default for unknown roles.
         setTickets([]);
         setIsLoading(false);
         return;
     }
     
     const unsubscribeTickets = onSnapshot(q, (querySnapshot) => {
-      const ticketsData: Ticket[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        ticketsData.push({
-          id: doc.id,
-          code: data.code,
-          title: data.title,
-          description: data.description,
-          zone: data.zone,
-          site: data.site,
-          category: data.category,
-          priority: data.priority,
-          status: data.status,
-          createdAt: data.createdAt?.toDate().toISOString() ?? new Date().toISOString(),
-          dueDate: data.dueDate?.toDate().toISOString() ?? new Date().toISOString(),
-          assignedTo: data.assignedTo || [],
-          requester: data.requester,
-          requesterId: data.requesterId,
-          assignedToIds: data.assignedToIds || [],
-        });
-      });
+      const ticketsData: Ticket[] = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticket));
       setTickets(ticketsData);
       setIsLoading(false);
       setError(null);
@@ -192,15 +288,6 @@ export default function TicketsPage() {
 
     return () => unsubscribeTickets();
   }, [currentUser]);
-
-  const groupedTickets = tickets.reduce((acc, ticket) => {
-    const { zone } = ticket;
-    if (!acc[zone]) {
-      acc[zone] = [];
-    }
-    acc[zone].push(ticket);
-    return acc;
-  }, {} as Record<string, Ticket[]>);
 
   const handleUpdate = async (ticketId: string, field: keyof Ticket, value: any) => {
     setIsUpdating(true);
@@ -222,198 +309,45 @@ export default function TicketsPage() {
         setIsUpdating(false);
     }
   };
+  
+  const statuses: Ticket['status'][] = ['Abierto', 'Asignado', 'En Progreso', 'Requiere Aprobación', 'Resuelto', 'Cancelado', 'Cerrado'];
+  const filteredTickets = (status: Ticket['status']) => tickets.filter(t => t.status === status);
 
   return (
-    <Tabs defaultValue="all">
+    <Tabs defaultValue="all" className="space-y-4">
       <div className="flex items-center">
-        <TabsList>
+        <TabsList className="overflow-x-auto h-auto p-1">
           <TabsTrigger value="all">Todos</TabsTrigger>
-          <TabsTrigger value="abierto">Abiertos</TabsTrigger>
-          <TabsTrigger value="en_progreso">En Progreso</TabsTrigger>
-          <TabsTrigger value="resuelto" className="hidden sm:flex">
-            Resueltos
-          </TabsTrigger>
+           {statuses.map(status => (
+                <TabsTrigger key={status} value={status}>{status}</TabsTrigger>
+            ))}
         </TabsList>
         <div className="ml-auto flex items-center gap-2">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 gap-1">
-                <ListFilter className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Filtro
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-7 gap-1"><ListFilter className="h-3.5 w-3.5" /><span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Filtro</span></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Zona</DropdownMenuItem>
-              <DropdownMenuItem>Prioridad</DropdownMenuItem>
-              <DropdownMenuItem>Estado</DropdownMenuItem>
+              <DropdownMenuLabel>Filtrar por</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem>Zona</DropdownMenuItem><DropdownMenuItem>Prioridad</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" variant="outline" className="h-7 gap-1">
-            <File className="h-3.5 w-3.5" />
-            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-              Exportar
-            </span>
-          </Button>
+          <Button size="sm" variant="outline" className="h-7 gap-1"><File className="h-3.5 w-3.5" /><span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Exportar</span></Button>
         </div>
       </div>
-      <TabsContent value="all">
-        <Card>
+       <Card>
           <CardHeader>
             <CardTitle className='font-headline'>Solicitudes de Mantenimiento</CardTitle>
-            <CardDescription>
-              Gestiona y monitorea todas las solicitudes.
-            </CardDescription>
+            <CardDescription>Gestiona y monitorea todas las solicitudes.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className='w-[180px]'>Código Ticket</TableHead>
-                  <TableHead>Sitio</TableHead>
-                  <TableHead>Título</TableHead>
-                  <TableHead>Prioridad</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Asignado a</TableHead>
-                  <TableHead className="hidden md:table-cell">Creado</TableHead>
-                  <TableHead className="hidden md:table-cell">Vence</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Acciones</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
-                       <div className="flex justify-center items-center">
-                          <div className="space-y-2 w-full">
-                            <Skeleton className="h-8 w-full" />
-                            <Skeleton className="h-8 w-full" />
-                            <Skeleton className="h-8 w-full" />
-                          </div>
-                       </div>
-                    </TableCell>
-                  </TableRow>
-                ) : error ? (
-                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center text-red-500">
-                        {error}
-                    </TableCell>
-                  </TableRow>
-                ) : tickets.length === 0 ? (
-                    <TableRow>
-                        <TableCell colSpan={9} className="h-24 text-center">
-                            No hay solicitudes de mantenimiento registradas.
-                        </TableCell>
-                    </TableRow>
-                ) : (
-                    Object.entries(groupedTickets).map(([zone, ticketsInZone]) => (
-                    <React.Fragment key={zone}>
-                        <TableRow className="bg-muted/50">
-                        <TableCell colSpan={9} className="font-bold font-headline text-primary">
-                            {zone}
-                        </TableCell>
-                        </TableRow>
-                        {ticketsInZone.map((ticket) => (
-                        <TableRow key={ticket.id}>
-                            <TableCell className="font-medium">
-                            <Link href={`/tickets/${ticket.id}`} className="text-primary hover:underline">
-                                {ticket.code}
-                            </Link>
-                            </TableCell>
-                            <TableCell>{ticket.site}</TableCell>
-                            <TableCell>{ticket.title}</TableCell>
-                            <TableCell>
-                                {currentUser?.role === 'Administrador' ? (
-                                    <Select 
-                                        value={ticket.priority} 
-                                        onValueChange={(value) => handleUpdate(ticket.id, 'priority', value)}
-                                        disabled={isUpdating}
-                                    >
-                                        <SelectTrigger className="w-[120px] h-8 text-xs">
-                                            <SelectValue placeholder="Prioridad" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Baja">Baja</SelectItem>
-                                            <SelectItem value="Media">Media</SelectItem>
-                                            <SelectItem value="Alta">Alta</SelectItem>
-                                            <SelectItem value="Urgente">Urgente</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                ) : (
-                                    <Badge variant={getPriorityBadgeVariant(ticket.priority)} className={getPriorityBadgeClassName(ticket.priority)}>{ticket.priority}</Badge>
-                                )}
-                            </TableCell>
-                            <TableCell>
-                                {currentUser?.role === 'Administrador' ? (
-                                    <Select 
-                                        value={ticket.status} 
-                                        onValueChange={(value) => handleUpdate(ticket.id, 'status', value)}
-                                        disabled={isUpdating}
-                                    >
-                                        <SelectTrigger className="w-[150px] h-8 text-xs">
-                                            <SelectValue placeholder="Estado" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                             <SelectItem value="Abierto">Abierto</SelectItem>
-                                             <SelectItem value="Asignado">Asignado</SelectItem>
-                                             <SelectItem value="En Progreso">En Progreso</SelectItem>
-                                             <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>
-                                             <SelectItem value="Resuelto">Resuelto</SelectItem>
-                                             <SelectItem value="Cancelado">Cancelado</SelectItem>
-                                             <SelectItem value="Cerrado">Cerrado</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                ) : (
-                                    <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
-                                )}
-                            </TableCell>
-                            <TableCell>{(Array.isArray(ticket.assignedTo) && ticket.assignedTo.length > 0) ? ticket.assignedTo.join(', ') : 'Sin Asignar'}</TableCell>
-                            <TableCell className="hidden md:table-cell">
-                            <ClientFormattedDate date={ticket.createdAt} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                            <ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
-                            </TableCell>
-                            <TableCell>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                <Button
-                                    aria-haspopup="true"
-                                    size="icon"
-                                    variant="ghost"
-                                >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                    <span className="sr-only">Toggle menu</span>
-                                </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>
-                                  Asignar
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                            </DropdownMenu>
-                            </TableCell>
-                        </TableRow>
-                        ))}
-                    </React.Fragment>
-                    ))
-                )}
-              </TableBody>
-            </Table>
+            <TabsContent value="all">
+                <TicketsTable tickets={tickets} isLoading={isLoading} error={error} isUpdating={isUpdating} currentUser={currentUser} handleUpdate={handleUpdate} />
+            </TabsContent>
+            {statuses.map(status => (
+                <TabsContent key={status} value={status}>
+                    <TicketsTable tickets={filteredTickets(status)} isLoading={isLoading} error={error} isUpdating={isUpdating} currentUser={currentUser} handleUpdate={handleUpdate} />
+                </TabsContent>
+            ))}
           </CardContent>
-        </Card>
-      </TabsContent>
+      </Card>
     </Tabs>
   );
 }
-
-    
