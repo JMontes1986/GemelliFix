@@ -40,6 +40,7 @@ import {
   Sparkles,
   UploadCloud,
   X as XIcon,
+  Send,
 } from 'lucide-react';
 import type { Ticket, User as CurrentUser, Attachment } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -144,8 +145,8 @@ export default function TicketDetailPage() {
 
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+    const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
         const fetchedTechnicians: CurrentUser[] = [];
         querySnapshot.forEach((doc) => {
             fetchedTechnicians.push({ id: doc.id, ...doc.data() } as CurrentUser);
@@ -155,8 +156,8 @@ export default function TicketDetailPage() {
         console.error("Error fetching technicians:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
     });
-
-    return () => unsubscribe();
+    
+    return () => unsubscribe_technicians();
   }, [toast]);
 
 
@@ -224,6 +225,8 @@ export default function TicketDetailPage() {
 
 
   const canEdit = currentUser?.role === 'Administrador';
+  const isRequester = currentUser?.id === ticket?.requesterId;
+  const isAssignedToCurrentUser = ticket?.assignedToIds?.includes(currentUser?.id ?? '') ?? false;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -250,7 +253,7 @@ export default function TicketDetailPage() {
   };
 
 
-  const handleUpdate = async (field: keyof Ticket, value: any, newEvidence: Attachment[] = []) => {
+  const handleUpdate = async (field: keyof Ticket, value: any) => {
     if (!ticket || !currentUser) return;
 
     if (field === 'status' && ticket.status !== value && value !== 'Asignado' && !comment.trim()) {
@@ -267,9 +270,6 @@ export default function TicketDetailPage() {
     const oldValue = ticket[field];
     
     let updates: { [key: string]: any } = { [field]: value };
-     if (newEvidence.length > 0) {
-        updates.evidence = arrayUnion(...newEvidence);
-    }
 
     let logDetails: any = { ticket, oldValue, newValue: value };
 
@@ -309,14 +309,22 @@ export default function TicketDetailPage() {
     }
   }
 
-  const handleMarkAsResolved = async () => {
-    if (!ticket) return;
+  const handleProgressUpdate = async () => {
+    if (!ticket || !currentUser) return;
 
     if (filesToUpload.length === 0) {
         toast({
             variant: "destructive",
             title: "Evidencia Requerida",
-            description: "Se requiere evidencia para marcar un ticket como resuelto.",
+            description: "Se requiere evidencia para enviar un ticket a aprobación.",
+        });
+        return;
+    }
+    if (!comment.trim()) {
+        toast({
+            variant: "destructive",
+            title: "Comentario Requerido",
+            description: "Debes agregar un comentario de progreso.",
         });
         return;
     }
@@ -334,8 +342,22 @@ export default function TicketDetailPage() {
         });
         uploadedEvidence = await Promise.all(uploadPromises);
         
-        await handleUpdate('status', 'Resuelto', uploadedEvidence);
-        setFilesToUpload([]); // Clear files after successful upload
+        const docRef = doc(db, "tickets", ticket.id);
+        await updateDoc(docRef, {
+            status: 'Requiere Aprobación',
+            evidence: arrayUnion(...uploadedEvidence),
+            // Aquí podríamos agregar el comentario también si lo guardamos en un historial.
+        });
+        
+        await createLog(currentUser, 'update_status', { ticket, oldValue: ticket.status, newValue: 'Requiere Aprobación' });
+
+        setFilesToUpload([]); // Limpiar archivos después de la subida exitosa
+        setComment(''); // Limpiar comentario
+        
+        toast({
+            title: 'Progreso Actualizado',
+            description: 'El ticket ha sido enviado para su aprobación por el solicitante.'
+        });
 
     } catch (uploadError: any) {
         console.error("Error uploading evidence:", uploadError);
@@ -357,10 +379,15 @@ export default function TicketDetailPage() {
     const personnelIds = personnel.map(p => p.id);
     const personnelNames = personnel.map(p => p.name);
     
-    await handleUpdate('assignedToIds', personnelIds);
-    await handleUpdate('assignedTo', personnelNames);
+    setIsUpdating(true);
+    const docRef = doc(db, "tickets", ticket.id);
     const newStatus = personnelIds.length > 0 ? 'Asignado' : 'Abierto';
-    await handleUpdate('status', newStatus);
+    await updateDoc(docRef, {
+        assignedToIds: personnelIds,
+        assignedTo: personnelNames,
+        status: newStatus,
+    });
+    setIsUpdating(false);
 
     await createLog(currentUser, 'update_assignment', { ticket, oldValue, newValue: personnelNames });
     
@@ -373,8 +400,12 @@ export default function TicketDetailPage() {
 
   const handleApproval = async (approve: boolean) => {
     if (!ticket) return;
-    const newStatus = approve ? 'Cerrado' : 'Asignado'; // If rejected, it goes back to 'Assigned'
+    const newStatus = approve ? 'Cerrado' : 'Asignado'; // Si se rechaza, vuelve a 'Asignado'
     await handleUpdate('status', newStatus);
+    toast({
+        title: `Ticket ${approve ? 'Aprobado y Cerrado' : 'Rechazado'}`,
+        description: approve ? 'La solicitud ha sido marcada como cerrada.' : 'La solicitud ha sido devuelta al personal asignado.'
+    });
   };
 
 
@@ -409,8 +440,6 @@ export default function TicketDetailPage() {
   const assignedPersonnelDetails = technicians.filter(
     (tech) => ticket.assignedToIds?.includes(tech.id)
   );
-  const isRequester = currentUser.id === ticket.requesterId;
-  const isAssignedToCurrentUser = ticket.assignedToIds?.includes(currentUser.id) ?? false;
   
 
   return (
@@ -468,7 +497,7 @@ export default function TicketDetailPage() {
                     <Tag className="w-4 h-4 text-muted-foreground" />
                     <strong>Estado:</strong>
                      <div className="flex items-center gap-1">
-                        {(canEdit || isRequester || isAssignedToCurrentUser) ? (
+                        {(canEdit || isAssignedToCurrentUser) ? (
                             <Select value={ticket.status} onValueChange={(value) => handleUpdate('status', value)} disabled={isUpdating}>
                                 <SelectTrigger className="w-[150px] h-8 text-xs">
                                     <SelectValue placeholder="Cambiar estado" />
@@ -587,8 +616,8 @@ export default function TicketDetailPage() {
             </CardContent>
             {isRequester && ticket.status === 'Requiere Aprobación' && (
               <CardFooter className="gap-4">
-                <Button className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApproval(true)} disabled={isUpdating}><ThumbsUp /> Aprobar y Cerrar Ticket</Button>
-                <Button variant="destructive" className="w-full" onClick={() => handleApproval(false)} disabled={isUpdating}><ThumbsDown /> Rechazar Solución</Button>
+                <Button className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApproval(true)} disabled={isUpdating}><ThumbsUp className="mr-2" /> Aprobar y Cerrar Ticket</Button>
+                <Button variant="destructive" className="w-full" onClick={() => handleApproval(false)} disabled={isUpdating}><ThumbsDown className="mr-2" /> Rechazar Solución</Button>
               </CardFooter>
             )}
           </Card>
@@ -601,8 +630,7 @@ export default function TicketDetailPage() {
             <CardTitle className="font-headline text-lg flex items-center gap-2"><Users className="w-5 h-5" />Personal Asignado</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {isUpdating && <div className="flex justify-center"><Loader2 className="animate-spin" /></div>}
-            {!isUpdating && assignedPersonnelDetails.length > 0 ? (
+            {assignedPersonnelDetails.length > 0 ? (
                 assignedPersonnelDetails.map(person => (
                     <div key={person.id} className="flex items-center gap-4">
                         <Avatar className="h-12 w-12">
@@ -615,7 +643,7 @@ export default function TicketDetailPage() {
                     </div>
                 ))
             ) : (
-              !isUpdating && <div className='text-sm text-muted-foreground'>Sin asignar</div>
+              <div className='text-sm text-muted-foreground'>Sin asignar</div>
             )}
           </CardContent>
           {canEdit && (
@@ -678,9 +706,10 @@ export default function TicketDetailPage() {
                     </div>
                  </CardContent>
                  <CardFooter>
-                    <Button className="w-full" onClick={handleMarkAsResolved} disabled={isUpdating}>
+                    <Button className="w-full" onClick={handleProgressUpdate} disabled={isUpdating}>
                         {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Marcar como Resuelto y Enviar Evidencia
+                        <Send className="mr-2" />
+                        Enviar a Aprobación
                     </Button>
                  </CardFooter>
             </Card>
