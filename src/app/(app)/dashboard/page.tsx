@@ -396,7 +396,7 @@ export default function DashboardPage() {
                     <TableCell>
                         <Badge variant={ticket.priority === 'Urgente' ? 'destructive' : 'default'} className={ticket.priority === 'Alta' ? 'bg-orange-500 text-white' : ''}>{ticket.priority}</Badge>
                     </TableCell>
-                    <TableCell>{ticket.assignedTo?.join(', ') || 'Sin asignar'}</TableCell>
+                    <TableCell>{Array.isArray(ticket.assignedTo) ? ticket.assignedTo.join(', ') : 'Sin asignar'}</TableCell>
                     <TableCell className="text-right">
                         <ClientFormattedDate date={ticket.dueDate} options={{ day: 'numeric', month: 'numeric', year: 'numeric' }} />
                     </TableCell>
@@ -410,5 +410,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
