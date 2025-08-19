@@ -3,3 +3,4 @@ config();
 
 import '@/ai/flows/suggest-technician-assignment.ts';
 import '@/ai/flows/diagnose-firebase-connection.ts';
+import '@/ai/flows/analyze-dashboard-data.ts';

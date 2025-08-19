@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   CalendarPlus,
+  Sparkles,
 } from 'lucide-react';
 import {
   Card,
@@ -38,6 +39,22 @@ import type { ChartConfig } from '@/components/ui/chart';
 import { tickets } from '@/lib/data';
 import Link from 'next/link';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import {
+  analyzeDashboardData,
+  type AnalyzeDashboardInput,
+  type AnalyzeDashboardOutput,
+} from '@/ai/flows/analyze-dashboard-data';
+
 
 const slaComplianceData = [
   { status: 'en_tiempo', count: 85, fill: 'var(--color-en_tiempo)' },
@@ -92,19 +109,93 @@ const ticketsByZoneConfig = {
     },
 } satisfies ChartConfig;
 
+function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="font-headline flex items-center gap-2">
+                        <Sparkles className="text-primary" />
+                        Análisis del Dashboard
+                    </DialogTitle>
+                    <DialogDescription>
+                        El asistente de IA ha analizado los KPIs actuales de mantenimiento.
+                    </DialogDescription>
+                </DialogHeader>
+                {isLoading && (
+                    <div className="space-y-4 py-4">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-1/2" />
+                    </div>
+                )}
+                {analysis && (
+                    <div
+                        className="prose prose-sm prose-p:text-muted-foreground"
+                        dangerouslySetInnerHTML={{ __html: analysis.summary }}
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+
 export default function DashboardPage() {
   const openTickets = tickets.filter(
     (t) => t.status === 'Abierto' || t.status === 'Asignado' || t.status === 'En Progreso'
   );
   const overdueTickets = tickets.filter((t) => new Date(t.dueDate) < new Date() && t.status !== 'Resuelto' && t.status !== 'Cerrado');
+  const slaCompliance = 95; // Hardcoded for now
+  const mttrHours = 8.2; // Hardcoded for now
+
+  const [isAnalysisOpen, setAnalysisOpen] = React.useState(false);
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
+  const [analysisResult, setAnalysisResult] = React.useState<AnalyzeDashboardOutput | null>(null);
+  const { toast } = useToast();
+
+  const handleAnalysis = async () => {
+    setAnalysisOpen(true);
+    setIsLoadingAnalysis(true);
+    setAnalysisResult(null);
+
+    const input: AnalyzeDashboardInput = {
+        openTickets: openTickets.length,
+        overdueTickets: overdueTickets.length,
+        slaCompliance: slaCompliance,
+        averageResolutionTimeHours: mttrHours
+    };
+
+    try {
+        const result = await analyzeDashboardData(input);
+        setAnalysisResult(result);
+    } catch (error) {
+        console.error("Error getting AI analysis:", error);
+        toast({
+            variant: "destructive",
+            title: "Error de IA",
+            description: "No se pudo obtener el análisis del asistente de IA.",
+        });
+        setAnalysisOpen(false);
+    } finally {
+        setIsLoadingAnalysis(false);
+    }
+  }
+
 
   return (
     <div className="flex flex-col gap-4">
+      <AiAnalysisDialog open={isAnalysisOpen} onOpenChange={setAnalysisOpen} analysis={analysisResult} isLoading={isLoadingAnalysis} />
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-headline font-bold tracking-tight">
           Dashboard de Líder
         </h1>
         <div className="flex items-center gap-2">
+           <Button onClick={handleAnalysis} variant="outline">
+              <Sparkles className="mr-2 h-4 w-4" />
+              Analizar con IA
+            </Button>
           <Link href="/calendar">
             <Button variant="secondary">
               <CalendarPlus className="mr-2 h-4 w-4" />
@@ -141,7 +232,7 @@ export default function DashboardPage() {
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">95%</div>
+            <div className="text-2xl font-bold">{slaCompliance}%</div>
             <p className="text-xs text-muted-foreground">-1% desde el mes pasado</p>
           </CardContent>
         </Card>
@@ -151,7 +242,7 @@ export default function DashboardPage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8.2h</div>
+            <div className="text-2xl font-bold">{mttrHours}h</div>
             <p className="text-xs text-muted-foreground">Mejora de 0.5h</p>
           </CardContent>
         </Card>
