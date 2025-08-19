@@ -1,12 +1,16 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import {
   ChevronLeft,
   ChevronRight,
   Plus,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,8 +38,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { technicians, scheduleEvents, tickets as unassignedTicketsData } from '@/lib/data';
-import type { Technician, ScheduleEvent, Ticket } from '@/lib/types';
+import { technicians as allTechnicians, scheduleEvents, tickets as unassignedTicketsData } from '@/lib/data';
+import type { Technician, ScheduleEvent, Ticket, User } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
@@ -47,7 +51,7 @@ const weekDays = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes
 const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 
 const EventCard = ({ event }: { event: ScheduleEvent }) => {
-  const technician = technicians.find(t => t.id === event.technicianId);
+  const technician = allTechnicians.find(t => t.id === event.technicianId);
   const eventDate = new Date(event.start);
   
   const startHour = eventDate.getHours();
@@ -155,7 +159,32 @@ export default function CalendarPage() {
     const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
     const [isLoadingAi, setIsLoadingAi] = useState(false);
     const [aiSuggestion, setAiSuggestion] = useState<SuggestCalendarAssignmentOutput | null>(null);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [isLoadingUser, setIsLoadingUser] = useState(true);
     const { toast } = useToast();
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+            if (firebaseUser) {
+                try {
+                    const userDocRef = doc(db, 'users', firebaseUser.uid);
+                    const userDocSnap = await getDoc(userDocRef);
+                    if (userDocSnap.exists()) {
+                        setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
+                    }
+                } catch (error) {
+                     console.error("Error fetching user data:", error);
+                }
+            }
+            setIsLoadingUser(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const technicians = currentUser?.role === 'Servicios Generales' 
+        ? allTechnicians.filter(t => t.name === currentUser.name)
+        : allTechnicians;
 
     const handleDrop = async (technicianId: string, day: Date, time: string, draggedTicketId: string) => {
         const ticket = unassignedTickets.find(t => t.id === draggedTicketId);
@@ -236,6 +265,13 @@ export default function CalendarPage() {
         return acc;
     }, {} as Record<string, Record<string, ScheduleEvent[]>>);
 
+  if (isLoadingUser) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-80px)]">
@@ -288,7 +324,7 @@ export default function CalendarPage() {
                                 <SelectValue placeholder="Seleccionar personal" />
                             </SelectTrigger>
                             <SelectContent>
-                                {technicians.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                {allTechnicians.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
@@ -388,7 +424,7 @@ export default function CalendarPage() {
             </div>
             
             {/* Day columns */}
-            <div className="grid grid-cols-7 h-full">
+            <div className={`grid h-full`} style={{ gridTemplateColumns: `repeat(${technicians.length > 0 ? technicians.length : 1}, 1fr)`}}>
                  {weekDates.map((date) => (
                     <div key={date.toString()} className="border-r relative" onDragOver={e => e.preventDefault()}>
                          {hours.map((hour, hourIndex) => (
@@ -397,16 +433,18 @@ export default function CalendarPage() {
                                 className="h-16 border-b"
                                 onDrop={e => {
                                     e.preventDefault();
-                                    const techId = "tech-1"; // Simplified: in a real scenario, determine technician from column
                                     const ticketId = e.dataTransfer.getData('ticketId');
-                                    if (ticketId && technicians.length > 0) {
+                                    // Drop logic needs to determine which technician's sub-column it was dropped into.
+                                    // This is a simplified placeholder.
+                                    const techId = technicians.length > 0 ? technicians[0].id : ''; 
+                                    if (ticketId && techId) {
                                       handleDrop(techId, date, hour, ticketId);
                                     }
                                 }} 
                              />
                          ))}
                          {/* Events for this day */}
-                         <div className="absolute inset-0 grid grid-cols-3">
+                         <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${technicians.length}, 1fr)`}}>
                              {technicians.map(tech => (
                                 <div key={tech.id} className="relative border-r last:border-r-0">
                                     {(eventsByTechnicianAndDay[tech.id]?.[date.toDateString()] || []).map(event => (
