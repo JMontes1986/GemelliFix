@@ -96,7 +96,7 @@ const getStatusBadgeClassName = (status: Ticket['status']) => {
 const currentUser = users[0];
 
 export default function TicketDetailPage({ params }: { params: { id: string } }) {
-  const ticketId = params.id;
+  const { id: ticketId } = params;
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -505,4 +505,5 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
       </div>
     </div>
   );
-}
+
+    
