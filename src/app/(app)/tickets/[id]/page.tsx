@@ -33,10 +33,12 @@ import {
   ThumbsDown,
   Briefcase,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import type { Ticket, Technician } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AiSuggestion from './components/ai-suggestion';
+import AiStateSuggestion from './components/ai-state-suggestion';
 import Image from 'next/image';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -279,23 +281,26 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 <div className="flex items-center gap-2">
                     <Tag className="w-4 h-4 text-muted-foreground" />
                     <strong>Estado:</strong>
-                    {canEdit || isRequester ? (
-                        <Select value={ticket.status} onValueChange={(value) => handleUpdate('status', value)} disabled={isUpdating}>
-                            <SelectTrigger className="w-[180px] h-8 text-xs">
-                                <SelectValue placeholder="Cambiar estado" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Abierto">Abierto</SelectItem>
-                                <SelectItem value="Asignado">Asignado</SelectItem>
-                                <SelectItem value="En Progreso">En Progreso</SelectItem>
-                                {isRequester && <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>}
-                                <SelectItem value="Resuelto">Resuelto</SelectItem>
-                                <SelectItem value="Cerrado">Cerrado</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    ) : (
-                         <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
-                    )}
+                     <div className="flex items-center gap-1">
+                        {(canEdit || isRequester) ? (
+                            <Select value={ticket.status} onValueChange={(value) => handleUpdate('status', value)} disabled={isUpdating}>
+                                <SelectTrigger className="w-[150px] h-8 text-xs">
+                                    <SelectValue placeholder="Cambiar estado" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Abierto">Abierto</SelectItem>
+                                    <SelectItem value="Asignado">Asignado</SelectItem>
+                                    <SelectItem value="En Progreso">En Progreso</SelectItem>
+                                    {isRequester && <SelectItem value="Requiere Aprobación">Requiere Aprobación</SelectItem>}
+                                    <SelectItem value="Resuelto">Resuelto</SelectItem>
+                                    <SelectItem value="Cerrado">Cerrado</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        ) : (
+                             <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
+                        )}
+                         {canEdit && <AiStateSuggestion ticket={ticket} onStatusChange={(newStatus) => handleUpdate('status', newStatus)} />}
+                    </div>
                    
                 </div>
                 <div className="flex items-center gap-2">
