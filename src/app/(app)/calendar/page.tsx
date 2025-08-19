@@ -46,7 +46,7 @@ import { suggestCalendarAssignment, type SuggestCalendarAssignmentInput, type Su
 import { Skeleton } from '@/components/ui/skeleton';
 
 
-const weekDays = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 
 const generateColorFromString = (str: string): string => {
@@ -55,7 +55,7 @@ const generateColorFromString = (str: string): string => {
         hash = str.charCodeAt(i) + ((hash << 7) - hash);
         hash = hash & hash;
     }
-    const h = hash % 360;
+    const h = (hash ^ (hash >> 10)) % 360;
     return `hsl(${h}, 60%, 70%)`;
 };
 
@@ -431,9 +431,12 @@ export default function CalendarPage() {
         }
     };
     
+    const dayOfWeek = currentDate.getDay();
     const startOfWeek = new Date(currentDate);
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-    const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const dayOffset = (dayOfWeek === 0) ? -6 : 1 - dayOfWeek;
+    startOfWeek.setDate(startOfWeek.getDate() + dayOffset);
+
+    const weekDates = Array.from({ length: 5 }, (_, i) => {
         const date = new Date(startOfWeek);
         date.setDate(date.getDate() + i);
         return date;
@@ -470,7 +473,7 @@ export default function CalendarPage() {
             Calendario Operativo
           </h1>
           <p className="text-muted-foreground">
-            Semana del {startOfWeek.getDate()} al {weekDates[6].getDate()} de {startOfWeek.toLocaleString('es-CO', { month: 'long' })}, {startOfWeek.getFullYear()}
+            Semana del {startOfWeek.getDate()} de {startOfWeek.toLocaleString('es-CO', { month: 'long' })} al {weekDates[4].getDate()} de {weekDates[4].toLocaleString('es-CO', { month: 'long' })}, {startOfWeek.getFullYear()}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -604,7 +607,7 @@ export default function CalendarPage() {
                 <div key={date.toISOString()} className={cn("relative", dayIndex < weekDates.length - 1 && 'border-r')}>
                   {/* Day Header */}
                    <div className="h-8 border-b text-center text-sm font-medium sticky top-0 bg-background z-20">
-                     {weekDays[date.getDay()]} {date.getDate()}
+                     {weekDays[date.getDay() - 1]} {date.getDate()}
                    </div>
                   
                   {/* Background Hour Lines */}
