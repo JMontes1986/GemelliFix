@@ -393,9 +393,13 @@ export default function TicketsPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                <DropdownMenuItem asChild><Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link></DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>Asignar</Link></DropdownMenuItem>
-                                </DropdownMenuContent>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>
+                                  Asignar
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
                             </DropdownMenu>
                             </TableCell>
                         </TableRow>
@@ -411,3 +415,5 @@ export default function TicketsPage() {
     </Tabs>
   );
 }
+
+    
