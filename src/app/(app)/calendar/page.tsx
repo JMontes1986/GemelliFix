@@ -197,6 +197,17 @@ export default function CalendarPage() {
     const { toast } = useToast();
     const [allTechnicians, setAllTechnicians] = useState<User[]>([]);
 
+    // State for manual event creation dialog
+    const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
+    const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+    const [newEventTitle, setNewEventTitle] = useState('');
+    const [newEventTechnicianId, setNewEventTechnicianId] = useState('');
+    const [newEventType, setNewEventType] = useState<ScheduleEvent['type']>('task');
+    const [newEventDate, setNewEventDate] = useState('');
+    const [newEventStartTime, setNewEventStartTime] = useState('');
+    const [newEventEndTime, setNewEventEndTime] = useState('');
+
+
      useEffect(() => {
         const fetchTechnicians = async () => {
             const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
@@ -301,7 +312,10 @@ export default function CalendarPage() {
             await addDoc(collection(db, "scheduleEvents"), newEvent);
             setUnassignedTickets(prev => prev.filter(t => t.id !== ticket.id));
             
-            await createCalendarNotification(technician.name, newEvent);
+            const tech = allTechnicians.find(t => t.id === technician.id);
+            if (tech) {
+              await createCalendarNotification(tech.name, newEvent);
+            }
 
             toast({
                 title: '¡Evento Programado!',
@@ -313,6 +327,52 @@ export default function CalendarPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el evento en el calendario.' });
         } finally {
             setIsAiDialogOpen(false);
+        }
+    };
+
+    const handleCreateEvent = async () => {
+        if (!newEventTitle || !newEventTechnicianId || !newEventDate || !newEventStartTime || !newEventEndTime) {
+            toast({ variant: 'destructive', title: 'Campos requeridos', description: 'Por favor, completa todos los campos para crear el evento.' });
+            return;
+        }
+
+        setIsCreatingEvent(true);
+        try {
+            const startDateTime = new Date(`${newEventDate}T${newEventStartTime}`);
+            const endDateTime = new Date(`${newEventDate}T${newEventEndTime}`);
+
+            const newEvent: Omit<ScheduleEvent, 'id'> = {
+                title: newEventTitle,
+                description: `Tarea: ${newEventTitle}`,
+                start: startDateTime.toISOString(),
+                end: endDateTime.toISOString(),
+                type: newEventType,
+                technicianId: newEventTechnicianId,
+            };
+
+            await addDoc(collection(db, 'scheduleEvents'), newEvent);
+            
+            const tech = allTechnicians.find(t => t.id === newEventTechnicianId);
+            if (tech) {
+                await createCalendarNotification(tech.name, newEvent);
+            }
+
+            toast({ title: '¡Evento Creado!', description: 'La nueva tarea ha sido añadida al calendario.' });
+
+            // Reset form and close dialog
+            setIsManualDialogOpen(false);
+            setNewEventTitle('');
+            setNewEventTechnicianId('');
+            setNewEventType('task');
+            setNewEventDate('');
+            setNewEventStartTime('');
+            setNewEventEndTime('');
+
+        } catch (error) {
+            console.error("Error creating manual event:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el evento.' });
+        } finally {
+            setIsCreatingEvent(false);
         }
     };
     
@@ -369,7 +429,7 @@ export default function CalendarPage() {
           <Button variant="outline" size="icon">
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Dialog>
+          <Dialog open={isManualDialogOpen} onOpenChange={setIsManualDialogOpen}>
             <DialogTrigger asChild>
                 <Button>
                     <Plus className="mr-2 h-4 w-4" />
@@ -386,11 +446,11 @@ export default function CalendarPage() {
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="title" className="text-right">Título</Label>
-                        <Input id="title" placeholder="Ej: Turno de mañana" className="col-span-3" />
+                        <Input id="title" placeholder="Ej: Turno de mañana" className="col-span-3" value={newEventTitle} onChange={(e) => setNewEventTitle(e.target.value)} />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="technician" className="text-right">Personal</Label>
-                        <Select>
+                        <Select onValueChange={setNewEventTechnicianId} value={newEventTechnicianId}>
                             <SelectTrigger className="col-span-3">
                                 <SelectValue placeholder="Seleccionar personal" />
                             </SelectTrigger>
@@ -401,7 +461,7 @@ export default function CalendarPage() {
                     </div>
                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="type" className="text-right">Tipo</Label>
-                        <Select>
+                        <Select onValueChange={(v) => setNewEventType(v as ScheduleEvent['type'])} value={newEventType}>
                             <SelectTrigger className="col-span-3">
                                 <SelectValue placeholder="Seleccionar tipo" />
                             </SelectTrigger>
@@ -414,18 +474,21 @@ export default function CalendarPage() {
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right">Fecha</Label>
-                         <Input id="date" type="date" className="col-span-3" />
+                         <Input id="date" type="date" className="col-span-3" value={newEventDate} onChange={(e) => setNewEventDate(e.target.value)} />
                     </div>
                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right">Hora</Label>
                         <div className="col-span-3 grid grid-cols-2 gap-2">
-                             <Input id="start_time" type="time" />
-                             <Input id="end_time" type="time" />
+                             <Input id="start_time" type="time" value={newEventStartTime} onChange={(e) => setNewEventStartTime(e.target.value)} />
+                             <Input id="end_time" type="time" value={newEventEndTime} onChange={(e) => setNewEventEndTime(e.target.value)} />
                         </div>
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button type="submit">Guardar Programación</Button>
+                    <Button onClick={handleCreateEvent} disabled={isCreatingEvent}>
+                        {isCreatingEvent && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Guardar Programación
+                    </Button>
                 </DialogFooter>
             </DialogContent>
           </Dialog>
