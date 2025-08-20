@@ -26,6 +26,8 @@ const SuggestCalendarAssignmentInputSchema = z.object({
     title: z.string(),
     description: z.string(),
     category: z.string(),
+    priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
+    createdAt: z.string().describe("The ticket's creation date in ISO 8601 format."),
   }).describe('The ticket that needs to be scheduled.'),
   targetDate: z.string().describe('The ISO 8601 string of the desired date and time for the assignment.'),
   targetTechnicianId: z.string().describe('The ID of the technician the user wants to assign the ticket to.'),
@@ -44,37 +46,66 @@ const SuggestCalendarAssignmentOutputSchema = z.object({
         name: z.string(),
     }),
     suggestedTime: z.string().describe("The suggested start time for the assignment in ISO 8601 format."),
-    reason: z.string().describe("A clear and concise explanation for the suggestion, explaining why the chosen technician and time are optimal."),
+    reason: z.string().describe("A clear and concise explanation for the suggestion, explaining why the chosen technician and time are optimal. Mention any SLA risks if applicable."),
 });
 export type SuggestCalendarAssignmentOutput = z.infer<typeof SuggestCalendarAssignmentOutputSchema>;
 
 // Define the tool to get technician data
 const techniciansTool = ai.defineTool(
     {
-        name: 'getTechnicianList',
-        description: 'Returns the list of available technicians with their skills and current workload.',
+        name: 'getTechnicianData',
+        description: 'Returns the list of available technicians (role: "Servicios Generales"), their skills, current weekly workload, and their existing calendar events for a given date range.',
+        inputSchema: z.object({
+            startDate: z.string().describe("The start of the date range to check for events, in ISO format."),
+            endDate: z.string().describe("The end of the date range to check for events, in ISO format."),
+        }),
         outputSchema: z.array(z.object({
             id: z.string(),
             name: z.string(),
-            skills: z.array(z.string()).describe('A list of skills the technician has. This is a placeholder for now.'),
-            workload: z.number().describe('The current workload percentage of the technician. This is a placeholder for now.'),
+            skills: z.array(z.string()),
+            workload: z.number().describe('The current workload percentage for the week.'),
+            events: z.array(z.object({
+                start: z.string().describe("Event start time in ISO format."),
+                end: z.string().describe("Event end time in ISO format."),
+            })).describe("The technician's scheduled events for the specified range."),
         })),
     },
-    async () => {
-        const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-        const querySnapshot = await getDocs(q);
-        const technicians = querySnapshot.docs.map(doc => {
-            const data = doc.data() as User;
+    async ({startDate, endDate}) => {
+        // 1. Get all technicians with role "Servicios Generales"
+        const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        const techSnapshot = await getDocs(techQuery);
+        const technicians = techSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+
+        // 2. For each technician, get their events in the date range
+        const technicianData = await Promise.all(technicians.map(async (tech) => {
+            const eventsQuery = query(
+                collection(db, 'scheduleEvents'),
+                where('technicianId', '==', tech.id),
+                where('start', '>=', new Date(startDate)),
+                where('end', '<=', new Date(endDate))
+            );
+            const eventsSnapshot = await getDocs(eventsQuery);
+            const events = eventsSnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    start: (data.start.toDate() as Date).toISOString(),
+                    end: (data.end.toDate() as Date).toISOString(),
+                };
+            });
+
             return {
-                id: data.id,
-                name: data.name,
-                skills: ['General', data.role], // Placeholder skills
+                id: tech.id,
+                name: tech.name,
+                skills: ['General', 'Electricidad', 'Fontanería', 'Sistemas'], // Placeholder skills
                 workload: Math.floor(Math.random() * 80) + 10, // Placeholder workload
+                events,
             };
-        });
-        return technicians;
+        }));
+        
+        return technicianData;
     }
 );
+
 
 // Define the main exported function
 export async function suggestCalendarAssignment(input: SuggestCalendarAssignmentInput): Promise<SuggestCalendarAssignmentOutput> {
@@ -87,36 +118,57 @@ const prompt = ai.definePrompt({
   input: {schema: SuggestCalendarAssignmentInputSchema},
   output: {schema: SuggestCalendarAssignmentOutputSchema},
   tools: [techniciansTool],
-  prompt: `You are an expert dispatcher for a maintenance company.
-Your goal is to find the best possible assignment for a new ticket on the calendar.
+  prompt: `
+Rol: Eres el Asistente de Programación de GemelliFix. Tu responsabilidad es proponer y/o confirmar la mejor franja horaria y el técnico adecuado para tareas y actividades del personal de Servicios Generales, maximizando cumplimiento de SLA, evitando choques y equilibrando la carga.
+Idioma de salida: Español (Colombia).
+Zona horaria: America/Bogota.
+Ventana operativa estándar: 08:00–20:00 (extender solo si lo solicita el Líder o si la prioridad lo exige).
+Fecha y hora actuales: ${new Date().toISOString()}
 
-A user has dragged a ticket onto the calendar, indicating a desired technician and time.
-Analyze this request and provide the best recommendation.
+Objetivos (en orden)
+1. Cumplir SLA por prioridad: Urgente 12h, Alta 24h, Media 36h, Baja 48h (desde ticket.createdAt).
+2. Evitar choques de agenda (no superponer eventos del mismo técnico).
+3. Balancear carga entre técnicos disponibles (distribuir horas totales en la semana).
+4. Respetar restricciones: zonas, habilidades/categoría, disponibilidad, duración mínima realista.
+5. Ofrecer explicación breve y accionable (por qué esa propuesta, alternativas si aplica).
 
-**User's Request:**
-- **Ticket to Assign:** "{{ticket.title}}" (Category: {{ticket.category}})
-- **Desired Technician ID:** {{targetTechnicianId}}
-- **Desired Time:** {{targetDate}}
+Reglas de negocio y criterios
+- Tipos: shift (turno), task (tarea), ticket (derivada de solicitud).
+- Duración sugerida por defecto para un ticket: 120 min. Ajusta por categoría si es lógico (p.ej., Electricidad 90–180, Aseo puntual 60–120).
+- SLA: Si la hora propuesta (targetDate) excede el SLA, recomienda una alternativa que cumpla; si es imposible, explica la razón, ofrece la mejor hora disponible y márcalo como “riesgo SLA”.
+- Conflictos: No programes si el técnico ya tiene un evento solapado. En su lugar, busca la franja libre más cercana o sugiere otro técnico con menos carga y habilidades compatibles.
+- No inventes datos. Si falta información, propón la mejor suposición razonable y decláralo.
 
-**Your Task:**
-1.  **Use the \`getTechnicianList\` tool** to get data on all available technicians, including their skills and current workload.
-2.  **Analyze the Target Technician:**
-    - Does the desired technician (ID: {{targetTechnicianId}}) have the right skills for the ticket's category ("{{ticket.category}}")?
-    - How does their workload compare to others?
-3.  **Find the Optimal Technician:**
-    - Identify the technician who is the best fit. This is the technician with the **required skills** and the **lowest workload**.
-4.  **Compare and Decide:**
-    - **If the user's chosen technician IS the optimal choice:** Congratulate them on a good choice. Confirm their selected time is good (assuming it is, for now).
-    - **If there is a BETTER technician available (better skills or much lower workload):** Politely suggest assigning the ticket to the better technician instead. Explain *why* they are a better fit (e.g., "Carlos Gomez has expertise in 'Electricidad' and has a lower workload.").
-5.  **Format the Output:**
-    - Populate the output fields with the ticket ID, the ID and name of the **best** technician, the suggested time (use the user's target time for this version), and a clear reason for your choice.
-    - The reason should be helpful and justify your final recommendation.
+**Petición del Usuario:**
+- Ticket a asignar: "{{ticket.title}}" (Categoría: {{ticket.category}}, Prioridad: {{ticket.priority}}, Creado: {{ticket.createdAt}})
+- Técnico deseado: ID {{targetTechnicianId}}
+- Hora deseada: {{targetDate}}
 
-Example Reason (if suggesting a change): "While Lucia is a great choice, Pedro Ramirez specializes in 'Sistemas' and has a lower workload (40%), making him a better fit for this task. I recommend assigning it to him at the same time."
+**Tu Tarea (paso a paso):**
+1. Calcula la fecha límite del SLA para este ticket.
+   - Urgente: createdAt + 12 horas
+   - Alta: createdAt + 24 horas
+   - Media: createdAt + 36 horas
+   - Baja: createdAt + 48 horas
+2. Estima la duración de la tarea. Por defecto, 120 minutos.
+3. Usa la herramienta \`getTechnicianData\` para obtener la lista completa de técnicos, su carga y sus eventos para la semana de la fecha objetivo (targetDate).
+4. Analiza la propuesta del usuario:
+   a. ¿La \`targetDate\` cumple con el SLA?
+   b. ¿El técnico \`targetTechnicianId\` está libre en esa franja horaria (targetDate a targetDate + duración)?
+   c. ¿El técnico tiene las habilidades para la categoría "{{ticket.category}}"? (Asume que todos pueden por ahora, pero prioriza si hubiera datos de habilidades).
+5. Encuentra la mejor opción:
+   a. Filtra los técnicos que no tengan conflictos de horario en la \`targetDate\`.
+   b. De los disponibles, ordena por menor carga de trabajo (\`workload\`). El de menor carga es el candidato ideal.
+6. Formula tu respuesta:
+   a. **Si la elección del usuario (targetTechnicianId) es la ideal (o casi ideal) y cumple SLA y no tiene conflictos:** Confirma su elección. Razón: "Carlos es una excelente opción, tiene la disponibilidad y capacidad para esta tarea. La hora sugerida cumple con el SLA."
+   b. **Si la elección del usuario tiene un conflicto de horario O excede el SLA:** Rechaza su propuesta amablemente. Busca el próximo espacio libre para ESE MISMO técnico que cumpla el SLA y sugiérelo. Razón: "Carlos ya tiene una tarea programada a esa hora. Te sugiero asignársela a las 14:00, que es su próximo espacio libre y aún cumple con el SLA."
+   c. **Si hay un técnico MUCHO MEJOR (carga significativamente menor) O el técnico del usuario no está disponible pronto:** Sugiere el técnico alternativo. Razón: "Aunque Carlos es una buena opción, está bastante ocupado. Sugiero asignar esta tarea a Pedro, quien tiene una carga de trabajo menor (30%) y está disponible a la misma hora."
+   d. **Si la \`targetDate\` está fuera del SLA:** Alerta sobre el riesgo. Razón: "¡Atención! La hora propuesta excede el tiempo de respuesta para un ticket de prioridad {{ticket.priority}}. Para cumplir el SLA, sugiero asignarlo a [Técnico Ideal] a más tardar a las [Hora Límite SLA]."
 
-Example Reason (if confirming): "Carlos Gomez is an excellent choice for this plumbing ticket as he has the right skills and available capacity. The suggested time works well with his schedule."
+Finalmente, completa el objeto de salida con tu recomendación final.
 `,
 });
+
 
 // Define the Genkit flow
 const suggestCalendarAssignmentFlow = ai.defineFlow(
@@ -145,3 +197,5 @@ const suggestCalendarAssignmentFlow = ai.defineFlow(
     return finalSuggestion;
   }
 );
+
+    

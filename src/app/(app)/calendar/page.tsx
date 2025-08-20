@@ -121,6 +121,8 @@ const UnassignedTicketCard = ({ ticket }: { ticket: Ticket }) => (
         e.dataTransfer.setData("ticketTitle", ticket.title);
         e.dataTransfer.setData("ticketDescription", ticket.description);
         e.dataTransfer.setData("ticketCategory", ticket.category);
+        e.dataTransfer.setData("ticketPriority", ticket.priority);
+        e.dataTransfer.setData("ticketCreatedAt", ticket.createdAt);
       }}
     >
       <p className="font-semibold text-sm">{ticket.code}</p>
@@ -319,7 +321,14 @@ export default function CalendarPage() {
         
         const ticketsQuery = query(collection(db, 'tickets'), where('status', 'in', ['Abierto', 'Asignado']));
         const unsubscribeTickets = onSnapshot(ticketsQuery, (snapshot) => {
-            const ticketsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as Ticket));
+            const ticketsData = snapshot.docs.map(doc => {
+                 const data = doc.data();
+                 return { 
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
+                } as Ticket
+            });
             setUnassignedTickets(ticketsData.filter(t => !t.assignedToIds || t.assignedToIds.length === 0));
         });
 
@@ -379,6 +388,8 @@ export default function CalendarPage() {
         const ticketTitle = e.dataTransfer.getData("ticketTitle");
         const ticketDescription = e.dataTransfer.getData("ticketDescription");
         const ticketCategory = e.dataTransfer.getData("ticketCategory");
+        const ticketPriority = e.dataTransfer.getData("ticketPriority") as Ticket['priority'];
+        const ticketCreatedAt = e.dataTransfer.getData("ticketCreatedAt");
         
         if (!ticketId) return;
 
@@ -390,7 +401,14 @@ export default function CalendarPage() {
         setAiSuggestion(null);
 
         const input: SuggestCalendarAssignmentInput = {
-            ticket: { id: ticketId, title: ticketTitle, description: ticketDescription, category: ticketCategory },
+            ticket: { 
+                id: ticketId, 
+                title: ticketTitle, 
+                description: ticketDescription, 
+                category: ticketCategory,
+                priority: ticketPriority,
+                createdAt: ticketCreatedAt
+            },
             targetDate: targetDate.toISOString(),
             targetTechnicianId: technicianId,
         };
@@ -428,7 +446,11 @@ export default function CalendarPage() {
         };
         
         try {
-            await addDoc(collection(db, "scheduleEvents"), newEvent);
+            await addDoc(collection(db, "scheduleEvents"), {
+                ...newEvent,
+                start: Timestamp.fromDate(newEvent.start),
+                end: Timestamp.fromDate(newEvent.end)
+            });
             
             const ticketRef = doc(db, "tickets", ticket.id);
             await updateDoc(ticketRef, {
@@ -492,7 +514,11 @@ export default function CalendarPage() {
                 technicianId: newEventTechnicianId,
             };
 
-            await addDoc(collection(db, 'scheduleEvents'), newEvent);
+            await addDoc(collection(db, 'scheduleEvents'), {
+                ...newEvent,
+                start: Timestamp.fromDate(newEvent.start),
+                end: Timestamp.fromDate(newEvent.end)
+            });
             
             const tech = allTechnicians.find(t => t.id === newEventTechnicianId);
             if (tech) {
@@ -757,3 +783,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
