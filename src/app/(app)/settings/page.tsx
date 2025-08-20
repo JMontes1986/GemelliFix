@@ -586,7 +586,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="locations">Zonas y Sitios</TabsTrigger>
           <TabsTrigger value="categories">Categorías</TabsTrigger>
