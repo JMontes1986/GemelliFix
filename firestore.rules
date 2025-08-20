@@ -1,71 +1,91 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Reglas para la colección 'users'
-    match /users/{userId} {
-      // Los administradores tienen acceso total a todos los perfiles de usuario.
+  
+    // =================================================================
+    // REGLA GLOBAL PARA ADMINISTRADORES
+    // Otorga acceso total de lectura y escritura a cualquier usuario
+    // cuyo token de autenticación tenga el claim 'admin' = true.
+    // Esto es fundamental para que el dashboard y las vistas de gestión
+    // funcionen correctamente.
+    // =================================================================
+    match /{document=**} {
       allow read, write: if request.auth.token.admin == true;
-      
-      // Los usuarios no administradores solo pueden leer y actualizar su propio perfil.
+    }
+
+    // =================================================================
+    // COLECCIÓN DE USUARIOS (users)
+    // =================================================================
+    match /users/{userId} {
+      // Un usuario puede leer y actualizar su propio perfil.
       allow read, update: if request.auth.uid == userId;
+      // Los administradores (definidos por el claim 'admin') pueden crear y eliminar usuarios.
+      allow create, delete: if request.auth.token.admin == true;
     }
 
-    // Reglas para la colección 'tickets'
+    // =================================================================
+    // COLECCIÓN DE TICKETS (tickets)
+    // =================================================================
     match /tickets/{ticketId} {
-      // Cualquier usuario autenticado puede crear un ticket.
+      // Cualquiera autenticado puede crear un ticket.
       allow create: if request.auth != null;
+      
+      // Los administradores pueden leer y escribir en cualquier ticket.
+      allow read, write: if request.auth.token.admin == true;
 
-      // Los administradores pueden leer y actualizar cualquier ticket.
-      // Los usuarios asignados (Servicios Generales) pueden leer y actualizar el ticket.
-      // El usuario que creó el ticket puede leerlo.
-      allow read, update: if request.auth.token.admin == true || request.auth.uid in resource.data.assignedToIds || request.auth.uid == resource.data.requesterId;
-    }
-
-    // Reglas para la colección de logs del sistema
-    match /logs/{logId} {
-      // Solo los administradores pueden leer los logs.
-      allow read: if request.auth.token.admin == true;
-      // Nadie puede modificar o eliminar logs, pero el sistema puede crearlos.
-      // La creación se maneja desde el backend (Cloud Functions o server-side logic).
-      allow write: if false; 
-      allow create: if true; // Permitir la creación desde el backend
+      // El solicitante puede leer su propio ticket.
+      allow read: if request.auth.uid == resource.data.requesterId;
+      
+      // El técnico asignado puede leer y actualizar el ticket.
+      allow read, update: if request.auth.uid in resource.data.assignedToIds;
     }
     
-    // Reglas para las notificaciones
-    match /notifications/{notificationId} {
-      // Un usuario solo puede leer o actualizar (marcar como leída) sus propias notificaciones.
-      allow read, update: if request.auth != null && resource.data.userId == request.auth.uid;
-      // La creación de notificaciones se maneja desde el backend.
-      allow create: if true;
-    }
-
-    // Reglas para el calendario de eventos
+    // =================================================================
+    // COLECCIÓN DE EVENTOS DEL CALENDARIO (scheduleEvents)
+    // =================================================================
     match /scheduleEvents/{eventId} {
-      // Cualquier usuario autenticado puede leer los eventos para ver el calendario.
+       // Cualquiera autenticado puede leer eventos para visualizarlos en el calendario.
       allow read: if request.auth != null;
       // Solo los administradores pueden crear, actualizar o eliminar eventos.
       allow write: if request.auth.token.admin == true;
     }
 
-    // Reglas para colecciones de configuración (zonas, sitios, etc.)
+    // =================================================================
+    // COLECCIÓN DE NOTIFICACIONES (notifications)
+    // =================================================================
+    match /notifications/{notificationId} {
+      // Un usuario puede leer o actualizar (marcar como leída) sus propias notificaciones.
+      allow read, update: if request.auth.uid == resource.data.userId;
+      // Nadie más puede acceder a las notificaciones de otros.
+    }
+    
+    // =================================================================
+    // COLECCIÓN DE ZONAS Y SITIOS (zones, sites)
+    // =================================================================
     match /zones/{zoneId} {
-        // Solo los administradores pueden gestionar las zonas.
-        allow read, write: if request.auth.token.admin == true;
+        allow read: if request.auth != null;
+        allow write: if request.auth.token.admin == true;
+    }
+    
+    match /sites/{siteId} {
+       allow read: if request.auth != null;
+       allow write: if request.auth.token.admin == true;
     }
 
-     match /sites/{siteId} {
-        // Solo los administradores pueden gestionar los sitios.
-        allow read, write: if request.auth.token.admin == true;
-    }
-
-    // Reglas para logs de diagnóstico (solo para pruebas)
+    // =================================================================
+    // COLECCIÓN DE LOGS DE DIAGNÓSTICO Y AUDITORÍA (diagnosis_logs, logs)
+    // =================================================================
     match /diagnosis_logs/{logId} {
-        // Permite a cualquier usuario autenticado escribir para las pruebas de diagnóstico.
-        allow write: if request.auth != null;
+      // Cualquiera autenticado puede crear un log de diagnóstico.
+      allow create: if request.auth != null;
     }
-
+    
+    match /logs/{logId} {
+       // Los logs solo pueden ser leídos por administradores.
+       allow read: if request.auth.token.admin == true;
+       // La creación de logs se gestiona desde el backend (funciones), no se permite desde el cliente.
+       allow write: if false;
+    }
   }
 }
