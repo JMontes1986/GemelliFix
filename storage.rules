@@ -1,22 +1,32 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Reglas para los avatares de usuario
-    match /avatars/{userId}/{allPaths=**} {
-      // Permite la lectura a cualquiera para poder ver las fotos de perfil
+    
+    // Regla de lectura global (opcional, si quieres que los archivos sean públicos)
+    // Si quieres que solo usuarios autenticados lean, muévela dentro de `match /avatars...`
+    match /{allPaths=**} {
       allow read;
-      
-      // Permite la escritura (subir, actualizar, borrar) solo si el
-      // usuario autenticado es el dueño de esa carpeta de avatar.
-      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Regla general para otros archivos (si los hubiera en el futuro)
-    // Por defecto, se deniega el acceso a menos que se especifique lo contrario.
-    match /{allPaths=**} {
-      allow read: if false; // Denegar lectura por defecto
-      allow write: if false; // Denegar escritura por defecto
+    // Reglas para los avatares de los usuarios
+    // Permite que un usuario lea y escriba solo en su propia carpeta de avatar.
+    match /avatars/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Reglas para los adjuntos de tickets
+    // Permite a cualquier usuario autenticado subir adjuntos.
+    // La lectura debe estar restringida por rol en tu lógica de aplicación (URL seguras).
+    match /ticket-attachments/{ticketId}/{allPaths=**} {
+        allow write: if request.auth != null;
+    }
+    
+    // Reglas para la evidencia de los tickets
+    // Permite a cualquier usuario autenticado subir evidencia.
+    match /ticket-evidence/{ticketId}/{allPaths=**} {
+        allow write: if request.auth != null;
     }
   }
 }

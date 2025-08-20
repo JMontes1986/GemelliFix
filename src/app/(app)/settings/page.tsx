@@ -107,20 +107,6 @@ export default function SettingsPage() {
 
 
     React.useEffect(() => {
-        const q = query(collection(db, 'users'), orderBy('name'));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const fetchedUsers: User[] = [];
-            querySnapshot.forEach((doc) => {
-                fetchedUsers.push({ id: doc.id, ...doc.data() } as User);
-            });
-            setAllUsers(fetchedUsers);
-            setIsLoadingUsers(false);
-        }, (error) => {
-            console.error("Error fetching users:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los usuarios.' });
-            setIsLoadingUsers(false);
-        });
-
         const qZones = query(collection(db, 'zones'), orderBy('name'));
         const unsubZones = onSnapshot(qZones, (snapshot) => {
             const fetchedZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
@@ -134,10 +120,24 @@ export default function SettingsPage() {
             setSites(fetchedSites);
         });
 
+        const qUsers = query(collection(db, 'users'), orderBy('name'));
+        const unsubUsers = onSnapshot(qUsers, (querySnapshot) => {
+            const fetchedUsers: User[] = [];
+            querySnapshot.forEach((doc) => {
+                fetchedUsers.push({ id: doc.id, ...doc.data() } as User);
+            });
+            setAllUsers(fetchedUsers);
+            setIsLoadingUsers(false);
+        }, (error) => {
+            console.error("Error fetching users:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los usuarios. Es posible que falte un índice en Firestore.' });
+            setIsLoadingUsers(false);
+        });
+
         return () => {
-            unsubscribe();
             unsubZones();
             unsubSites();
+            unsubUsers();
         };
     }, [toast]);
     
