@@ -173,7 +173,7 @@ export default function NotificationsPage() {
                         </div>
                         <div className="grid gap-1 flex-1">
                         <Link href={notification.linkTo || '#'} passHref>
-                          <a className="font-semibold hover:underline">{notification.title}</a>
+                          <div className="font-semibold hover:underline">{notification.title}</div>
                         </Link>
                         <p className="text-sm text-muted-foreground">
                             {notification.description}
