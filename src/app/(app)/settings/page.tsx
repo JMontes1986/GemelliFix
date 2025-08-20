@@ -124,13 +124,12 @@ export default function SettingsPage() {
             setIsLoadingUsers(false);
         });
 
-        const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'), orderBy('name'));
         const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
             const fetchedTechnicians: User[] = [];
             querySnapshot.forEach((doc) => {
                 fetchedTechnicians.push({ id: doc.id, ...doc.data() } as User);
             });
-            fetchedTechnicians.sort((a, b) => a.name.localeCompare(b.name));
             setTechnicians(fetchedTechnicians);
             setIsLoadingTechnicians(false);
         }, (error) => {
