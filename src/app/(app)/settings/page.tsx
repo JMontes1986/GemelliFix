@@ -41,8 +41,9 @@ import { PlusCircle, Loader2 } from 'lucide-react';
 import { categories } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { collection, onSnapshot, doc, updateDoc, query, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, onSnapshot, doc, updateDoc, query, where, orderBy, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import type { User, Zone, Site } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import LogsPage from './logs/page';
@@ -82,6 +83,10 @@ export default function SettingsPage() {
     const [isNewSiteDialogOpen, setIsNewSiteDialogOpen] = React.useState(false);
     const [newSiteName, setNewSiteName] = React.useState('');
     const [newSiteZoneId, setNewSiteZoneId] = React.useState('');
+    
+    // State for creating new user
+    const [isNewUserDialogOpen, setIsNewUserDialogOpen] = React.useState(false);
+    const [newUserForm, setNewUserForm] = React.useState({ name: '', email: '', password: '', role: '' as User['role'] | '' });
 
 
     // State for system settings
@@ -100,7 +105,7 @@ export default function SettingsPage() {
 
 
     React.useEffect(() => {
-        const q = collection(db, 'users');
+        const q = query(collection(db, 'users'), orderBy('name'));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const fetchedUsers: User[] = [];
             querySnapshot.forEach((doc) => {
@@ -114,7 +119,7 @@ export default function SettingsPage() {
             setIsLoadingUsers(false);
         });
 
-        const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'), orderBy('name'));
         const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
             const fetchedTechnicians: User[] = [];
             querySnapshot.forEach((doc) => {
@@ -244,6 +249,46 @@ export default function SettingsPage() {
         }
     };
 
+    const handleCreateUser = async () => {
+        const { name, email, password, role } = newUserForm;
+        if (!name || !email || !password || !role) {
+          toast({ variant: 'destructive', title: 'Error', description: 'Por favor, completa todos los campos.' });
+          return;
+        }
+        setIsUpdating(true);
+        try {
+          // This is a temporary auth client to create the user, then we sign out and let them log in.
+          const tempAuth = auth;
+          const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
+          const user = userCredential.user;
+          await updateProfile(user, { displayName: name });
+    
+          await setDoc(doc(db, 'users', user.uid), {
+            id: user.uid,
+            uid: user.uid,
+            name,
+            email,
+            role,
+            avatar: `https://placehold.co/100x100.png`,
+          });
+          
+          toast({ title: 'Usuario Creado', description: 'El nuevo usuario ha sido registrado con éxito.' });
+          setIsNewUserDialogOpen(false);
+          setNewUserForm({ name: '', email: '', password: '', role: '' });
+        } catch (error: any) {
+          console.error('Error creating user:', error);
+          let description = 'Ocurrió un error inesperado.';
+          if (error.code === 'auth/email-already-in-use') {
+            description = 'Este correo electrónico ya está en uso.';
+          } else if (error.code === 'auth/weak-password') {
+            description = 'La contraseña debe tener al menos 6 caracteres.';
+          }
+          toast({ variant: 'destructive', title: 'Error al Crear Usuario', description });
+        } finally {
+          setIsUpdating(false);
+        }
+      };
+
 
     const handleSystemSave = async () => {
         setIsUpdating(true);
@@ -305,6 +350,72 @@ export default function SettingsPage() {
                     Guardar Cambios
                 </Button>
             </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isNewUserDialogOpen} onOpenChange={setIsNewUserDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+            <DialogDescription>
+              Completa los datos para registrar un nuevo usuario en la plataforma.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="new-user-name" className="text-right">Nombre</Label>
+              <Input
+                id="new-user-name"
+                value={newUserForm.name}
+                onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                className="col-span-3"
+                placeholder="Nombre Completo"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="new-user-email" className="text-right">Email</Label>
+              <Input
+                id="new-user-email"
+                type="email"
+                value={newUserForm.email}
+                onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                className="col-span-3"
+                placeholder="correo@ejemplo.com"
+              />
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="new-user-password" className="text-right">Contraseña</Label>
+              <Input
+                id="new-user-password"
+                type="password"
+                value={newUserForm.password}
+                onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                className="col-span-3"
+                placeholder="Mínimo 6 caracteres"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="new-user-role" className="text-right">Rol</Label>
+              <Select
+                value={newUserForm.role}
+                onValueChange={(value: User['role']) => setNewUserForm({ ...newUserForm, role: value })}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Selecciona un rol" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNewUserDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateUser} disabled={isUpdating}>
+              {isUpdating && <Loader2 className="mr-2 animate-spin" />}
+              Crear Usuario
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -431,7 +542,7 @@ export default function SettingsPage() {
                     Visualiza y gestiona los usuarios de la plataforma.
                   </CardDescription>
                 </div>
-                <Button>
+                <Button onClick={() => setIsNewUserDialogOpen(true)}>
                   <PlusCircle className="mr-2" /> Crear Usuario
                 </Button>
               </div>
@@ -719,3 +830,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
