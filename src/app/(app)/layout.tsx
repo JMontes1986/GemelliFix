@@ -69,7 +69,7 @@ function CollapseToggle() {
         <Button
             variant="ghost"
             size="icon"
-            className="w-full justify-center text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="w-full justify-center bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
             onClick={toggleSidebar}
         >
             <Icon className="h-5 w-5" />
