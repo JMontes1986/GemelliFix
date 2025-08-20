@@ -62,11 +62,8 @@ const userRoles: User['role'][] = ['Administrador', 'Servicios Generales', 'Doce
 
 export default function SettingsPage() {
     const [allUsers, setAllUsers] = React.useState<User[]>([]);
-    const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
-    const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
     const [isUpdating, setIsUpdating] = React.useState(false);
-    const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
-    const [activeTab, setActiveTab] = React.useState("users");
+    const [activeTab, setActiveTab] = React.useState("locations");
     const { toast } = useToast();
     
     // State for avatar management in dialog
@@ -120,34 +117,12 @@ export default function SettingsPage() {
             setSites(fetchedSites);
         });
 
-        const qUsers = query(collection(db, 'users'), orderBy('name'));
-        const unsubUsers = onSnapshot(qUsers, (querySnapshot) => {
-            const fetchedUsers: User[] = [];
-            querySnapshot.forEach((doc) => {
-                fetchedUsers.push({ id: doc.id, ...doc.data() } as User);
-            });
-            setAllUsers(fetchedUsers);
-            setIsLoadingUsers(false);
-        }, (error) => {
-            console.error("Error fetching users:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los usuarios. Es posible que falte un índice en Firestore.' });
-            setIsLoadingUsers(false);
-        });
-
         return () => {
             unsubZones();
             unsubSites();
-            unsubUsers();
         };
-    }, [toast]);
+    }, []);
     
-    const handleEditClick = (user: User) => {
-        setSelectedUser(user);
-        setAvatarFile(null);
-        setAvatarPreview(null);
-        setIsEditDialogOpen(true);
-    };
-
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           const file = e.target.files[0];
@@ -158,54 +133,6 @@ export default function SettingsPage() {
           setAvatarFile(file);
           setAvatarPreview(URL.createObjectURL(file));
       }
-    };
-
-    const handleUserUpdate = async () => {
-        if (!selectedUser) return;
-        setIsUpdating(true);
-        const userDocRef = doc(db, 'users', selectedUser.id);
-        let newAvatarUrl = selectedUser.avatar;
-
-        try {
-            if (avatarFile) {
-                toast({ title: 'Subiendo nueva imagen...', description: 'Por favor espera.'});
-                const avatarRef = ref(storage, `avatars/${selectedUser.id}/${avatarFile.name}`);
-                const uploadResult = await uploadBytes(avatarRef, avatarFile);
-                newAvatarUrl = await getDownloadURL(uploadResult.ref);
-            }
-
-            await updateDoc(userDocRef, {
-                name: selectedUser.name,
-                role: selectedUser.role,
-                avatar: newAvatarUrl,
-            });
-
-            toast({ title: 'Usuario Actualizado', description: 'Los cambios se han guardado correctamente.' });
-            setIsEditDialogOpen(false);
-        } catch (error) {
-            console.error('Error updating user:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el usuario.' });
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-
-    const handlePasswordReset = async () => {
-        if (!selectedUser) return;
-        try {
-            await sendPasswordResetEmail(auth, selectedUser.email);
-            toast({
-                title: 'Correo de Restablecimiento Enviado',
-                description: `Se ha enviado un correo a ${selectedUser.email} con instrucciones.`,
-            });
-        } catch (error) {
-            console.error('Error sending password reset email:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'No se pudo enviar el correo de restablecimiento.',
-            });
-        }
     };
     
     const handleLocationEditClick = (type: 'zone' | 'site', data: Zone | Site) => {
@@ -279,47 +206,6 @@ export default function SettingsPage() {
         }
     };
 
-    const handleCreateUser = async () => {
-        const { name, email, password, role } = newUserForm;
-        if (!name || !email || !password || !role) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Por favor, completa todos los campos.' });
-          return;
-        }
-        setIsUpdating(true);
-        try {
-          // This is a temporary auth client to create the user, then we sign out and let them log in.
-          const tempAuth = auth;
-          const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
-          const user = userCredential.user;
-          await updateProfile(user, { displayName: name });
-    
-          await setDoc(doc(db, 'users', user.uid), {
-            id: user.uid,
-            uid: user.uid,
-            name,
-            email,
-            role,
-            avatar: `https://placehold.co/100x100.png`,
-          });
-          
-          toast({ title: 'Usuario Creado', description: 'El nuevo usuario ha sido registrado con éxito.' });
-          setIsNewUserDialogOpen(false);
-          setNewUserForm({ name: '', email: '', password: '', role: '' });
-        } catch (error: any) {
-          console.error('Error creating user:', error);
-          let description = 'Ocurrió un error inesperado.';
-          if (error.code === 'auth/email-already-in-use') {
-            description = 'Este correo electrónico ya está en uso.';
-          } else if (error.code === 'auth/weak-password') {
-            description = 'La contraseña debe tener al menos 6 caracteres.';
-          }
-          toast({ variant: 'destructive', title: 'Error al Crear Usuario', description });
-        } finally {
-          setIsUpdating(false);
-        }
-      };
-
-
     const handleSystemSave = async () => {
         setIsUpdating(true);
         // Simulate saving to a database
@@ -333,137 +219,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Editar Usuario</DialogTitle>
-                <DialogDescription>
-                    Modifica la información del usuario. Haz clic en "Guardar Cambios" al terminar.
-                </DialogDescription>
-            </DialogHeader>
-            {selectedUser && (
-                <div className="grid gap-4 py-4">
-                    <div className="relative flex justify-center mb-4 group">
-                        <Avatar className="h-24 w-24 border-4 border-primary">
-                          <AvatarImage src={avatarPreview || selectedUser.avatar} alt={selectedUser.name} />
-                          <AvatarFallback className="text-4xl">{selectedUser.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <label htmlFor="avatar-upload" className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                            <Camera className="h-8 w-8 text-white" />
-                        </label>
-                        <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right">Nombre</Label>
-                        <Input
-                            id="name"
-                            value={selectedUser.name}
-                            onChange={(e) => setSelectedUser({ ...selectedUser, name: e.target.value })}
-                            className="col-span-3"
-                        />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="email" className="text-right">Email</Label>
-                        <Input id="email" value={selectedUser.email} className="col-span-3" disabled />
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="role" className="text-right">Rol</Label>
-                         <Select 
-                            value={selectedUser.role} 
-                            onValueChange={(value) => setSelectedUser({ ...selectedUser, role: value as User['role'] })}
-                         >
-                            <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Selecciona un rol" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {userRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label className="text-right">Contraseña</Label>
-                         <Button variant="outline" className="col-span-3" onClick={handlePasswordReset}>
-                            Enviar Correo de Restablecimiento
-                        </Button>
-                    </div>
-                </div>
-            )}
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleUserUpdate} disabled={isUpdating}>
-                    {isUpdating && <Loader2 className="mr-2 animate-spin" />}
-                    Guardar Cambios
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
       
-      <Dialog open={isNewUserDialogOpen} onOpenChange={setIsNewUserDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Crear Nuevo Usuario</DialogTitle>
-            <DialogDescription>
-              Completa los datos para registrar un nuevo usuario en la plataforma.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="new-user-name" className="text-right">Nombre</Label>
-              <Input
-                id="new-user-name"
-                value={newUserForm.name}
-                onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                className="col-span-3"
-                placeholder="Nombre Completo"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="new-user-email" className="text-right">Email</Label>
-              <Input
-                id="new-user-email"
-                type="email"
-                value={newUserForm.email}
-                onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
-                className="col-span-3"
-                placeholder="correo@ejemplo.com"
-              />
-            </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="new-user-password" className="text-right">Contraseña</Label>
-              <Input
-                id="new-user-password"
-                type="password"
-                value={newUserForm.password}
-                onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
-                className="col-span-3"
-                placeholder="Mínimo 6 caracteres"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="new-user-role" className="text-right">Rol</Label>
-              <Select
-                value={newUserForm.role}
-                onValueChange={(value: User['role']) => setNewUserForm({ ...newUserForm, role: value })}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Selecciona un rol" />
-                </SelectTrigger>
-                <SelectContent>
-                  {userRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsNewUserDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreateUser} disabled={isUpdating}>
-              {isUpdating && <Loader2 className="mr-2 animate-spin" />}
-              Crear Usuario
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
        <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
             <DialogContent>
                 <DialogHeader>
@@ -568,71 +324,13 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="users">Usuarios</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="locations">Zonas y Sitios</TabsTrigger>
           <TabsTrigger value="categories">Categorías</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
           <TabsTrigger value="logs">Logs del Sistema</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="font-headline">Gestión de Usuarios</CardTitle>
-                  <CardDescription>
-                    Visualiza y gestiona los usuarios de la plataforma.
-                  </CardDescription>
-                </div>
-                <Button onClick={() => setIsNewUserDialogOpen(true)}>
-                  <PlusCircle className="mr-2" /> Crear Usuario
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[80px]">Avatar</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Rol</TableHead>
-                    <TableHead>Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoadingUsers ? (
-                     <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
-                           <Loader2 className="mx-auto h-8 w-8 animate-spin" />
-                        </TableCell>
-                    </TableRow>
-                  ) : (
-                    allUsers.map((user) => (
-                        <TableRow key={user.id}>
-                        <TableCell>
-                            <Avatar>
-                            <AvatarImage src={user.avatar} alt={user.name} />
-                            <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                        </TableCell>
-                        <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
-                        <TableCell>
-                            <Button variant="outline" size="sm" onClick={() => handleEditClick(user)}>Editar</Button>
-                        </TableCell>
-                        </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
         <TabsContent value="locations">
             <div className="grid md:grid-cols-2 gap-6">
                 <Card>
