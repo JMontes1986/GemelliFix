@@ -312,15 +312,32 @@ export default function CalendarPage() {
     const [newEventEndTime, setNewEventEndTime] = useState('');
 
 
-     useEffect(() => {
-        const fetchTechnicians = async () => {
-            const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-            const querySnapshot = await getDocs(techQuery);
-            const techData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-            setAllTechnicians(techData);
-        };
-        fetchTechnicians();
-        
+    useEffect(() => {
+        const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+            if (firebaseUser) {
+                try {
+                    const userDocRef = doc(db, 'users', firebaseUser.uid);
+                    const userDocSnap = await getDoc(userDocRef);
+                    if (userDocSnap.exists()) {
+                        const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+                        setCurrentUser(userData);
+
+                        // Fetch technicians based on role
+                        if (userData.role === 'Administrador') {
+                            const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+                            const querySnapshot = await getDocs(techQuery);
+                            const techData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+                            setAllTechnicians(techData);
+                        } else if (userData.role === 'Servicios Generales') {
+                            setAllTechnicians([userData]);
+                        }
+                    }
+                } catch (error) {
+                     console.error("Error fetching user data:", error);
+                }
+            }
+        });
+
         const ticketsQuery = query(collection(db, 'tickets'), where('status', 'in', ['Abierto', 'Asignado']));
         const unsubscribeTickets = onSnapshot(ticketsQuery, (snapshot) => {
             const ticketsData = snapshot.docs.map(doc => {
@@ -332,25 +349,6 @@ export default function CalendarPage() {
                 } as Ticket
             });
             setUnassignedTickets(ticketsData.filter(t => !t.assignedToIds || t.assignedToIds.length === 0));
-        });
-
-        return () => unsubscribeTickets();
-
-    }, []);
-
-    useEffect(() => {
-        const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-            if (firebaseUser) {
-                try {
-                    const userDocRef = doc(db, 'users', firebaseUser.uid);
-                    const userDocSnap = await getDoc(userDocRef);
-                    if (userDocSnap.exists()) {
-                        setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
-                    }
-                } catch (error) {
-                     console.error("Error fetching user data:", error);
-                }
-            }
         });
 
         const q = query(collection(db, 'scheduleEvents'));
@@ -377,12 +375,11 @@ export default function CalendarPage() {
         return () => {
             unsubscribeAuth();
             unsubscribeEvents();
+            unsubscribeTickets();
         };
     }, [toast]);
 
-    const techniciansToDisplay = currentUser?.role === 'Servicios Generales' 
-        ? allTechnicians.filter(t => t.id === currentUser.id)
-        : allTechnicians;
+    const techniciansToDisplay = allTechnicians;
 
     const handleDrop = async (e: React.DragEvent<HTMLDivElement>, technicianId: string, day: Date, hour: number) => {
         e.preventDefault();
