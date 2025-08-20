@@ -1,79 +1,69 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper function to check for Admin role via custom claims
+
+    // Función para verificar si el usuario es un administrador
     function isAdmin() {
       return request.auth.token.admin == true;
     }
     
-    // Helper function to check if the user is authenticated
+    // Función para verificar si el usuario está autenticado
     function isSignedIn() {
-      return request.auth != null;
+        return request.auth != null;
     }
-    
-    // Helper function to check if the user is the owner of the document
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
-    // Global rule for Admin: Full access to everything
+
+    // Los administradores tienen acceso completo a toda la base de datos
     match /{document=**} {
       allow read, write: if isAdmin();
     }
-
-    // Users can only read/update their own profile.
-    // Admins have full access from the global rule.
-    match /users/{userId} {
-      allow read, update: if isOwner(userId);
-    }
     
-    // Rules for Tickets
-    match /tickets/{ticketId} {
-      // Users can create tickets
-      allow create: if isSignedIn();
-      // Users can read tickets they created or are assigned to.
-      // Admins can read all tickets.
-      allow read: if isOwner(resource.data.requesterId) || request.auth.uid in resource.data.assignedToIds;
-      // Users can update tickets they created or are assigned to.
-      // Admins can update all tickets.
-      allow update: if isOwner(resource.data.requesterId) || request.auth.uid in resource.data.assignedToIds;
-    }
+    // Reglas para los usuarios no administradores
     
-    // Notifications can only be read/updated by the recipient.
-    // Admins have full access.
-    match /notifications/{notificationId} {
-      allow read, update: if isOwner(resource.data.userId);
-      // Anyone signed in can create a notification (actions are controlled by backend logic)
-      allow create: if isSignedIn();
-    }
-
-    // General Staff and Admins can manage schedule events
-    match /scheduleEvents/{eventId} {
-      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Servicios Generales';
-    }
-
-    // Only Admins can read system logs
-    match /logs/{logId} {
-      allow read: if isAdmin();
-    }
-    
-    // Any authenticated user can write to the diagnosis logs collection for testing.
-    match /diagnosis_logs/{logId} {
-      allow create: if isSignedIn();
-    }
-    
-    // Any authenticated user can read zones and sites, only admins can write.
+    // Colecciones de datos maestros: cualquier usuario autenticado puede leerlas.
     match /zones/{zoneId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+    }
+    match /sites/{siteId} {
+        allow read: if isSignedIn();
+    }
+     match /categories/{categoryId} {
+        allow read: if isSignedIn();
+    }
+
+    // Los usuarios pueden leer y actualizar su propio documento
+    match /users/{userId} {
+      allow read, update: if isSignedIn() && request.auth.uid == userId;
     }
     
-    match /sites/{siteId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+    match /tickets/{ticketId} {
+      // Cualquiera puede crear un ticket si está autenticado
+      allow create: if isSignedIn();
+      // Solo el creador del ticket puede leerlo, o un administrador (ya cubierto arriba)
+      allow read: if isSignedIn() && resource.data.requesterId == request.auth.uid;
+      // Solo el creador, el personal asignado, o un admin pueden actualizar
+      allow update: if isSignedIn() && (resource.data.requesterId == request.auth.uid || request.auth.uid in resource.data.assignedToIds);
+    }
+    
+    match /notifications/{notificationId} {
+        // Solo el destinatario de la notificación puede leerla o actualizarla (marcarla como leída)
+        allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /scheduleEvents/{eventId} {
+        // Cualquiera puede crear un evento (los administradores o personal asignado lo harán)
+        allow create: if isSignedIn();
+        // Cualquiera puede leer los eventos del calendario
+        allow read: if isSignedIn();
+    }
+    
+    match /logs/{logId} {
+        // Solo los administradores pueden leer los logs (ya cubierto por la regla global)
+        allow read: if false; 
+    }
+    
+    match /diagnosis_logs/{logId} {
+        allow create: if isSignedIn();
     }
   }
 }
