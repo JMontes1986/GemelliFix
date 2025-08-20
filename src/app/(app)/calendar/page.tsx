@@ -450,8 +450,8 @@ export default function CalendarPage() {
         try {
             await addDoc(collection(db, "scheduleEvents"), {
                 ...newEvent,
-                start: Timestamp.fromDate(newEvent.start),
-                end: Timestamp.fromDate(newEvent.end)
+                start: newEvent.start,
+                end: newEvent.end
             });
             
             const ticketRef = doc(db, "tickets", ticket.id);
@@ -518,8 +518,8 @@ export default function CalendarPage() {
 
             await addDoc(collection(db, 'scheduleEvents'), {
                 ...newEvent,
-                start: Timestamp.fromDate(newEvent.start),
-                end: Timestamp.fromDate(newEvent.end)
+                start: newEvent.start,
+                end: newEvent.end
             });
             
             const tech = allTechnicians.find(t => t.id === newEventTechnicianId);
@@ -678,54 +678,63 @@ export default function CalendarPage() {
                         Crea un nuevo turno, tarea o asigna un ticket.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="title" className="text-right">Título</Label>
-                        <Input id="title" placeholder="Ej: Mantenimiento Aires" className="col-span-3" value={newEventTitle} onChange={(e) => setNewEventTitle(e.target.value)} />
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="title">Título</Label>
+                        <Input id="title" placeholder="Ej: Mantenimiento Aires" value={newEventTitle} onChange={(e) => setNewEventTitle(e.target.value)} />
                     </div>
-                     <div className="grid grid-cols-4 items-start gap-4">
-                        <Label htmlFor="description" className="text-right pt-2">Descripción</Label>
-                        <Textarea id="description" placeholder="Ej: Limpieza de filtros y revisión de gas" className="col-span-3" value={newEventDescription} onChange={(e) => setNewEventDescription(e.target.value)} />
+                     <div className="space-y-2">
+                        <Label htmlFor="description">Descripción</Label>
+                        <Textarea id="description" placeholder="Ej: Limpieza de filtros y revisión de gas" value={newEventDescription} onChange={(e) => setNewEventDescription(e.target.value)} />
                     </div>
-                    <div className="col-span-4 flex justify-end">
+
+                    <div className="pt-2 flex justify-end">
                         <Button variant="outline" size="sm" onClick={handleSuggestWithAi} disabled={!newEventTitle || isLoadingAi}>
                              {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                             Sugerir con IA
                         </Button>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="technician" className="text-right">Personal</Label>
-                        <Select onValueChange={setNewEventTechnicianId} value={newEventTechnicianId}>
-                            <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Seleccionar personal" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {allTechnicians.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                          <Label htmlFor="technician">Personal</Label>
+                          <Select onValueChange={setNewEventTechnicianId} value={newEventTechnicianId}>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar personal" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  {allTechnicians.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                              </SelectContent>
+                          </Select>
+                      </div>
+                       <div className="space-y-2">
+                          <Label htmlFor="type">Tipo</Label>
+                          <Select onValueChange={(v) => setNewEventType(v as ScheduleEvent['type'])} value={newEventType}>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar tipo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="shift">Turno</SelectItem>
+                                  <SelectItem value="task">Tarea</SelectItem>
+                                  <SelectItem value="ticket">Ticket</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
                     </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="type" className="text-right">Tipo</Label>
-                        <Select onValueChange={(v) => setNewEventType(v as ScheduleEvent['type'])} value={newEventType}>
-                            <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Seleccionar tipo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="shift">Turno</SelectItem>
-                                <SelectItem value="task">Tarea</SelectItem>
-                                <SelectItem value="ticket">Ticket</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label className="text-right">Fecha</Label>
-                         <Input id="date" type="date" className="col-span-3" value={newEventDate} onChange={(e) => setNewEventDate(e.target.value)} />
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label className="text-right">Hora</Label>
-                        <div className="col-span-3 grid grid-cols-2 gap-2">
-                             <Input id="start_time" type="time" value={newEventStartTime} onChange={(e) => setNewEventStartTime(e.target.value)} />
-                             <Input id="end_time" type="time" value={newEventEndTime} onChange={(e) => setNewEventEndTime(e.target.value)} />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2 md:col-span-1">
+                            <Label htmlFor="date">Fecha</Label>
+                            <Input id="date" type="date" value={newEventDate} onChange={(e) => setNewEventDate(e.target.value)} />
+                        </div>
+                        <div className="space-y-2 md:col-span-2 grid grid-cols-2 gap-2">
+                            <div>
+                               <Label htmlFor="start_time">Hora Inicio</Label>
+                               <Input id="start_time" type="time" value={newEventStartTime} onChange={(e) => setNewEventStartTime(e.target.value)} />
+                            </div>
+                             <div>
+                                <Label htmlFor="end_time">Hora Fin</Label>
+                                <Input id="end_time" type="time" value={newEventEndTime} onChange={(e) => setNewEventEndTime(e.target.value)} />
+                            </div>
                         </div>
                     </div>
                 </div>
