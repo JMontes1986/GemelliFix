@@ -150,7 +150,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   >
                     <Link href="/dashboard">
                       <LayoutDashboard />
-                      <span>Dashboard</span>
+                      <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -165,7 +165,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   >
                     <Link href="/diagnosis">
                       <HeartPulse />
-                      <span>Diagnóstico</span>
+                      <span className="group-data-[collapsible=icon]:hidden">Diagnóstico</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -179,7 +179,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               >
                 <Link href="/tickets">
                   <Wrench />
-                  <span>Solicitudes</span>
+                  <span className="group-data-[collapsible=icon]:hidden">Solicitudes</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -191,7 +191,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               >
                 <Link href="/calendar">
                   <Calendar />
-                  <span>Calendario</span>
+                  <span className="group-data-[collapsible=icon]:hidden">Calendario</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -203,7 +203,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               >
                 <Link href="/notifications">
                   <Bell />
-                  <span>Notificaciones</span>
+                  <span className="group-data-[collapsible=icon]:hidden">Notificaciones</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -216,7 +216,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 >
                     <Link href="/settings">
                     <Settings />
-                    <span>Configuración</span>
+                    <span className="group-data-[collapsible=icon]:hidden">Configuración</span>
                     </Link>
                 </SidebarMenuButton>
                 </SidebarMenuItem>
