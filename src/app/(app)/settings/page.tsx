@@ -63,8 +63,6 @@ const userRoles: User['role'][] = ['Administrador', 'Servicios Generales', 'Doce
 export default function SettingsPage() {
     const [allUsers, setAllUsers] = React.useState<User[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
-    const [technicians, setTechnicians] = React.useState<User[]>([]);
-    const [isLoadingTechnicians, setIsLoadingTechnicians] = React.useState(true);
     const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
     const [isUpdating, setIsUpdating] = React.useState(false);
     const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
@@ -123,20 +121,6 @@ export default function SettingsPage() {
             setIsLoadingUsers(false);
         });
 
-        const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'), orderBy('name'));
-        const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
-            const fetchedTechnicians: User[] = [];
-            querySnapshot.forEach((doc) => {
-                fetchedTechnicians.push({ id: doc.id, ...doc.data() } as User);
-            });
-            setTechnicians(fetchedTechnicians);
-            setIsLoadingTechnicians(false);
-        }, (error) => {
-            console.error("Error fetching technicians:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
-            setIsLoadingTechnicians(false);
-        });
-
         const qZones = query(collection(db, 'zones'), orderBy('name'));
         const unsubZones = onSnapshot(qZones, (snapshot) => {
             const fetchedZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
@@ -152,7 +136,6 @@ export default function SettingsPage() {
 
         return () => {
             unsubscribe();
-            unsubscribe_technicians();
             unsubZones();
             unsubSites();
         };
@@ -836,3 +819,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
