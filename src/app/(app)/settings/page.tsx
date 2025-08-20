@@ -41,7 +41,7 @@ import { PlusCircle, Loader2 } from 'lucide-react';
 import { categories } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { collection, onSnapshot, doc, updateDoc, query, where, orderBy, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import type { User, Zone, Site } from '@/lib/types';
@@ -119,12 +119,13 @@ export default function SettingsPage() {
             setIsLoadingUsers(false);
         });
 
-        const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'), orderBy('name'));
+        const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
         const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
             const fetchedTechnicians: User[] = [];
             querySnapshot.forEach((doc) => {
                 fetchedTechnicians.push({ id: doc.id, ...doc.data() } as User);
             });
+            fetchedTechnicians.sort((a, b) => a.name.localeCompare(b.name));
             setTechnicians(fetchedTechnicians);
             setIsLoadingTechnicians(false);
         }, (error) => {
@@ -830,5 +831,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
