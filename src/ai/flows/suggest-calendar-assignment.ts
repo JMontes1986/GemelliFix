@@ -24,11 +24,11 @@ const SuggestCalendarAssignmentInputSchema = z.object({
   ticket: z.object({
     id: z.string(),
     title: z.string(),
-    description: z.string(),
+    description: z.string().optional(),
     category: z.string(),
     priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
     createdAt: z.string().describe("The ticket's creation date in ISO 8601 format."),
-  }).describe('The ticket that needs to be scheduled.'),
+  }).describe('The ticket or task that needs to be scheduled.'),
   targetDate: z.string().describe('The ISO 8601 string of the desired date and time for the assignment.'),
   targetTechnicianId: z.string().describe('The ID of the technician the user wants to assign the ticket to.'),
 });
@@ -190,12 +190,10 @@ const suggestCalendarAssignmentFlow = ai.defineFlow(
         ticket: {
             id: input.ticket.id,
             title: input.ticket.title,
-            description: input.ticket.description,
+            description: input.ticket.description || 'Tarea manual sin descripción detallada.',
         }
     };
     
     return finalSuggestion;
   }
 );
-
-    

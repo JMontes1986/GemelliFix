@@ -50,6 +50,7 @@ import { suggestCalendarAssignment, type SuggestCalendarAssignmentInput, type Su
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { createCalendarEvent } from '@/ai/flows/create-calendar-event';
+import { Textarea } from '@/components/ui/textarea';
 
 
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
@@ -303,6 +304,7 @@ export default function CalendarPage() {
     const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
     const [isCreatingEvent, setIsCreatingEvent] = useState(false);
     const [newEventTitle, setNewEventTitle] = useState('');
+    const [newEventDescription, setNewEventDescription] = useState('');
     const [newEventTechnicianId, setNewEventTechnicianId] = useState('');
     const [newEventType, setNewEventType] = useState<ScheduleEvent['type']>('task');
     const [newEventDate, setNewEventDate] = useState('');
@@ -507,7 +509,7 @@ export default function CalendarPage() {
 
             const newEvent: Omit<ScheduleEvent, 'id'> = {
                 title: newEventTitle,
-                description: `Tarea: ${newEventTitle}`,
+                description: newEventDescription,
                 start: startDateTime,
                 end: endDateTime,
                 type: newEventType,
@@ -542,6 +544,7 @@ export default function CalendarPage() {
 
             setIsManualDialogOpen(false);
             setNewEventTitle('');
+            setNewEventDescription('');
             setNewEventTechnicianId('');
             setNewEventType('task');
             setNewEventDate('');
@@ -553,6 +556,49 @@ export default function CalendarPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el evento. Revisa la conexión con Google Calendar.' });
         } finally {
             setIsCreatingEvent(false);
+        }
+    };
+
+    const handleSuggestWithAi = async () => {
+        if (!newEventTitle) {
+            toast({ variant: 'destructive', title: 'Título requerido', description: 'Escribe un título para la tarea antes de pedir una sugerencia.' });
+            return;
+        }
+        setIsLoadingAi(true);
+        try {
+            const input: SuggestCalendarAssignmentInput = {
+                ticket: {
+                    id: `manual-${Date.now()}`,
+                    title: newEventTitle,
+                    description: newEventDescription,
+                    category: 'General',
+                    priority: 'Media',
+                    createdAt: new Date().toISOString(),
+                },
+                targetDate: new Date().toISOString(),
+                targetTechnicianId: allTechnicians[0]?.id || '', // Default to first technician
+            };
+            
+            const result = await suggestCalendarAssignment(input);
+            const suggestedDate = new Date(result.suggestedTime);
+            
+            setNewEventTechnicianId(result.technician.id);
+            setNewEventDate(suggestedDate.toISOString().split('T')[0]);
+            setNewEventStartTime(suggestedDate.toTimeString().substring(0,5));
+            // Set end time 2 hours later
+            const endTime = new Date(suggestedDate.getTime() + 2 * 60 * 60 * 1000);
+            setNewEventEndTime(endTime.toTimeString().substring(0,5));
+            
+            toast({
+                title: 'Sugerencia Aplicada',
+                description: result.reason
+            });
+
+        } catch (error) {
+            console.error('Error getting AI suggestion for manual task:', error);
+            toast({ variant: 'destructive', title: 'Error de IA', description: 'No se pudo obtener la sugerencia.' });
+        } finally {
+            setIsLoadingAi(false);
         }
     };
     
@@ -625,7 +671,7 @@ export default function CalendarPage() {
                     Programar
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Programar Evento</DialogTitle>
                     <DialogDescription>
@@ -635,7 +681,17 @@ export default function CalendarPage() {
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="title" className="text-right">Título</Label>
-                        <Input id="title" placeholder="Ej: Turno de mañana" className="col-span-3" value={newEventTitle} onChange={(e) => setNewEventTitle(e.target.value)} />
+                        <Input id="title" placeholder="Ej: Mantenimiento Aires" className="col-span-3" value={newEventTitle} onChange={(e) => setNewEventTitle(e.target.value)} />
+                    </div>
+                     <div className="grid grid-cols-4 items-start gap-4">
+                        <Label htmlFor="description" className="text-right pt-2">Descripción</Label>
+                        <Textarea id="description" placeholder="Ej: Limpieza de filtros y revisión de gas" className="col-span-3" value={newEventDescription} onChange={(e) => setNewEventDescription(e.target.value)} />
+                    </div>
+                    <div className="col-span-4 flex justify-end">
+                        <Button variant="outline" size="sm" onClick={handleSuggestWithAi} disabled={!newEventTitle || isLoadingAi}>
+                             {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                            Sugerir con IA
+                        </Button>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="technician" className="text-right">Personal</Label>
@@ -783,5 +839,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-
-    
