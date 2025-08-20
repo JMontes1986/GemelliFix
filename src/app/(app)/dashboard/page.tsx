@@ -57,6 +57,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Ticket, User } from '@/lib/types';
 import { GemelliFixLogo } from '@/components/icons';
+import { Progress } from '@/components/ui/progress';
 
 
 function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
@@ -163,6 +164,20 @@ export default function DashboardPage() {
       return acc;
     }, {} as Record<string, number>)
   ).map(([name, total]) => ({ name, total }));
+  
+  const calculateSlaByPriority = (priority: Ticket['priority']): number => {
+    const priorityTickets = closedTickets.filter(t => t.priority === priority);
+    if (priorityTickets.length === 0) return 100;
+    const compliantTickets = priorityTickets.filter(t => new Date(t.resolvedAt || t.dueDate) <= new Date(t.dueDate));
+    return Math.round((compliantTickets.length / priorityTickets.length) * 100);
+  };
+
+  const slaByPriority = {
+      Urgente: calculateSlaByPriority('Urgente'),
+      Alta: calculateSlaByPriority('Alta'),
+      Media: calculateSlaByPriority('Media'),
+      Baja: calculateSlaByPriority('Baja'),
+  };
 
   const handleAnalysis = async () => {
     setAnalysisOpen(true);
@@ -296,20 +311,21 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Personal Activo</CardTitle>
-            <CardDescription>Resumen del equipo de Servicios Generales.</CardDescription>
+            <CardTitle className="font-headline">Cumplimiento de SLA por Prioridad</CardTitle>
+            <CardDescription>Rendimiento del equipo según la urgencia del ticket.</CardDescription>
           </CardHeader>
           <CardContent>
              {isLoading ? <Skeleton className="h-[200px] w-full" /> : (
               <div className="space-y-4 h-full flex flex-col justify-center">
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                    <div className="font-semibold text-lg">Total de Técnicos</div>
-                    <div className="font-bold text-3xl">{technicians.length}</div>
-                  </div>
-                   <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                    <div className="font-semibold text-lg">Técnicos Disponibles</div>
-                    <div className="font-bold text-3xl text-green-600">{technicians.length}</div>
-                  </div>
+                  {Object.entries(slaByPriority).map(([priority, value]) => (
+                      <div key={priority} className="space-y-1">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="font-medium">{priority}</span>
+                            <span className="text-muted-foreground font-semibold">{value}%</span>
+                          </div>
+                          <Progress value={value} aria-label={`Cumplimiento de SLA para prioridad ${priority}`} />
+                      </div>
+                  ))}
               </div>
             )}
           </CardContent>
