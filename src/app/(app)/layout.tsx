@@ -91,6 +91,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
         if (firebaseUser) {
             try {
+                // Force a token refresh to get the latest custom claims.
+                await firebaseUser.getIdToken(true);
+                
                 const userDocRef = doc(db, 'users', firebaseUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
@@ -101,7 +104,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     router.push('/login');
                 }
             } catch (error) {
-                 console.error("Error fetching user data:", error);
+                 console.error("Error fetching user data or refreshing token:", error);
                  await auth.signOut();
                  router.push('/login');
             }
