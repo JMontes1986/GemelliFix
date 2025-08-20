@@ -11,6 +11,10 @@ import {
   Plus,
   Sparkles,
   Loader2,
+  Ticket as TicketIcon,
+  Briefcase,
+  Clock,
+  User as UserIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,6 +48,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { suggestCalendarAssignment, type SuggestCalendarAssignmentInput, type SuggestCalendarAssignmentOutput } from '@/ai/flows/suggest-calendar-assignment';
 import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link';
 
 
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
@@ -51,6 +56,7 @@ const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 
 const generateColorFromString = (str: string): string => {
     let hash = 0;
+    if (!str) return `hsl(0, 60%, 70%)`;
     for (let i = 0; i < str.length; i++) {
         hash = str.charCodeAt(i) + ((hash << 7) - hash);
         hash = hash & hash;
@@ -60,7 +66,7 @@ const generateColorFromString = (str: string): string => {
 };
 
 
-const EventCard = ({ event, color }: { event: ScheduleEvent, color: string }) => {
+const EventCard = ({ event, color, onClick }: { event: ScheduleEvent, color: string, onClick: () => void }) => {
   const eventStartDate = event.start;
   const eventEndDate = event.end;
   
@@ -81,9 +87,10 @@ const EventCard = ({ event, color }: { event: ScheduleEvent, color: string }) =>
 
 
   return (
-    <div
+    <button
+      onClick={onClick}
       className={cn(
-        'absolute w-full p-2 rounded-lg border text-xs shadow-sm cursor-pointer hover:shadow-md transition-all z-10'
+        'absolute w-full p-2 rounded-lg border text-xs shadow-sm cursor-pointer hover:shadow-md transition-all z-10 text-left'
       )}
       style={{
         top: `${top}px`,
@@ -99,7 +106,7 @@ const EventCard = ({ event, color }: { event: ScheduleEvent, color: string }) =>
     >
       <p className="font-bold truncate">{event.title}</p>
       <p className="opacity-80 truncate">{event.description}</p>
-    </div>
+    </button>
   );
 };
 
@@ -174,6 +181,78 @@ function AiAssignmentDialog({
     );
 }
 
+function EventDetailsDialog({ 
+    isOpen, 
+    onOpenChange, 
+    event,
+    technician
+}: { 
+    isOpen: boolean, 
+    onOpenChange: (open: boolean) => void, 
+    event: ScheduleEvent | null,
+    technician: User | undefined
+}) {
+    if (!event) return null;
+
+    const eventTypeMap = {
+        task: { label: 'Tarea Programada', icon: <Briefcase /> },
+        shift: { label: 'Turno', icon: <Clock /> },
+        ticket: { label: 'Ticket de Mantenimiento', icon: <TicketIcon /> }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="font-headline text-2xl">{event.title}</DialogTitle>
+                    <DialogDescription>{event.description}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="flex items-center gap-4 text-sm bg-muted/50 p-3 rounded-lg">
+                        <span className="text-primary">{eventTypeMap[event.type].icon}</span>
+                        <span>{eventTypeMap[event.type].label}</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-start gap-3">
+                            <Clock className="w-5 h-5 mt-0.5 text-primary" />
+                            <div>
+                                <p className="font-semibold">Inicio</p>
+                                <p className="text-muted-foreground">{event.start.toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                             <Clock className="w-5 h-5 mt-0.5 text-primary" />
+                            <div>
+                                <p className="font-semibold">Fin</p>
+                                <p className="text-muted-foreground">{event.end.toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}</p>
+                            </div>
+                        </div>
+                    </div>
+                     {technician && (
+                        <div className="flex items-center gap-3">
+                           <UserIcon className="w-5 h-5 text-primary" />
+                            <div>
+                                <p className="font-semibold">Asignado a</p>
+                                <p className="text-muted-foreground">{technician.name}</p>
+                            </div>
+                        </div>
+                     )}
+                </div>
+                 <DialogFooter>
+                    {event.type === 'ticket' && event.ticketId && (
+                        <Link href={`/tickets/${event.ticketId}`} className="w-full">
+                            <Button className="w-full">
+                                <TicketIcon className="mr-2 h-4 w-4" />
+                                Ver Ticket de Origen
+                            </Button>
+                        </Link>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 async function createCalendarNotification(technicianName: string, event: Omit<ScheduleEvent, 'id'>) {
     try {
         const usersRef = collection(db, "users");
@@ -215,6 +294,7 @@ export default function CalendarPage() {
     const [isLoadingData, setIsLoadingData] = useState(true);
     const { toast } = useToast();
     const [allTechnicians, setAllTechnicians] = useState<User[]>([]);
+    const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
 
     // State for manual event creation dialog
     const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
@@ -347,11 +427,7 @@ export default function CalendarPage() {
         };
         
         try {
-            await addDoc(collection(db, "scheduleEvents"), {
-                ...newEvent,
-                start: Timestamp.fromDate(newEvent.start),
-                end: Timestamp.fromDate(newEvent.end)
-            });
+            await addDoc(collection(db, "scheduleEvents"), newEvent);
             
             const ticketRef = doc(db, "tickets", ticket.id);
             await updateDoc(ticketRef, {
@@ -402,11 +478,7 @@ export default function CalendarPage() {
                 technicianId: newEventTechnicianId,
             };
 
-            await addDoc(collection(db, 'scheduleEvents'), {
-                ...newEvent,
-                start: Timestamp.fromDate(startDateTime),
-                end: Timestamp.fromDate(endDateTime)
-            });
+            await addDoc(collection(db, 'scheduleEvents'), newEvent);
             
             const tech = allTechnicians.find(t => t.id === newEventTechnicianId);
             if (tech) {
@@ -449,6 +521,10 @@ export default function CalendarPage() {
             return e.technicianId === technicianId && eventDate.toDateString() === day.toDateString();
         });
     };
+    
+    const handleEventClick = (event: ScheduleEvent) => {
+        setSelectedEvent(event);
+    };
 
   if (isLoadingData) {
     return (
@@ -466,6 +542,12 @@ export default function CalendarPage() {
         isLoading={isLoadingAi}
         suggestion={aiSuggestion}
         onConfirm={handleConfirmAssignment}
+      />
+      <EventDetailsDialog 
+        isOpen={!!selectedEvent}
+        onOpenChange={(open) => !open && setSelectedEvent(null)}
+        event={selectedEvent}
+        technician={allTechnicians.find(t => t.id === selectedEvent?.technicianId)}
       />
       <div className="flex items-center justify-between pb-4">
         <div>
@@ -634,7 +716,7 @@ export default function CalendarPage() {
                       >
                         {/* Events for this technician on this day */}
                         {eventsByTechnicianAndDay(tech.id, date).map(event => (
-                            <EventCard key={event.id} event={event} color={generateColorFromString(tech.id)} />
+                            <EventCard key={event.id} event={event} color={generateColorFromString(tech.id)} onClick={() => handleEventClick(event)} />
                         ))}
                       </div>
                     ))}
