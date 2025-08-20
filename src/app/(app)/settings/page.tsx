@@ -41,7 +41,7 @@ import { PlusCircle, Loader2 } from 'lucide-react';
 import { categories } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { collection, onSnapshot, doc, updateDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Zone, Site } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -75,6 +75,13 @@ export default function SettingsPage() {
     const [isLoadingLocations, setIsLoadingLocations] = React.useState(true);
     const [isLocationDialogOpen, setIsLocationDialogOpen] = React.useState(false);
     const [editingLocation, setEditingLocation] = React.useState<{type: 'zone' | 'site', data: Zone | Site} | null>(null);
+    
+    // State for creating new locations
+    const [isNewZoneDialogOpen, setIsNewZoneDialogOpen] = React.useState(false);
+    const [newZoneName, setNewZoneName] = React.useState('');
+    const [isNewSiteDialogOpen, setIsNewSiteDialogOpen] = React.useState(false);
+    const [newSiteName, setNewSiteName] = React.useState('');
+    const [newSiteZoneId, setNewSiteZoneId] = React.useState('');
 
 
     // State for system settings
@@ -190,6 +197,53 @@ export default function SettingsPage() {
             setIsUpdating(false);
         }
     };
+    
+    const handleCreateZone = async () => {
+        if (!newZoneName.trim()) {
+            toast({ variant: 'destructive', title: 'Error', description: 'El nombre de la zona no puede estar vacío.' });
+            return;
+        }
+        setIsUpdating(true);
+        try {
+            await addDoc(collection(db, 'zones'), {
+                name: newZoneName,
+                createdAt: serverTimestamp()
+            });
+            toast({ title: 'Zona Creada', description: 'La nueva zona se ha guardado correctamente.' });
+            setIsNewZoneDialogOpen(false);
+            setNewZoneName('');
+        } catch (error) {
+            console.error('Error creating zone:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la nueva zona.' });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const handleCreateSite = async () => {
+        if (!newSiteName.trim() || !newSiteZoneId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Debes proporcionar un nombre para el sitio y seleccionar una zona.' });
+            return;
+        }
+        setIsUpdating(true);
+        try {
+            await addDoc(collection(db, 'sites'), {
+                name: newSiteName,
+                zoneId: newSiteZoneId,
+                createdAt: serverTimestamp()
+            });
+            toast({ title: 'Sitio Creado', description: 'El nuevo sitio se ha guardado correctamente.' });
+            setIsNewSiteDialogOpen(false);
+            setNewSiteName('');
+            setNewSiteZoneId('');
+        } catch (error) {
+            console.error('Error creating site:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear el nuevo sitio.' });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
 
     const handleSystemSave = async () => {
         setIsUpdating(true);
@@ -280,6 +334,71 @@ export default function SettingsPage() {
                     <Button onClick={handleLocationUpdate} disabled={isUpdating}>
                         {isUpdating && <Loader2 className="mr-2 animate-spin" />}
                         Guardar Cambios
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        
+        <Dialog open={isNewZoneDialogOpen} onOpenChange={setIsNewZoneDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Crear Nueva Zona</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="new-zone-name" className="text-right">Nombre</Label>
+                        <Input
+                            id="new-zone-name"
+                            value={newZoneName}
+                            onChange={(e) => setNewZoneName(e.target.value)}
+                            className="col-span-3"
+                            placeholder="Ej: Bloque C - Deportivo"
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsNewZoneDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleCreateZone} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 animate-spin" />}
+                        Guardar Zona
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        
+        <Dialog open={isNewSiteDialogOpen} onOpenChange={setIsNewSiteDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Crear Nuevo Sitio</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="new-site-name" className="text-right">Nombre</Label>
+                        <Input
+                            id="new-site-name"
+                            value={newSiteName}
+                            onChange={(e) => setNewSiteName(e.target.value)}
+                            className="col-span-3"
+                            placeholder="Ej: Cancha de Fútbol"
+                        />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="new-site-zone" className="text-right">Zona</Label>
+                        <Select onValueChange={setNewSiteZoneId} value={newSiteZoneId}>
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Seleccionar zona" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {zones.map(z => <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsNewSiteDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleCreateSite} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 animate-spin" />}
+                        Guardar Sitio
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -423,7 +542,7 @@ export default function SettingsPage() {
                                 <CardTitle className="font-headline">Zonas</CardTitle>
                                 <CardDescription>Áreas principales de la institución.</CardDescription>
                             </div>
-                            <Button size="sm"><PlusCircle className="mr-2" /> Nueva Zona</Button>
+                            <Button size="sm" onClick={() => setIsNewZoneDialogOpen(true)}><PlusCircle className="mr-2" /> Nueva Zona</Button>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -454,7 +573,7 @@ export default function SettingsPage() {
                                 <CardTitle className="font-headline">Sitios</CardTitle>
                                 <CardDescription>Ubicaciones específicas dentro de una zona.</CardDescription>
                             </div>
-                             <Button size="sm"><PlusCircle className="mr-2" /> Nuevo Sitio</Button>
+                             <Button size="sm" onClick={() => setIsNewSiteDialogOpen(true)}><PlusCircle className="mr-2" /> Nuevo Sitio</Button>
                         </div>
                     </CardHeader>
                     <CardContent>
