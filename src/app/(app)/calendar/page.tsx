@@ -49,7 +49,7 @@ import { useToast } from '@/hooks/use-toast';
 import { suggestCalendarAssignment, type SuggestCalendarAssignmentInput, type SuggestCalendarAssignmentOutput } from '@/ai/flows/suggest-calendar-assignment';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { createGoogleCalendarEvent } from '@/lib/google-calendar';
+import { createCalendarEvent } from '@/ai/flows/create-calendar-event';
 
 
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
@@ -452,7 +452,7 @@ export default function CalendarPage() {
             });
             
             // Sync with Google Calendar
-            await createGoogleCalendarEvent({
+            await createCalendarEvent({
                 summary: newEvent.title,
                 description: newEvent.description || 'Sin descripción.',
                 start: { dateTime: newEvent.start.toISOString(), timeZone: 'America/Bogota' },
@@ -502,7 +502,7 @@ export default function CalendarPage() {
             toast({ title: '¡Evento Creado!', description: 'La nueva tarea ha sido añadida al calendario.' });
             
             // Sync with Google Calendar
-            await createGoogleCalendarEvent({
+            await createCalendarEvent({
                 summary: newEvent.title,
                 description: newEvent.description || 'Sin descripción.',
                 start: { dateTime: newEvent.start.toISOString(), timeZone: 'America/Bogota' },

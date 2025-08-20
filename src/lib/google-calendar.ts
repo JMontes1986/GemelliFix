@@ -1,3 +1,4 @@
+
 import { google } from 'googleapis';
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
@@ -6,24 +7,24 @@ const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
 
 if (!CALENDAR_ID || !privateKey || !clientEmail) {
-  throw new Error(
-    'Google Calendar API credentials are not set in environment variables. Please check your .env file.'
-  );
+  console.error('Google Calendar API credentials are not set in environment variables. Check .env file.');
+  // We don't throw an error here to prevent crashing the server during build if credentials are not yet set.
+  // The functions below will handle the uninitialized client.
 }
 
 // Initialize the JWT client
-const jwtClient = new google.auth.JWT(
-  clientEmail,
-  undefined,
-  privateKey,
-  SCOPES
-);
+const getJwtClient = () => {
+    if (!CALENDAR_ID || !privateKey || !clientEmail) {
+        return null;
+    }
+    return new google.auth.JWT(
+        clientEmail,
+        undefined,
+        privateKey,
+        SCOPES
+    );
+};
 
-// Initialize the Calendar API client
-const calendar = google.calendar({
-  version: 'v3',
-  auth: jwtClient,
-});
 
 /**
  * Creates an event in the configured Google Calendar.
@@ -36,6 +37,16 @@ export async function createGoogleCalendarEvent(event: {
   start: { dateTime: string; timeZone: string };
   end: { dateTime: string; timeZone: string };
 }) {
+  const jwtClient = getJwtClient();
+  if (!jwtClient) {
+    throw new Error('Google Calendar API client is not initialized. Please check credentials.');
+  }
+
+  const calendar = google.calendar({
+    version: 'v3',
+    auth: jwtClient,
+  });
+
   try {
     const response = await calendar.events.insert({
       calendarId: CALENDAR_ID,
@@ -66,6 +77,16 @@ export async function createGoogleCalendarEvent(event: {
  * @returns A list of events from Google Calendar.
  */
 export async function listGoogleCalendarEvents(timeMin: string, timeMax: string) {
+    const jwtClient = getJwtClient();
+    if (!jwtClient) {
+        throw new Error('Google Calendar API client is not initialized. Please check credentials.');
+    }
+    
+    const calendar = google.calendar({
+      version: 'v3',
+      auth: jwtClient,
+    });
+
     try {
         const response = await calendar.events.list({
             calendarId: CALENDAR_ID,
