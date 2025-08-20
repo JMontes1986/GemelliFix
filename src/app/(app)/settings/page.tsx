@@ -62,8 +62,9 @@ const userRoles: User['role'][] = ['Administrador', 'Servicios Generales', 'Doce
 
 export default function SettingsPage() {
     const [allUsers, setAllUsers] = React.useState<User[]>([]);
+    const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
     const [isUpdating, setIsUpdating] = React.useState(false);
-    const [activeTab, setActiveTab] = React.useState("locations");
+    const [activeTab, setActiveTab] = React.useState("users");
     const { toast } = useToast();
     
     // State for avatar management in dialog
@@ -87,6 +88,10 @@ export default function SettingsPage() {
     const [isNewUserDialogOpen, setIsNewUserDialogOpen] = React.useState(false);
     const [newUserForm, setNewUserForm] = React.useState({ name: '', email: '', password: '', role: '' as User['role'] | '' });
 
+    // State for editing a user
+    const [editingUser, setEditingUser] = React.useState<User | null>(null);
+    const [isEditUserDialogOpen, setIsEditUserDialogOpen] = React.useState(false);
+
 
     // State for system settings
     const [slaTimes, setSlaTimes] = React.useState({
@@ -104,6 +109,24 @@ export default function SettingsPage() {
 
 
     React.useEffect(() => {
+        const qUsers = query(collection(db, 'users'), orderBy('name'));
+        const unsubUsers = onSnapshot(qUsers, (snapshot) => {
+            const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+            setAllUsers(fetchedUsers);
+            setIsLoadingUsers(false);
+        }, (error) => {
+            console.error("Error fetching users:", error);
+            if (error.code === 'failed-precondition') {
+                 toast({
+                    variant: "destructive",
+                    title: "Índice requerido",
+                    description: "La consulta de usuarios necesita un índice en Firestore. Por favor, créalo.",
+                    duration: 10000,
+                });
+            }
+            setIsLoadingUsers(false);
+        });
+
         const qZones = query(collection(db, 'zones'), orderBy('name'));
         const unsubZones = onSnapshot(qZones, (snapshot) => {
             const fetchedZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
@@ -118,10 +141,11 @@ export default function SettingsPage() {
         });
 
         return () => {
+            unsubUsers();
             unsubZones();
             unsubSites();
         };
-    }, []);
+    }, [toast]);
     
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
@@ -205,6 +229,92 @@ export default function SettingsPage() {
             setIsUpdating(false);
         }
     };
+    
+    const handleCreateUser = async () => {
+        if (!newUserForm.name || !newUserForm.email || !newUserForm.password || !newUserForm.role) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Todos los campos son requeridos para crear un usuario.' });
+            return;
+        }
+        setIsUpdating(true);
+        let newAvatarUrl = 'https://placehold.co/100x100.png';
+        try {
+             if (avatarFile) {
+                const avatarRef = ref(storage, `avatars/temp_${Date.now()}/${avatarFile.name}`);
+                const uploadResult = await uploadBytes(avatarRef, avatarFile);
+                newAvatarUrl = await getDownloadURL(uploadResult.ref);
+            }
+
+            // NOTE: This creates the user in a temporary auth state. We're not handling this flow for now.
+            // For a production app, you would create a temporary user or send an invitation link.
+            // This is a simplified example for demonstration.
+            const tempAuth = auth; // In a real app, you might use a separate admin auth instance.
+            const userCredential = await createUserWithEmailAndPassword(tempAuth, newUserForm.email, newUserForm.password);
+            const user = userCredential.user;
+
+            await updateProfile(user, { displayName: newUserForm.name, photoURL: newAvatarUrl });
+
+            await setDoc(doc(db, "users", user.uid), {
+                id: user.uid,
+                uid: user.uid,
+                name: newUserForm.name,
+                email: newUserForm.email,
+                role: newUserForm.role,
+                avatar: newAvatarUrl
+            });
+            
+            toast({ title: 'Usuario Creado', description: 'El nuevo usuario ha sido registrado.' });
+            setIsNewUserDialogOpen(false);
+            setNewUserForm({ name: '', email: '', password: '', role: '' });
+            setAvatarFile(null);
+            setAvatarPreview(null);
+        } catch (error: any) {
+            console.error('Error creating user:', error);
+            toast({ variant: 'destructive', title: 'Error al crear usuario', description: error.message });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const handleEditUserClick = (user: User) => {
+        setEditingUser(user);
+        setIsEditUserDialogOpen(true);
+    };
+
+    const handleUpdateUser = async () => {
+        if (!editingUser) return;
+
+        setIsUpdating(true);
+        const userRef = doc(db, "users", editingUser.id);
+        
+        try {
+            await updateDoc(userRef, {
+                name: editingUser.name,
+                role: editingUser.role
+            });
+            toast({ title: 'Usuario Actualizado', description: 'La información del usuario ha sido guardada.' });
+            setIsEditUserDialogOpen(false);
+            setEditingUser(null);
+        } catch (error) {
+            console.error('Error updating user:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la información del usuario.' });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+    
+    const handleSendPasswordReset = async (email: string) => {
+        setIsUpdating(true);
+        try {
+            await sendPasswordResetEmail(auth, email);
+            toast({ title: 'Correo enviado', description: `Se ha enviado un correo para restablecer la contraseña a ${email}.` });
+        } catch (error) {
+            console.error('Error sending password reset:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo enviar el correo de restablecimiento.' });
+        } finally {
+            setIsUpdating(false);
+        }
+    }
+
 
     const handleSystemSave = async () => {
         setIsUpdating(true);
@@ -315,6 +425,94 @@ export default function SettingsPage() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        
+        <Dialog open={isNewUserDialogOpen} onOpenChange={setIsNewUserDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                    <DialogDescription>Completa el formulario para añadir un nuevo miembro al sistema.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                     <div className="relative flex justify-center mb-4 group">
+                        <Avatar className="h-24 w-24 border-4 border-primary">
+                          <AvatarImage src={avatarPreview || ''} />
+                          <AvatarFallback className="text-4xl">?</AvatarFallback>
+                        </Avatar>
+                        <label htmlFor="avatar-upload-new" className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                            <Camera className="h-8 w-8 text-white" />
+                        </label>
+                        <input id="avatar-upload-new" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                      </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="new-user-name">Nombre Completo</Label>
+                        <Input id="new-user-name" placeholder="John Doe" value={newUserForm.name} onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })} />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="new-user-email">Correo Electrónico</Label>
+                        <Input id="new-user-email" type="email" placeholder="john.doe@example.com" value={newUserForm.email} onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="new-user-password">Contraseña</Label>
+                        <Input id="new-user-password" type="password" value={newUserForm.password} onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })} />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="new-user-role">Rol</Label>
+                         <Select onValueChange={(v: User['role']) => setNewUserForm({ ...newUserForm, role: v })} value={newUserForm.role}>
+                            <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
+                            <SelectContent>{userRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsNewUserDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleCreateUser} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 animate-spin" />}
+                        Crear Usuario
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        
+        <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Editar Usuario</DialogTitle>
+                </DialogHeader>
+                 {editingUser && (
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-user-name">Nombre Completo</Label>
+                            <Input id="edit-user-name" value={editingUser.name} onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-user-email">Correo Electrónico</Label>
+                            <Input id="edit-user-email" type="email" value={editingUser.email} disabled />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-user-role">Rol</Label>
+                            <Select onValueChange={(v: User['role']) => setEditingUser({ ...editingUser, role: v })} value={editingUser.role}>
+                                <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
+                                <SelectContent>{userRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                         <div className="space-y-2 pt-4">
+                            <Label>Gestión de Contraseña</Label>
+                            <Button variant="secondary" className="w-full" onClick={() => handleSendPasswordReset(editingUser.email)} disabled={isUpdating}>
+                                {isUpdating && <Loader2 className="mr-2 animate-spin" />}
+                                Enviar Correo de Restablecimiento
+                            </Button>
+                        </div>
+                    </div>
+                )}
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsEditUserDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleUpdateUser} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 animate-spin" />}
+                        Guardar Cambios
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
       <div>
         <h1 className="text-2xl font-headline font-bold tracking-tight">Configuración General</h1>
@@ -324,12 +522,62 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="locations">Zonas y Sitios</TabsTrigger>
           <TabsTrigger value="categories">Categorías</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
           <TabsTrigger value="logs">Logs del Sistema</TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="users">
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle className="font-headline">Gestión de Usuarios</CardTitle>
+                            <CardDescription>Añade, edita o gestiona los usuarios del sistema.</CardDescription>
+                        </div>
+                        <Button size="sm" onClick={() => setIsNewUserDialogOpen(true)}><PlusCircle className="mr-2" /> Nuevo Usuario</Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Usuario</TableHead>
+                                <TableHead>Rol</TableHead>
+                                <TableHead>Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoadingUsers ? (
+                                <TableRow><TableCell colSpan={3} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                            ) : allUsers.map(user => (
+                                <TableRow key={user.id}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className="h-10 w-10">
+                                                <AvatarImage src={user.avatar} alt={user.name} />
+                                                <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <div className="font-medium">{user.name}</div>
+                                                <div className="text-sm text-muted-foreground">{user.email}</div>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
+                                    <TableCell>
+                                        <Button variant="outline" size="sm" onClick={() => handleEditUserClick(user)}>Editar</Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </TabsContent>
 
         <TabsContent value="locations">
             <div className="grid md:grid-cols-2 gap-6">
@@ -517,5 +765,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
