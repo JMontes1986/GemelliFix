@@ -37,13 +37,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { PlusCircle, Loader2 } from 'lucide-react';
+import { PlusCircle, Loader2, Camera } from 'lucide-react';
 import { categories } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { db, auth, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import type { User, Zone, Site } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import LogsPage from './logs/page';
@@ -70,6 +71,10 @@ export default function SettingsPage() {
     const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
     const [activeTab, setActiveTab] = React.useState("users");
     const { toast } = useToast();
+    
+    // State for avatar management in dialog
+    const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
+    const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
     
     const [zones, setZones] = React.useState<Zone[]>([]);
     const [sites, setSites] = React.useState<Site[]>([]);
@@ -157,18 +162,43 @@ export default function SettingsPage() {
     
     const handleEditClick = (user: User) => {
         setSelectedUser(user);
+        setAvatarFile(null);
+        setAvatarPreview(null);
         setIsEditDialogOpen(true);
+    };
+
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          if (file.size > 2 * 1024 * 1024) { // 2MB limit
+              toast({ variant: 'destructive', title: 'Archivo demasiado grande', description: 'La imagen no puede superar los 2MB.'});
+              return;
+          }
+          setAvatarFile(file);
+          setAvatarPreview(URL.createObjectURL(file));
+      }
     };
 
     const handleUserUpdate = async () => {
         if (!selectedUser) return;
         setIsUpdating(true);
         const userDocRef = doc(db, 'users', selectedUser.id);
+        let newAvatarUrl = selectedUser.avatar;
+
         try {
+            if (avatarFile) {
+                toast({ title: 'Subiendo nueva imagen...', description: 'Por favor espera.'});
+                const avatarRef = ref(storage, `avatars/${selectedUser.id}/${avatarFile.name}`);
+                const uploadResult = await uploadBytes(avatarRef, avatarFile);
+                newAvatarUrl = await getDownloadURL(uploadResult.ref);
+            }
+
             await updateDoc(userDocRef, {
                 name: selectedUser.name,
                 role: selectedUser.role,
+                avatar: newAvatarUrl,
             });
+
             toast({ title: 'Usuario Actualizado', description: 'Los cambios se han guardado correctamente.' });
             setIsEditDialogOpen(false);
         } catch (error) {
@@ -176,6 +206,24 @@ export default function SettingsPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el usuario.' });
         } finally {
             setIsUpdating(false);
+        }
+    };
+
+    const handlePasswordReset = async () => {
+        if (!selectedUser) return;
+        try {
+            await sendPasswordResetEmail(auth, selectedUser.email);
+            toast({
+                title: 'Correo de Restablecimiento Enviado',
+                description: `Se ha enviado un correo a ${selectedUser.email} con instrucciones.`,
+            });
+        } catch (error) {
+            console.error('Error sending password reset email:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'No se pudo enviar el correo de restablecimiento.',
+            });
         }
     };
     
@@ -320,6 +368,16 @@ export default function SettingsPage() {
             </DialogHeader>
             {selectedUser && (
                 <div className="grid gap-4 py-4">
+                    <div className="relative flex justify-center mb-4 group">
+                        <Avatar className="h-24 w-24 border-4 border-primary">
+                          <AvatarImage src={avatarPreview || selectedUser.avatar} alt={selectedUser.name} />
+                          <AvatarFallback className="text-4xl">{selectedUser.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <label htmlFor="avatar-upload" className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                            <Camera className="h-8 w-8 text-white" />
+                        </label>
+                        <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                    </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="name" className="text-right">Nombre</Label>
                         <Input
@@ -346,6 +404,12 @@ export default function SettingsPage() {
                                 {userRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                             </SelectContent>
                         </Select>
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Contraseña</Label>
+                         <Button variant="outline" className="col-span-3" onClick={handlePasswordReset}>
+                            Enviar Correo de Restablecimiento
+                        </Button>
                     </div>
                 </div>
             )}
