@@ -10,7 +10,7 @@ import {
   CalendarPlus,
   Sparkles,
   Users,
-  Zone,
+  MapPin,
 } from 'lucide-react';
 import {
   Card,
@@ -252,7 +252,7 @@ export default function DashboardPage() {
                 {ticketsByZoneData.map(([zone, count]) => (
                     <div key={zone} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <Zone className="h-5 w-5 text-muted-foreground" />
+                            <MapPin className="h-5 w-5 text-muted-foreground" />
                             <span className="font-medium">{zone}</span>
                         </div>
                         <span className="font-bold text-lg">{count}</span>
