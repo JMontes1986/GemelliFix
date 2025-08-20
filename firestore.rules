@@ -1,62 +1,72 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check for admin role
+    // Helper function to check for Admin role via custom claims
     function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
+      return request.auth.token.admin == true;
     }
 
     match /users/{userId} {
-      // Any authenticated user can read any single user profile.
-      // This is necessary for Storage Rules to check roles.
-      // Listing all users is still restricted to admins.
-      allow get: if request.auth != null;
+      // An admin can do anything.
+      // A user can update their own document.
+      // Any authenticated user can read any profile.
+      allow read, update: if request.auth != null && (isAdmin() || request.auth.uid == userId);
       
-      // Admins can list all users.
-      allow list: if isAdmin();
-      
-      // Allow users to create their own profile, and admins to create any.
-      allow create: if request.auth != null;
-      
-      // Allow users to update their own profile, and admins to update any.
-      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      // Only admins can list all users or create new ones from the backend.
+      allow list, create: if request.auth != null && isAdmin();
     }
     
     match /tickets/{ticketId} {
-      allow read, write: if request.auth != null;
+      // Any authenticated user can create a ticket.
+      allow create: if request.auth != null;
+      
+      // Admins can read/update any ticket.
+      // The user who requested it can read it.
+      // A technician assigned to it can read it.
+      allow read, update: if request.auth != null && (
+        isAdmin() || 
+        resource.data.requesterId == request.auth.uid ||
+        request.auth.uid in resource.data.assignedToIds
+      );
     }
     
-    match /zones/{zoneId} {
-        allow read, write: if request.auth != null && isAdmin();
-    }
-    
-    match /sites/{siteId} {
-        allow read, write: if request.auth != null && isAdmin();
+    match /notifications/{notificationId} {
+       // Admins and the target user can read/write notifications.
+       allow read, write: if request.auth != null && (isAdmin() || resource.data.userId == request.auth.uid);
     }
 
     match /scheduleEvents/{eventId} {
-      // Allow authenticated users (especially admins/technicians) to create/manage events
-      allow read, write: if request.auth != null;
-    }
-
-    match /notifications/{notificationId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Any authenticated user can create an event. (Handled by the app logic)
       allow create: if request.auth != null;
+
+      // Any authenticated user can read all events.
+      allow read: if request.auth != null;
+
+      // Only admins or the assigned technician can update/delete an event.
+      allow update, delete: if request.auth != null && (isAdmin() || resource.data.technicianId == request.auth.uid);
     }
     
-     match /logs/{logId} {
-      // Only admins should be able to read logs. No one should write directly.
-      allow read: if request.auth != null && isAdmin();
-      allow write: if false; // Logs should only be created from backend/functions
+    match /zones/{zoneId} {
+       // Only admins can manage zones and sites.
+       allow read, write: if request.auth != null && isAdmin();
     }
 
-    // This collection is just for testing connectivity. 
-    // Any authenticated user can write to it.
-    match /diagnosis_logs/{logId} {
-        allow read, write: if request.auth != null;
+    match /sites/{siteId} {
+       // Only admins can manage zones and sites.
+       allow read, write: if request.auth != null && isAdmin();
+    }
+
+    match /logs/{logId} {
+      // Only admins can read all logs.
+      allow read: if request.auth != null && isAdmin();
+      // App backend can write logs.
+      allow create: if request.auth != null;
+    }
+
+     match /diagnosis_logs/{logId} {
+      allow read, write: if request.auth != null;
     }
   }
 }
