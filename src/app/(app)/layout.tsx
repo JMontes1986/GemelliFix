@@ -119,6 +119,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const isActive = (path: string) => pathname === path;
   const showFab = isMounted && pathname !== '/tickets/create';
+  
+  const isAdmin = currentUser?.role === 'Administrador';
+  const isServiceUser = currentUser?.role === 'Servicios Generales';
 
   if (isLoadingUser) {
     return (
@@ -141,35 +144,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {currentUser.email === 'sistemas@colgemelli.edu.co' && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive('/dashboard')}
-                    tooltip="Dashboard"
-                  >
-                    <Link href="/dashboard">
-                      <LayoutDashboard />
-                      <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-            )}
-             {currentUser.role === 'Administrador' && (
-              <>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive('/diagnosis')}
-                    tooltip="Diagnóstico"
-                  >
-                    <Link href="/diagnosis">
-                      <HeartPulse />
-                      <span className="group-data-[collapsible=icon]:hidden">Diagnóstico</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </>
+            {isAdmin && (
+                <>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive('/dashboard')}
+                        tooltip="Dashboard"
+                      >
+                        <Link href="/dashboard">
+                          <LayoutDashboard />
+                          <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive('/diagnosis')}
+                        tooltip="Diagnóstico"
+                      >
+                        <Link href="/diagnosis">
+                          <HeartPulse />
+                          <span className="group-data-[collapsible=icon]:hidden">Diagnóstico</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </>
             )}
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -183,18 +184,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={isActive('/calendar')}
-                tooltip="Calendario"
-              >
-                <Link href="/calendar">
-                  <Calendar />
-                  <span className="group-data-[collapsible=icon]:hidden">Calendario</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {(isAdmin || isServiceUser) && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive('/calendar')}
+                  tooltip="Calendario"
+                >
+                  <Link href="/calendar">
+                    <Calendar />
+                    <span className="group-data-[collapsible=icon]:hidden">Calendario</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
@@ -207,7 +210,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-             {currentUser.role === 'Administrador' && (
+             {isAdmin && (
                 <SidebarMenuItem>
                 <SidebarMenuButton
                     asChild
@@ -282,12 +285,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <span>Perfil</span>
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Configuración</span>
-                </Link>
-              </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem asChild>
+                    <Link href="/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Configuración</span>
+                    </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild onClick={async () => await auth.signOut()}>
                 <Link href="/login">
