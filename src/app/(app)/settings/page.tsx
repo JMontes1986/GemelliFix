@@ -302,6 +302,11 @@ export default function SettingsPage() {
         setIsUpdating(false);
     };
 
+    const openNewTechnicianDialog = () => {
+        setNewUserForm({ name: '', email: '', password: '', role: 'Servicios Generales' });
+        setIsNewUserDialogOpen(true);
+    };
+
 
   return (
     <div className="space-y-6">
@@ -600,7 +605,7 @@ export default function SettingsPage() {
                             Define el personal de mantenimiento y sus especialidades.
                         </CardDescription>
                     </div>
-                    <Button>
+                    <Button onClick={openNewTechnicianDialog}>
                         <PlusCircle className="mr-2" /> Añadir Personal
                     </Button>
                 </div>
