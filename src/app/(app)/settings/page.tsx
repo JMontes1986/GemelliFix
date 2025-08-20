@@ -349,12 +349,6 @@ export default function SettingsPage() {
         setIsUpdating(false);
     };
 
-    const openNewTechnicianDialog = () => {
-        setNewUserForm({ name: '', email: '', password: '', role: 'Servicios Generales' });
-        setIsNewUserDialogOpen(true);
-    };
-
-
   return (
     <div className="space-y-6">
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -592,9 +586,8 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
-          <TabsTrigger value="technicians">Servicios Generales</TabsTrigger>
           <TabsTrigger value="locations">Zonas y Sitios</TabsTrigger>
           <TabsTrigger value="categories">Categorías</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
@@ -648,61 +641,6 @@ export default function SettingsPage() {
                         <TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
                         <TableCell>
                             <Button variant="outline" size="sm" onClick={() => handleEditClick(user)}>Editar</Button>
-                        </TableCell>
-                        </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="technicians">
-          <Card>
-            <CardHeader>
-                <div className="flex justify-between items-center">
-                    <div>
-                        <CardTitle className="font-headline">Gestión de Servicios Generales</CardTitle>
-                        <CardDescription>
-                            Define el personal de mantenimiento y sus especialidades.
-                        </CardDescription>
-                    </div>
-                    <Button onClick={openNewTechnicianDialog}>
-                        <PlusCircle className="mr-2" /> Añadir Personal
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[80px]">Avatar</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Rol</TableHead>
-                    <TableHead>Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoadingTechnicians ? (
-                    <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center">
-                           <Loader2 className="mx-auto h-8 w-8 animate-spin" />
-                        </TableCell>
-                    </TableRow>
-                  ) : (
-                    technicians.map((tech) => (
-                        <TableRow key={tech.id}>
-                        <TableCell>
-                            <Avatar>
-                            <AvatarImage src={tech.avatar} alt={tech.name} />
-                            <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                        </TableCell>
-                        <TableCell className="font-medium">{tech.name}</TableCell>
-                        <TableCell><Badge variant="secondary">{tech.role}</Badge></TableCell>
-                        <TableCell>
-                            <Button variant="outline" size="sm" onClick={() => handleEditClick(tech)}>Editar</Button>
                         </TableCell>
                         </TableRow>
                     ))
