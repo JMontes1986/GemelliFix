@@ -1,74 +1,65 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Función para verificar si un usuario tiene un rol de administrador.
-    function isAdministrator() {
-      return request.auth.token.admin == true;
-    }
-    
-    // Función para verificar si un usuario es el propietario del documento.
-    function isOwner(userId) {
-        return request.auth.uid == userId;
+    // Regla global para Administradores: Acceso total a todo.
+    // Esta es la regla principal que desbloquea la vista de administrador.
+    match /{document=**} {
+      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
     }
 
     // Reglas para la colección 'users'
     match /users/{userId} {
-      // Los administradores pueden leer, escribir y eliminar cualquier perfil de usuario.
-      allow read, write, delete: if isAdministrator();
       // Los usuarios pueden leer y actualizar su propio perfil.
-      allow read, update: if isOwner(userId);
+      allow read, update: if request.auth.uid == userId;
+      // Solo los administradores pueden crear o eliminar usuarios. (Heredado de la regla global)
     }
     
     // Reglas para la colección 'tickets'
     match /tickets/{ticketId} {
-      // Los administradores pueden realizar cualquier acción en los tickets.
-      allow read, write, delete: if isAdministrator();
-      // Los usuarios pueden crear tickets.
-      allow create: if request.auth != null;
-      // Los usuarios pueden leer los tickets que ellos crearon.
-      allow read: if isOwner(request.resource.data.requesterId);
-      // El personal de Servicios Generales puede leer los tickets que tienen asignados.
-      allow read: if request.auth.uid in resource.data.assignedToIds;
-      // El personal de Servicios Generales puede actualizar los tickets que tienen asignados.
-      allow update: if request.auth.uid in resource.data.assignedToIds;
+        // Permitir creación a cualquier usuario autenticado
+        allow create: if request.auth != null;
+
+        // Permitir lectura si:
+        // 1. Eres el solicitante.
+        // 2. Eres de Servicios Generales.
+        // 3. Eres Administrador (cubierto por la regla global).
+        allow read: if request.auth.uid == resource.data.requesterId 
+                        || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Servicios Generales';
+
+        // Permitir actualización si:
+        // 1. Eres de Servicios Generales.
+        // 2. Eres Administrador (cubierto por la regla global).
+        allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Servicios Generales';
     }
 
     // Reglas para la colección 'notifications'
     match /notifications/{notificationId} {
-        // Los usuarios solo pueden leer o actualizar (marcar como leída) sus propias notificaciones.
-        allow read, update: if isOwner(resource.data.userId);
-        // Los administradores pueden crear notificaciones (acción del servidor).
-        allow create: if isAdministrator();
-    }
-    
-    // Reglas para las colecciones de configuración (solo para administradores)
-    match /zones/{zoneId} {
-      allow read, write: if isAdministrator() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Servicios Generales';
-    }
-    
-    match /sites/{siteId} {
-      allow read, write: if isAdministrator() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Servicios Generales';
-    }
-    
-    // Reglas para los eventos del calendario
-    match /scheduleEvents/{eventId} {
-      allow read: if isAdministrator() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Servicios Generales';
-      allow create: if isAdministrator() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Servicios Generales';
-      allow update, delete: if isAdministrator();
-    }
-    
-    // Reglas para los logs
-    match /logs/{logId} {
-      allow read: if isAdministrator();
-      allow create: if request.auth != null; // Cualquiera puede generar logs (ej: creación de ticket)
+      // Un usuario puede leer y actualizar (marcar como leída) sus propias notificaciones.
+      allow read, update: if request.auth.uid == resource.data.userId;
+      // La creación de notificaciones se maneja desde el backend (servidor o funciones).
     }
 
-    // Reglas para los logs de diagnóstico (solo para pruebas)
-    match /diagnosis_logs/{logId} {
-        allow create: if request.auth != null;
+    // Reglas para eventos del calendario
+    match /scheduleEvents/{eventId} {
+      // Solo el personal de Servicios Generales y Administradores pueden ver/crear eventos.
+      allow read, create: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Servicios Generales';
+    }
+
+    // Reglas para los logs
+    match /logs/{logId} {
+      // Los logs son de solo lectura para los Administradores. La creación se maneja desde el backend.
+      allow read: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
+    }
+
+    // Reglas para datos maestros (zonas, sitios)
+    match /zones/{zoneId} {
+        // Lectura para usuarios autenticados, escritura solo para admins.
+        allow read: if request.auth != null;
+    }
+    match /sites/{siteId} {
+        allow read: if request.auth != null;
     }
   }
 }
