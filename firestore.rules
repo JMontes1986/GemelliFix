@@ -2,13 +2,62 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Regla simplificada:
-    // Permite la lectura y escritura en cualquier documento de la base de datos
-    // únicamente si el usuario ha iniciado sesión (está autenticado).
-    // Esto es seguro para esta aplicación, ya que no hay acceso anónimo
-    // y todos los usuarios son parte de la institución.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // Helper functions
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isRole(role) {
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    // Users
+    match /users/{userId} {
+      allow get: if isAuth();
+      allow list: if isRole('Administrador');
+      allow create: if !isAuth(); // Allow user creation during sign-up
+      allow update: if request.auth.uid == userId; // Users can update their own profile
+    }
+
+    // Tickets
+    match /tickets/{ticketId} {
+      allow read: if isAuth(); // Any authenticated user can read tickets
+      allow create: if isAuth(); // Any authenticated user can create a ticket
+      allow update: if isRole('Administrador') || (isRole('Servicios Generales') && resource.data.assignedToIds[0] == request.auth.uid); // Admins or assigned technicians can update
+    }
+    
+    // Schedule Events
+    match /scheduleEvents/{eventId} {
+      allow read: if isAuth();
+      allow create: if isRole('Administrador') || isRole('Servicios Generales');
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+        allow read, update: if isAuth() && request.auth.uid == resource.data.userId;
+        allow create: if isAuth();
+    }
+    
+    // Logs
+    match /logs/{logId} {
+      allow read: if isRole('Administrador');
+      allow create: if isAuth();
+    }
+    
+    // Diagnosis Logs (for testing)
+    match /diagnosis_logs/{logId} {
+        allow read, write: if isAuth();
+    }
+    
+    // Zones and Sites
+    match /zones/{zoneId} {
+        allow read: if isAuth();
+        allow create, update: if isRole('Administrador');
+    }
+     match /sites/{siteId} {
+        allow read: if isAuth();
+        allow create, update: if isRole('Administrador');
     }
   }
 }
