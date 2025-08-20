@@ -315,6 +315,38 @@ export default function DiagnosisPage() {
             <p>Una vez que la base de datos esté creada, esta prueba de conexión debería funcionar.</p>
         </CardContent>
       </Card>
+      
+      <Card className="w-full max-w-2xl border-yellow-500 border-2 bg-yellow-50">
+          <CardHeader>
+              <CardTitle className="font-headline text-2xl flex items-center gap-3">
+                  <AlertTriangle className="text-yellow-600 h-8 w-8" />
+                  Diagnóstico: No se carga el personal de Servicios Generales
+              </CardTitle>
+              <CardDescription className="text-yellow-800">
+                  Si la pestaña de "Servicios Generales" en Configuración aparece vacía o con un error, es casi seguro que falta un índice en Firestore.
+              </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-yellow-900">
+              <p>La aplicación necesita consultar a los usuarios que tienen el rol "Servicios Generales" y ordenarlos por nombre. Para que esta operación funcione, Firestore requiere un <strong>índice compuesto</strong>.</p>
+              <p className="font-medium">Solución: Debes añadir el siguiente bloque de código a tu archivo <code className="bg-yellow-200/50 px-1 py-0.5 rounded">firestore.indexes.json</code>:</p>
+              <pre className="bg-yellow-200/50 p-4 rounded-md text-xs overflow-x-auto">
+                  <code>
+{`
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "role", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "ASCENDING" }
+      ]
+    }
+`}
+                  </code>
+              </pre>
+              <p>Asegúrate de añadirlo dentro del array <code className="bg-yellow-200/50 px-1 py-0.5 rounded">"indexes"</code> existente, sin eliminar los otros índices. Después de guardar el cambio, el sistema debería aplicar la configuración.</p>
+          </CardContent>
+      </Card>
+
 
       <Card className="w-full max-w-2xl">
         <CardHeader>
@@ -495,5 +527,3 @@ export default function DiagnosisPage() {
     </div>
   );
 }
-
-    
