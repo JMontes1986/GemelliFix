@@ -32,15 +32,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { zones, sites, categories } from '@/lib/data';
 import { db, storage, auth } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud, File as FileIcon, X, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createLog } from '@/lib/utils';
-import type { User, Ticket } from '@/lib/types';
+import type { User, Ticket, Zone, Site, Category } from '@/lib/types';
 import { suggestTicketDetails } from '@/ai/flows/suggest-ticket-details';
 
 
@@ -66,6 +65,10 @@ export default function CreateTicketPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [isAuthLoading, setIsAuthLoading] = React.useState(true);
   const [isAiLoading, setIsAiLoading] = React.useState(false);
+
+  const [zones, setZones] = React.useState<Zone[]>([]);
+  const [sites, setSites] = React.useState<Site[]>([]);
+  const [categories, setCategories] = React.useState<Category[]>([]);
   
   React.useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(user => {
@@ -75,7 +78,28 @@ export default function CreateTicketPage() {
         router.push('/login');
       }
     });
-    return () => unsubscribe();
+
+    const qZones = query(collection(db, 'zones'), orderBy('name'));
+    const unsubZones = onSnapshot(qZones, snapshot => {
+        setZones(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone)));
+    });
+    
+    const qSites = query(collection(db, 'sites'), orderBy('name'));
+    const unsubSites = onSnapshot(qSites, snapshot => {
+        setSites(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Site)));
+    });
+
+    const qCategories = query(collection(db, 'categories'), orderBy('name'));
+    const unsubCategories = onSnapshot(qCategories, snapshot => {
+        setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
+    });
+
+    return () => {
+      unsubscribe();
+      unsubZones();
+      unsubSites();
+      unsubCategories();
+    };
   }, [router]);
 
   const form = useForm<TicketFormValues>({
@@ -514,3 +538,5 @@ export default function CreateTicketPage() {
     </div>
   );
 }
+
+    

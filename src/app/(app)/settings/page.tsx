@@ -36,15 +36,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { PlusCircle, Loader2, Camera } from 'lucide-react';
-import { categories } from '@/lib/data';
+import { PlusCircle, Loader2, Camera, UploadCloud } from 'lucide-react';
+import { categories as initialCategories, sites as initialSites, zones as initialZones } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy, writeBatch } from 'firebase/firestore';
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
-import type { User, Zone, Site } from '@/lib/types';
+import type { User, Zone, Site, Category } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
   Table,
@@ -71,6 +71,7 @@ export default function SettingsPage() {
     
     const [zones, setZones] = React.useState<Zone[]>([]);
     const [sites, setSites] = React.useState<Site[]>([]);
+    const [categories, setCategories] = React.useState<Category[]>([]);
     const [isLoadingLocations, setIsLoadingLocations] = React.useState(true);
     const [isLocationDialogOpen, setIsLocationDialogOpen] = React.useState(false);
     const [editingLocation, setEditingLocation] = React.useState<{type: 'zone' | 'site', data: Zone | Site} | null>(null);
@@ -95,8 +96,8 @@ export default function SettingsPage() {
     const [slaTimes, setSlaTimes] = React.useState({
         urgent: 12,
         high: 24,
-        medium: 3,
-        low: 7,
+        medium: 36,
+        low: 48,
     });
     const [notificationPrefs, setNotificationPrefs] = React.useState({
         newTicket: true,
@@ -137,11 +138,18 @@ export default function SettingsPage() {
             const fetchedSites = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Site));
             setSites(fetchedSites);
         });
+        
+        const qCategories = query(collection(db, 'categories'), orderBy('name'));
+        const unsubCategories = onSnapshot(qCategories, (snapshot) => {
+            const fetchedCategories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
+            setCategories(fetchedCategories);
+        });
 
         return () => {
             unsubUsers();
             unsubZones();
             unsubSites();
+            unsubCategories();
         };
     }, [toast]);
     
@@ -323,6 +331,43 @@ export default function SettingsPage() {
             description: "Los cambios en la configuración del sistema han sido guardados.",
         });
         setIsUpdating(false);
+    };
+
+    const handleSeedData = async () => {
+        setIsUpdating(true);
+        try {
+            const batch = writeBatch(db);
+
+            // Seed Zones
+            initialZones.forEach(zone => {
+                const docRef = doc(db, "zones", zone.id);
+                batch.set(docRef, zone);
+            });
+
+            // Seed Sites
+            initialSites.forEach(site => {
+                const docRef = doc(db, "sites", site.id);
+                batch.set(docRef, site);
+            });
+            
+            // Seed Categories
+            initialCategories.forEach(category => {
+                const docRef = doc(db, "categories", category.id);
+                batch.set(docRef, category);
+            });
+
+            await batch.commit();
+            toast({
+                title: '¡Datos Cargados!',
+                description: 'Las zonas, sitios y categorías iniciales se han guardado en Firestore.'
+            });
+
+        } catch (error) {
+            console.error("Error seeding data:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los datos maestros.'});
+        } finally {
+            setIsUpdating(false);
+        }
     };
 
   return (
@@ -655,7 +700,7 @@ export default function SettingsPage() {
                                 Administra las categorías para las solicitudes de mantenimiento.
                             </CardDescription>
                         </div>
-                        <Button>
+                        <Button disabled>
                             <PlusCircle className="mr-2" /> Nueva Categoría
                         </Button>
                     </div>
@@ -669,11 +714,13 @@ export default function SettingsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {categories.map((category) => (
+                      {isLoadingLocations ? (
+                          <TableRow><TableCell colSpan={2} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                      ) : categories.map((category) => (
                         <TableRow key={category.id}>
                           <TableCell className="font-medium">{category.name}</TableCell>
                           <TableCell>
-                            <Button variant="outline" size="sm">Editar</Button>
+                            <Button variant="outline" size="sm" disabled>Editar</Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -688,10 +735,21 @@ export default function SettingsPage() {
                 <CardHeader>
                     <CardTitle className="font-headline">Configuración del Sistema</CardTitle>
                     <CardDescription>
-                        Parámetros avanzados como SLAs, notificaciones y más.
+                        Parámetros avanzados y carga de datos iniciales.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8">
+                  <div className="space-y-4 p-4 border rounded-lg">
+                     <h3 className="text-lg font-medium text-primary">Carga de Datos Maestros</h3>
+                     <p className="text-sm text-muted-foreground">
+                        Usa este botón para poblar la base de datos con los datos iniciales de Zonas, Sitios y Categorías. Esto solo es necesario hacerlo una vez.
+                     </p>
+                     <Button onClick={handleSeedData} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <UploadCloud className="mr-2"/>
+                        Cargar Datos Maestros
+                     </Button>
+                  </div>
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium text-primary">Tiempos de Respuesta (SLA)</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -704,11 +762,11 @@ export default function SettingsPage() {
                             <Input id="sla-high" type="number" value={slaTimes.high} onChange={(e) => setSlaTimes({...slaTimes, high: +e.target.value})} />
                         </div>
                          <div className="space-y-2">
-                            <Label htmlFor="sla-medium">Prioridad Media (días)</Label>
+                            <Label htmlFor="sla-medium">Prioridad Media (horas)</Label>
                             <Input id="sla-medium" type="number" value={slaTimes.medium} onChange={(e) => setSlaTimes({...slaTimes, medium: +e.target.value})} />
                         </div>
                          <div className="space-y-2">
-                            <Label htmlFor="sla-low">Prioridad Baja (días)</Label>
+                            <Label htmlFor="sla-low">Prioridad Baja (horas)</Label>
                             <Input id="sla-low" type="number" value={slaTimes.low} onChange={(e) => setSlaTimes({...slaTimes, low: +e.target.value})} />
                         </div>
                     </div>
@@ -759,3 +817,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
