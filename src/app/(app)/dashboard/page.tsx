@@ -9,6 +9,8 @@ import {
   Clock,
   CalendarPlus,
   Sparkles,
+  Users,
+  Zone,
 } from 'lucide-react';
 import {
   Card,
@@ -27,15 +29,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from '@/components/ui/chart';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell } from 'recharts';
-import type { ChartConfig } from '@/components/ui/chart';
 import Link from 'next/link';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import {
@@ -56,59 +49,6 @@ import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Ticket } from '@/lib/types';
 import { GemelliFixLogo } from '@/components/icons';
-
-
-const slaComplianceConfig = {
-  count: {
-    label: 'Tickets',
-  },
-  en_tiempo: {
-    label: 'En Tiempo',
-    color: 'hsl(var(--chart-2))',
-  },
-  en_riesgo: {
-    label: 'En Riesgo',
-    color: 'hsl(var(--chart-4))',
-  },
-  vencido: {
-    label: 'Vencido',
-    color: 'hsl(var(--destructive))',
-  },
-} satisfies ChartConfig;
-
-
-const ticketsByZoneConfig = {
-    tickets: {
-        label: 'Tickets',
-    },
-    'Bloque A - Aulas': {
-        label: 'Bloque A',
-        color: 'hsl(var(--chart-1))',
-    },
-    'Bloque B - Laboratorios': {
-        label: 'Bloque B',
-        color: 'hsl(var(--chart-2))',
-    },
-    'Áreas Administrativas': {
-        label: 'Admin',
-        color: 'hsl(var(--chart-3))',
-    },
-    'Zonas Comunes': {
-        label: 'Comunes',
-        color: 'hsl(var(--chart-4))',
-    },
-     'Default': {
-        label: 'Otra',
-        color: 'hsl(var(--chart-5))',
-    }
-} satisfies ChartConfig;
-
-const zoneColorMap: Record<string, string> = {
-    'Bloque A - Aulas': ticketsByZoneConfig['Bloque A - Aulas'].color,
-    'Bloque B - Laboratorios': ticketsByZoneConfig['Bloque B - Laboratorios'].color,
-    'Áreas Administrativas': ticketsByZoneConfig['Áreas Administrativas'].color,
-    'Zonas Comunes': ticketsByZoneConfig['Zonas Comunes'].color,
-};
 
 
 function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
@@ -202,17 +142,7 @@ export default function DashboardPage() {
       acc[ticket.zone] = (acc[ticket.zone] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
-  ).map(([zone, count]) => ({ 
-      zone, 
-      tickets: count, 
-      fill: zoneColorMap[zone] || ticketsByZoneConfig['Default'].color,
-  }));
-
-    const slaComplianceData = [
-      { status: 'en_tiempo', count: closedTickets.filter(t => new Date(t.resolvedAt || t.dueDate) <= new Date(t.dueDate)).length, fill: 'var(--color-en_tiempo)' },
-      { status: 'vencido', count: closedTickets.filter(t => new Date(t.resolvedAt || t.dueDate) > new Date(t.dueDate)).length, fill: 'var(--color-vencido)' },
-    ];
-
+  );
 
   const handleAnalysis = async () => {
     setAnalysisOpen(true);
@@ -310,72 +240,45 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+        <Card>
           <CardHeader>
             <CardTitle className="font-headline">Tickets por Zona</CardTitle>
-            <CardDescription>Volumen de solicitudes activas.</CardDescription>
+            <CardDescription>Volumen de solicitudes activas por cada zona.</CardDescription>
           </CardHeader>
-          <CardContent className="pl-2">
-            {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
-            <ChartContainer config={ticketsByZoneConfig} className="h-[300px] w-full">
-              <BarChart
-                accessibilityLayer
-                data={ticketsByZoneData}
-                layout="vertical"
-                margin={{ left: 10, right: 10 }}
-              >
-                <CartesianGrid horizontal={false} />
-                <YAxis
-                  dataKey="zone"
-                  type="category"
-                  tickLine={false}
-                  tickMargin={10}
-                  axisLine={false}
-                  tickFormatter={(value) => {
-                      const config = ticketsByZoneConfig[value as keyof typeof ticketsByZoneConfig];
-                      return config ? config.label : value;
-                  }}
-                  />
-                <XAxis dataKey="tickets" type="number" hide />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="line" />}
-                />
-                <Bar dataKey="tickets" radius={5}>
-                    {ticketsByZoneData.map((entry) => (
-                        <Cell key={`cell-${entry.zone}`} fill={entry.fill} />
-                    ))}
-                </Bar>
-              </BarChart>
-            </ChartContainer>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-[200px] w-full" /> : (
+              <div className="space-y-4">
+                {ticketsByZoneData.map(([zone, count]) => (
+                    <div key={zone} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Zone className="h-5 w-5 text-muted-foreground" />
+                            <span className="font-medium">{zone}</span>
+                        </div>
+                        <span className="font-bold text-lg">{count}</span>
+                    </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
-        <Card className="lg:col-span-3">
+        <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Cumplimiento de SLA</CardTitle>
-            <CardDescription>Estado de los tickets cerrados este mes.</CardDescription>
+            <CardTitle className="font-headline">Personal Activo</CardTitle>
+            <CardDescription>Resumen del equipo de Servicios Generales.</CardDescription>
           </CardHeader>
-          <CardContent className="flex items-center justify-center">
-            {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
-            <ChartContainer
-              config={slaComplianceConfig}
-              className="h-[300px] w-full max-w-[300px]"
-            >
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent nameKey="status" />} />
-                <Pie data={slaComplianceData} dataKey="count" nameKey="status" innerRadius={60}>
-                    {slaComplianceData.map((entry) => (
-                        <Cell key={`cell-${entry.status}`} fill={entry.fill} />
-                    ))}
-                </Pie>
-                <ChartLegend
-                  content={<ChartLegendContent nameKey="status" />}
-                  className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-                />
-              </PieChart>
-            </ChartContainer>
+          <CardContent>
+             {isLoading ? <Skeleton className="h-[200px] w-full" /> : (
+              <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="font-semibold">Total de Técnicos</div>
+                    <div className="font-bold text-2xl">...</div>
+                  </div>
+                   <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="font-semibold">Técnicos Disponibles</div>
+                    <div className="font-bold text-2xl text-green-600">...</div>
+                  </div>
+              </div>
             )}
           </CardContent>
         </Card>
