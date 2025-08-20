@@ -41,7 +41,7 @@ import { PlusCircle, Loader2 } from 'lucide-react';
 import { categories } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { collection, onSnapshot, doc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Zone, Site } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
