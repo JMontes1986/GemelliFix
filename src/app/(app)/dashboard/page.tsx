@@ -59,6 +59,7 @@ import { db } from '@/lib/firebase';
 import type { Ticket, User } from '@/lib/types';
 import { GemelliFixLogo } from '@/components/icons';
 import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 
 function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
@@ -91,6 +92,16 @@ function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: b
             </DialogContent>
         </Dialog>
     );
+}
+
+const getSlaProgressColor = (priority: string) => {
+    switch(priority) {
+        case 'Urgente': return 'bg-red-500';
+        case 'Alta': return 'bg-orange-500';
+        case 'Media': return 'bg-yellow-400';
+        case 'Baja': return 'bg-green-500';
+        default: return 'bg-primary';
+    }
 }
 
 
@@ -330,7 +341,7 @@ export default function DashboardPage() {
                             <span className="font-medium">{priority}</span>
                             <span className="text-muted-foreground font-semibold">{value}%</span>
                           </div>
-                          <Progress value={value} aria-label={`Cumplimiento de SLA para prioridad ${priority}`} />
+                          <Progress value={value} indicatorClassName={getSlaProgressColor(priority)} aria-label={`Cumplimiento de SLA para prioridad ${priority}`} />
                       </div>
                   ))}
               </div>
