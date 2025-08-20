@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -586,8 +585,9 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="technicians">Servicios Generales</TabsTrigger>
           <TabsTrigger value="locations">Zonas y Sitios</TabsTrigger>
           <TabsTrigger value="categories">Categorías</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
@@ -639,6 +639,54 @@ export default function SettingsPage() {
                         <TableCell className="font-medium">{user.name}</TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
+                        <TableCell>
+                            <Button variant="outline" size="sm" onClick={() => handleEditClick(user)}>Editar</Button>
+                        </TableCell>
+                        </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="technicians">
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-headline">Personal de Servicios Generales</CardTitle>
+              <CardDescription>
+                Usuarios con el rol de Servicios Generales asignados en el sistema.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[80px]">Avatar</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoadingTechnicians ? (
+                     <TableRow>
+                        <TableCell colSpan={4} className="h-24 text-center">
+                           <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+                        </TableCell>
+                    </TableRow>
+                  ) : (
+                    technicians.map((user) => (
+                        <TableRow key={user.id}>
+                        <TableCell>
+                            <Avatar>
+                            <AvatarImage src={user.avatar} alt={user.name} />
+                            <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                        </TableCell>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
                         <TableCell>
                             <Button variant="outline" size="sm" onClick={() => handleEditClick(user)}>Editar</Button>
                         </TableCell>
