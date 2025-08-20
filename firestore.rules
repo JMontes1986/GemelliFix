@@ -2,62 +2,46 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Rules for user profiles
+
     match /users/{userId} {
-      // Any authenticated user can read a single user profile.
       allow get: if request.auth != null;
-      // Only admins can list all users or update any user profile.
       allow list, update: if request.auth.token.admin == true;
-    }
-    
-    // Rules for tickets
-    match /tickets/{ticketId} {
-        // Any authenticated user can read tickets.
-        allow get: if request.auth != null;
-        // Authenticated users can create tickets.
-        allow create: if request.auth != null;
-        // Users can update a ticket if they are an admin or the assigned technician.
-        allow update: if request.auth != null && (request.auth.token.admin == true || request.auth.uid in resource.data.assignedToIds);
-    }
-    
-    // Rules for notifications
-    match /notifications/{notificationId} {
-        // Users can read their own notifications.
-        allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
-        // Backend or trusted roles can create notifications.
-        allow create: if request.auth != null;
+      allow create: if request.auth != null;
     }
 
-    // Rules for audit logs
-    match /logs/{logId} {
-        // Only admins can read the full audit trail.
-        allow read: if request.auth.token.admin == true;
-        // Any authenticated user action can create a log entry.
+    match /tickets/{ticketId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth.uid == request.resource.data.requesterId;
+      allow update: if request.auth.token.admin == true || request.auth.uid == resource.data.requesterId || request.auth.uid in resource.data.assignedToIds;
+    }
+    
+    match /notifications/{notificationId} {
+        allow read, update: if request.auth.uid == resource.data.userId;
         allow create: if request.auth != null;
     }
     
-    // Rules for system settings like zones and sites
+    match /scheduleEvents/{eventId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth.token.admin == true;
+    }
+    
     match /zones/{zoneId} {
         allow read: if request.auth != null;
-        allow create, update: if request.auth.token.admin == true;
+        allow create, update, delete: if request.auth.token.admin == true;
     }
+    
     match /sites/{siteId} {
         allow read: if request.auth != null;
-        allow create, update: if request.auth.token.admin == true;
+        allow create, update, delete: if request.auth.token.admin == true;
     }
 
-    // Rules for calendar events
-    match /scheduleEvents/{eventId} {
-        // Any authenticated user can read calendar events.
-        allow read: if request.auth != null;
-        // Admins and assigned technicians can create/update events.
-        allow create, update: if request.auth != null;
+    match /logs/{logId} {
+      allow read: if request.auth.token.admin == true;
+      allow create: if request.auth != null;
     }
-
-    // Rules for diagnosis logs
+    
     match /diagnosis_logs/{logId} {
-        // Allow any authenticated user to create a diagnosis log entry.
-        allow create: if request.auth != null;
+      allow create: if request.auth != null;
     }
   }
 }
