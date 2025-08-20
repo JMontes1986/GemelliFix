@@ -18,7 +18,8 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
-  Tooltip
+  Tooltip,
+  Cell
 } from "recharts"
 import {
   Card,
@@ -207,6 +208,8 @@ export default function DashboardPage() {
     }
   }
 
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
 
   return (
     <div className="flex flex-col gap-4">
@@ -303,7 +306,11 @@ export default function DashboardPage() {
                       borderRadius: 'var(--radius)'
                     }}
                   />
-                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="total" radius={[0, 4, 4, 0]}>
+                    {ticketsByZoneData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
