@@ -46,7 +46,6 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import type { User, Zone, Site } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import LogsPage from './logs/page';
 import {
   Table,
   TableBody,
@@ -64,7 +63,6 @@ export default function SettingsPage() {
     const [allUsers, setAllUsers] = React.useState<User[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
     const [isUpdating, setIsUpdating] = React.useState(false);
-    const [activeTab, setActiveTab] = React.useState("users");
     const { toast } = useToast();
     
     // State for avatar management in dialog
@@ -521,13 +519,12 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="locations">Zonas y Sitios</TabsTrigger>
           <TabsTrigger value="categories">Categorías</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
-          <TabsTrigger value="logs">Logs del Sistema</TabsTrigger>
         </TabsList>
         
         <TabsContent value="users">
@@ -757,9 +754,6 @@ export default function SettingsPage() {
                   </Button>
                 </CardFooter>
             </Card>
-        </TabsContent>
-        <TabsContent value="logs">
-            {activeTab === 'logs' ? <LogsPage /> : null}
         </TabsContent>
       </Tabs>
     </div>
