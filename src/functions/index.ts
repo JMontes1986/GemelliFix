@@ -74,3 +74,4 @@ export const onUserUpdated = onDocumentUpdated('users/{userId}', async (event) =
         await setRoleClaim(uid, newRole);
     }
 });
+
