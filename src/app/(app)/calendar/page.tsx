@@ -49,6 +49,7 @@ import { useToast } from '@/hooks/use-toast';
 import { suggestCalendarAssignment, type SuggestCalendarAssignmentInput, type SuggestCalendarAssignmentOutput } from '@/ai/flows/suggest-calendar-assignment';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { createGoogleCalendarEvent } from '@/lib/google-calendar';
 
 
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
@@ -449,10 +450,23 @@ export default function CalendarPage() {
                 title: '¡Evento Programado!',
                 description: `Se ha asignado el ticket a ${technician.name} y se le ha notificado.`
             });
+            
+            // Sync with Google Calendar
+            await createGoogleCalendarEvent({
+                summary: newEvent.title,
+                description: newEvent.description || 'Sin descripción.',
+                start: { dateTime: newEvent.start.toISOString(), timeZone: 'America/Bogota' },
+                end: { dateTime: newEvent.end.toISOString(), timeZone: 'America/Bogota' },
+            });
+
+            toast({
+                title: 'Sincronizado con Google Calendar',
+                description: 'El evento también ha sido creado en el calendario de Google.'
+            });
 
         } catch (error) {
             console.error("Error saving event:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el evento en el calendario.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el evento. Revisa la conexión con Google Calendar.' });
         } finally {
             setIsAiDialogOpen(false);
         }
@@ -486,6 +500,19 @@ export default function CalendarPage() {
             }
 
             toast({ title: '¡Evento Creado!', description: 'La nueva tarea ha sido añadida al calendario.' });
+            
+            // Sync with Google Calendar
+            await createGoogleCalendarEvent({
+                summary: newEvent.title,
+                description: newEvent.description || 'Sin descripción.',
+                start: { dateTime: newEvent.start.toISOString(), timeZone: 'America/Bogota' },
+                end: { dateTime: newEvent.end.toISOString(), timeZone: 'America/Bogota' },
+            });
+            
+            toast({
+                title: 'Sincronizado con Google Calendar',
+                description: 'El evento también ha sido creado en el calendario de Google.'
+            });
 
             setIsManualDialogOpen(false);
             setNewEventTitle('');
@@ -497,7 +524,7 @@ export default function CalendarPage() {
 
         } catch (error) {
             console.error("Error creating manual event:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el evento.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el evento. Revisa la conexión con Google Calendar.' });
         } finally {
             setIsCreatingEvent(false);
         }
