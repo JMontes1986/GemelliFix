@@ -38,12 +38,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { PlusCircle, Loader2 } from 'lucide-react';
-import { zones, sites, categories } from '@/lib/data';
+import { categories } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { collection, onSnapshot, doc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User } from '@/lib/types';
+import type { User, Zone, Site } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import LogsPage from './logs/page';
 import {
@@ -69,6 +69,13 @@ export default function SettingsPage() {
     const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
     const [activeTab, setActiveTab] = React.useState("users");
     const { toast } = useToast();
+    
+    const [zones, setZones] = React.useState<Zone[]>([]);
+    const [sites, setSites] = React.useState<Site[]>([]);
+    const [isLoadingLocations, setIsLoadingLocations] = React.useState(true);
+    const [isLocationDialogOpen, setIsLocationDialogOpen] = React.useState(false);
+    const [editingLocation, setEditingLocation] = React.useState<{type: 'zone' | 'site', data: Zone | Site} | null>(null);
+
 
     // State for system settings
     const [slaTimes, setSlaTimes] = React.useState({
@@ -100,10 +107,6 @@ export default function SettingsPage() {
             setIsLoadingUsers(false);
         });
 
-        return () => unsubscribe();
-    }, [toast]);
-    
-    React.useEffect(() => {
         const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
         const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
             const fetchedTechnicians: User[] = [];
@@ -118,10 +121,27 @@ export default function SettingsPage() {
             setIsLoadingTechnicians(false);
         });
 
-        return () => unsubscribe_technicians();
+        const qZones = query(collection(db, 'zones'), orderBy('name'));
+        const unsubZones = onSnapshot(qZones, (snapshot) => {
+            const fetchedZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
+            setZones(fetchedZones);
+            setIsLoadingLocations(false);
+        });
+
+        const qSites = query(collection(db, 'sites'), orderBy('name'));
+        const unsubSites = onSnapshot(qSites, (snapshot) => {
+            const fetchedSites = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Site));
+            setSites(fetchedSites);
+        });
+
+        return () => {
+            unsubscribe();
+            unsubscribe_technicians();
+            unsubZones();
+            unsubSites();
+        };
     }, [toast]);
-
-
+    
     const handleEditClick = (user: User) => {
         setSelectedUser(user);
         setIsEditDialogOpen(true);
@@ -146,6 +166,31 @@ export default function SettingsPage() {
         }
     };
     
+    const handleLocationEditClick = (type: 'zone' | 'site', data: Zone | Site) => {
+        setEditingLocation({ type, data: { ...data } });
+        setIsLocationDialogOpen(true);
+    };
+
+    const handleLocationUpdate = async () => {
+        if (!editingLocation) return;
+        setIsUpdating(true);
+        const { type, data } = editingLocation;
+        const collectionName = type === 'zone' ? 'zones' : 'sites';
+        const docRef = doc(db, collectionName, data.id);
+
+        try {
+            await updateDoc(docRef, { name: data.name });
+            toast({ title: `${type === 'zone' ? 'Zona' : 'Sitio'} Actualizado`, description: 'El nombre se ha guardado.' });
+            setIsLocationDialogOpen(false);
+            setEditingLocation(null);
+        } catch (error) {
+            console.error(`Error updating ${type}:`, error);
+            toast({ variant: 'destructive', title: 'Error', description: `No se pudo actualizar ${type === 'zone' ? 'la zona' : 'el sitio'}.` });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
     const handleSystemSave = async () => {
         setIsUpdating(true);
         // Simulate saving to a database
@@ -208,6 +253,38 @@ export default function SettingsPage() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+
+       <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Editar {editingLocation?.type === 'zone' ? 'Zona' : 'Sitio'}</DialogTitle>
+                </DialogHeader>
+                {editingLocation && (
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="location-name" className="text-right">Nombre</Label>
+                            <Input
+                                id="location-name"
+                                value={editingLocation.data.name}
+                                onChange={(e) => setEditingLocation({
+                                    ...editingLocation,
+                                    data: { ...editingLocation.data, name: e.target.value }
+                                })}
+                                className="col-span-3"
+                            />
+                        </div>
+                    </div>
+                )}
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsLocationDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleLocationUpdate} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 animate-spin" />}
+                        Guardar Cambios
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
       <div>
         <h1 className="text-2xl font-headline font-bold tracking-tight">Configuración General</h1>
         <p className="text-muted-foreground">
@@ -358,10 +435,12 @@ export default function SettingsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {zones.map(zone => (
+                                {isLoadingLocations ? (
+                                    <TableRow><TableCell colSpan={2} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                                ) : zones.map(zone => (
                                     <TableRow key={zone.id}>
                                         <TableCell>{zone.name}</TableCell>
-                                        <TableCell><Button variant="outline" size="sm">Editar</Button></TableCell>
+                                        <TableCell><Button variant="outline" size="sm" onClick={() => handleLocationEditClick('zone', zone)}>Editar</Button></TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -388,11 +467,13 @@ export default function SettingsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {sites.map(site => (
+                                {isLoadingLocations ? (
+                                    <TableRow><TableCell colSpan={3} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                                ) : sites.map(site => (
                                     <TableRow key={site.id}>
                                         <TableCell>{site.name}</TableCell>
-                                        <TableCell>{zones.find(z => z.id === site.zoneId)?.name}</TableCell>
-                                        <TableCell><Button variant="outline" size="sm">Editar</Button></TableCell>
+                                        <TableCell>{zones.find(z => z.id === site.zoneId)?.name || 'N/A'}</TableCell>
+                                        <TableCell><Button variant="outline" size="sm" onClick={() => handleLocationEditClick('site', site)}>Editar</Button></TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
