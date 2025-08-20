@@ -2,29 +2,25 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Regla general: Permitir la lectura pública de todos los archivos.
-    // Esto es útil para avatares, adjuntos de tickets y evidencias que necesitan ser visibles en la app.
-    allow read;
+    // Permite la lectura de todos los archivos para que las imágenes puedan ser vistas.
+    match /{allPaths=**} {
+      allow read;
+    }
 
-    // Regla para Avatares:
-    // Un usuario solo puede escribir (subir, actualizar, borrar) en su propia carpeta de avatares.
-    // La carpeta se identifica por el ID del usuario (userId).
+    // Permite a un usuario escribir (subir, actualizar, eliminar) solo en su propia carpeta de avatares.
+    // Esto asegura que un usuario no pueda modificar la foto de perfil de otro.
     match /avatars/{userId}/{allPaths=**} {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Regla para Adjuntos de Tickets:
-    // Cualquier usuario autenticado puede subir adjuntos a un ticket.
-    // La seguridad se basa en que solo usuarios logueados pueden crear tickets.
+    // Reglas para adjuntos de tickets
     match /ticket-attachments/{allPaths=**} {
-        allow write: if request.auth != null;
+      allow write: if request.auth != null;
     }
 
-    // Regla para Evidencia de Tickets:
-    // Cualquier usuario autenticado puede subir evidencia.
-    // Las reglas de la app y de Firestore controlan quién puede cambiar el estado de un ticket.
-     match /ticket-evidence/{allPaths=**} {
-        allow write: if request.auth != null;
+    // Reglas para evidencia de tickets
+    match /ticket-evidence/{allPaths=**} {
+      allow write: if request.auth != null;
     }
   }
 }
