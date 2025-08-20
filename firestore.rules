@@ -1,66 +1,69 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // REGLA PARA USUARIOS
-    // Permite a los administradores gestionar todos los perfiles.
-    // Permite a los usuarios leer perfiles, pero no modificar datos sensibles ni listar a todos.
+    // Reglas para la colección de usuarios
     match /users/{userId} {
-      allow get: if request.auth != null; // Cualquiera autenticado puede leer un perfil
-      allow list, update, delete: if request.auth.token.admin == true; // Solo Admins pueden listar y modificar
-      allow create: if request.auth != null; // Cualquiera puede crear su propio perfil al registrarse
-    }
+      // SOLO los administradores pueden listar todos los usuarios o actualizar perfiles.
+      allow list: if request.auth.token.admin == true;
+      allow update: if request.auth.token.admin == true || request.auth.uid == userId;
 
-    // REGLA PARA TICKETS
-    // Permite a todos los usuarios leer los tickets (para el dashboard), pero restringe la escritura.
+      // CUALQUIER usuario autenticado puede leer un perfil individual (get).
+      allow get: if request.auth != null;
+
+      // Un usuario solo puede crear su propio documento.
+      allow create: if request.auth.uid == userId;
+    }
+    
+    // Reglas para la colección de tickets
     match /tickets/{ticketId} {
-      allow read: if request.auth != null; // Cualquiera autenticado puede leer
-      allow create: if request.auth != null; // Cualquiera autenticado puede crear
-      // Admins o el técnico asignado pueden actualizar
-      allow update: if request.auth.token.admin == true || (resource.data.assignedToIds != null && request.auth.uid in resource.data.assignedToIds);
-      allow delete: if request.auth.token.admin == true; // Solo Admins pueden borrar
-    }
-
-    // REGLA PARA LOGS DE DIAGNÓSTICO
-    // Permite a cualquier usuario autenticado escribir un log de prueba.
-    match /diagnosis_logs/{logId} {
-      allow create: if request.auth != null;
+        // CUALQUIER usuario autenticado puede leer los tickets (necesario para el dashboard).
+        allow read: if request.auth != null;
+        
+        // SOLO los administradores o el solicitante pueden actualizar un ticket.
+        allow update: if request.auth.token.admin == true || request.auth.uid == resource.data.requesterId;
+        
+        // CUALQUIER usuario autenticado puede crear un ticket.
+        allow create: if request.auth != null;
     }
     
-    // REGLA PARA NOTIFICACIONES
-    // Los usuarios solo pueden ver y modificar sus propias notificaciones.
-    match /notifications/{notificationId} {
-      allow read, update, delete: if request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null; // La lógica de la app asigna el ID correcto
+    // Reglas para las colecciones de zonas y sitios (solo lectura para usuarios autenticados)
+    match /zones/{zoneId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.admin == true;
     }
     
-    // REGLA PARA LOGS DE AUDITORÍA
-    // Solo los administradores pueden leer el historial completo de acciones.
+    match /sites/{siteId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.admin == true;
+    }
+    
+    // Reglas para la colección de logs (creación para cualquiera, lectura solo para admins)
     match /logs/{logId} {
       allow read: if request.auth.token.admin == true;
       allow create: if request.auth != null;
     }
     
-    // REGLA PARA EVENTOS DEL CALENDARIO
-    // Cualquiera puede leer, pero solo Admins o el personal asignado pueden escribir.
+    // Reglas para la colección de notificaciones
+    match /notifications/{notificationId} {
+        // Los usuarios solo pueden ver y modificar sus propias notificaciones.
+        allow read, update, delete: if request.auth.uid == resource.data.userId;
+        
+        // Cualquiera puede crear una notificación (la lógica de la app asigna el userId correcto).
+        allow create: if request.auth != null;
+    }
+
+    // Reglas para la colección de eventos del calendario
     match /scheduleEvents/{eventId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth.token.admin == true || request.auth.uid == request.resource.data.technicianId;
-      allow delete: if request.auth.token.admin == true;
+        allow read: if request.auth != null;
+        allow write: if request.auth.token.admin == true || request.auth.uid == request.resource.data.technicianId;
     }
 
-    // REGLAS PARA ZONAS Y SITIOS (Datos Maestros)
-    // Cualquiera puede leer, solo Admins pueden modificar.
-    match /zones/{zoneId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.token.admin == true;
-    }
-
-    match /sites/{siteId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.token.admin == true;
+    // Regla para la colección de diagnóstico
+    match /diagnosis_logs/{logId} {
+        allow create: if request.auth != null;
+        allow read: if request.auth.token.admin == true;
     }
   }
 }
