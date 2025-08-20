@@ -13,6 +13,14 @@ import {
   MapPin,
 } from 'lucide-react';
 import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip
+} from "recharts"
+import {
   Card,
   CardContent,
   CardDescription,
@@ -45,9 +53,9 @@ import {
   type AnalyzeDashboardInput,
   type AnalyzeDashboardOutput,
 } from '@/ai/flows/analyze-dashboard-data';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Ticket } from '@/lib/types';
+import type { Ticket, User } from '@/lib/types';
 import { GemelliFixLogo } from '@/components/icons';
 
 
@@ -86,6 +94,7 @@ function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: b
 
 export default function DashboardPage() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
+  const [technicians, setTechnicians] = React.useState<User[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isAnalysisOpen, setAnalysisOpen] = React.useState(false);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
@@ -114,7 +123,17 @@ export default function DashboardPage() {
       });
       setIsLoading(false);
     });
-    return () => unsubscribe();
+    
+    const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+    const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
+        const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        setTechnicians(techData);
+    });
+    
+    return () => {
+      unsubscribe();
+      unsubscribeTechs();
+    };
   }, [toast]);
 
   const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto').length;
@@ -139,10 +158,11 @@ export default function DashboardPage() {
 
   const ticketsByZoneData = Object.entries(
     tickets.reduce((acc, ticket) => {
-      acc[ticket.zone] = (acc[ticket.zone] || 0) + 1;
+      const zoneName = ticket.zone || "Sin Zona";
+      acc[zoneName] = (acc[zoneName] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
-  );
+  ).map(([name, total]) => ({ name, total }));
 
   const handleAnalysis = async () => {
     setAnalysisOpen(true);
@@ -248,17 +268,29 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? <Skeleton className="h-[200px] w-full" /> : (
-              <div className="space-y-4">
-                {ticketsByZoneData.map(([zone, count]) => (
-                    <div key={zone} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <MapPin className="h-5 w-5 text-muted-foreground" />
-                            <span className="font-medium">{zone}</span>
-                        </div>
-                        <span className="font-bold text-lg">{count}</span>
-                    </div>
-                ))}
-              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={ticketsByZoneData} layout="vertical" margin={{ left: 20 }}>
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    width={100}
+                    />
+                  <Tooltip 
+                    cursor={{fill: 'hsl(var(--muted))'}}
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      borderColor: 'hsl(var(--border))',
+                      borderRadius: 'var(--radius)'
+                    }}
+                  />
+                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
@@ -269,14 +301,14 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
              {isLoading ? <Skeleton className="h-[200px] w-full" /> : (
-              <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <div className="font-semibold">Total de Técnicos</div>
-                    <div className="font-bold text-2xl">...</div>
+              <div className="space-y-4 h-full flex flex-col justify-center">
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="font-semibold text-lg">Total de Técnicos</div>
+                    <div className="font-bold text-3xl">{technicians.length}</div>
                   </div>
-                   <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <div className="font-semibold">Técnicos Disponibles</div>
-                    <div className="font-bold text-2xl text-green-600">...</div>
+                   <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="font-semibold text-lg">Técnicos Disponibles</div>
+                    <div className="font-bold text-3xl text-green-600">{technicians.length}</div>
                   </div>
               </div>
             )}
@@ -286,7 +318,7 @@ export default function DashboardPage() {
 
        <Card>
         <CardHeader>
-          <CardTitle className="font-headline">Tickets</CardTitle>
+          <CardTitle className="font-headline">Tickets Recientes</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -315,6 +347,7 @@ export default function DashboardPage() {
                 </TableRow>
               ) : (
                 tickets
+                    .slice(0, 5) // Show only latest 5
                     .map((ticket) => (
                     <TableRow key={ticket.id} className="cursor-pointer" onClick={() => window.location.href=`/tickets/${ticket.id}`}>
                     <TableCell>
