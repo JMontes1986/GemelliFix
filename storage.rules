@@ -3,33 +3,28 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Regla por defecto: denegar todo
-    match /{allPaths=**} {
-      allow read, write: if false;
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // Permitir la lectura pública de avatares para que se puedan mostrar en la app
-    match /avatars/{userId}/{fileName} {
-      allow read: if true;
-      // Permitir la escritura solo si el usuario está autenticado y es el dueño de esa carpeta
-      allow write: if request.auth != null && request.auth.uid == userId;
+    function isAdmin() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
     }
 
-     // Permitir la lectura pública de adjuntos de tickets
-    match /ticket-attachments/{ticketId}/{fileName} {
-      allow read: if true;
-      allow write: if request.auth != null; // Permitir que cualquier usuario autenticado suba adjuntos
+    match /avatars/{userId}/{allPaths=**} {
+      allow read;
+      allow write: if isOwner(userId) || isAdmin();
     }
 
-     // Permitir la lectura pública de evidencia de tickets
-    match /ticket-evidence/{ticketId}/{fileName} {
-      allow read: if true;
-      allow write: if request.auth != null; // Permitir que cualquier usuario autenticado suba evidencia
+    match /ticket-attachments/{ticketId}/{allPaths=**} {
+        allow read;
+        allow write: if request.auth != null;
     }
 
-    // Regla para el logo, hacerlo público para lectura
-    match /Logo.png {
-      allow read: if true;
+    match /ticket-evidence/{ticketId}/{allPaths=**} {
+        allow read;
+        allow write: if request.auth != null;
     }
   }
 }
