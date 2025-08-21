@@ -44,7 +44,7 @@ import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTim
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import type { User, Zone, Site, Category } from '@/lib/types';
+import type { User, Zone, Site, Category, Log } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
   Table,
@@ -55,9 +55,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 
 
 const userRoles: User['role'][] = ['Administrador', 'Servicios Generales', 'Docentes', 'Coordinadores', 'Administrativos'];
+
+
+const getLogActionBadgeVariant = (action: Log['action']) => {
+    if (action.startsWith('update')) return 'secondary';
+    if (action === 'login') return 'default';
+    return 'outline';
+}
 
 
 export default function SettingsPage() {
@@ -92,6 +101,10 @@ export default function SettingsPage() {
     // State for editing a user
     const [editingUser, setEditingUser] = React.useState<User | null>(null);
     const [isEditUserDialogOpen, setIsEditUserDialogOpen] = React.useState(false);
+
+    // State for logs
+    const [logs, setLogs] = React.useState<Log[]>([]);
+    const [isLoadingLogs, setIsLoadingLogs] = React.useState(true);
 
 
     // State for system settings
@@ -172,12 +185,27 @@ export default function SettingsPage() {
             const fetchedCategories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
             setCategories(fetchedCategories);
         });
+        
+        const qLogs = query(collection(db, 'logs'), orderBy('timestamp', 'desc'));
+        const unsubLogs = onSnapshot(qLogs, (snapshot) => {
+            const fetchedLogs: Log[] = [];
+            snapshot.forEach((doc) => {
+                fetchedLogs.push({ id: doc.id, ...doc.data() } as Log);
+            });
+            setLogs(fetchedLogs);
+            setIsLoadingLogs(false);
+        }, (error) => {
+            console.error("Error fetching logs:", error);
+            setIsLoadingLogs(false);
+        });
+
 
         return () => {
             unsubUsers();
             unsubZones();
             unsubSites();
             unsubCategories();
+            unsubLogs();
         };
     }, [toast, currentUser]);
     
@@ -601,11 +629,12 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="locations">Zonas y Sitios</TabsTrigger>
           <TabsTrigger value="categories">Categorías</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
+          <TabsTrigger value="logs">Logs del Sistema</TabsTrigger>
         </TabsList>
         
         <TabsContent value="users">
@@ -764,6 +793,73 @@ export default function SettingsPage() {
                   </Table>
                 </CardContent>
             </Card>
+        </TabsContent>
+        
+        <TabsContent value="logs">
+           <Card>
+            <CardHeader>
+                <CardTitle className="font-headline">Logs de Auditoría del Sistema</CardTitle>
+                <CardDescription>
+                    Aquí se muestra un registro cronológico de las acciones importantes realizadas en la plataforma.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Usuario</TableHead>
+                            <TableHead>Acción</TableHead>
+                            <TableHead>Detalles</TableHead>
+                            <TableHead className="text-right">Fecha</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoadingLogs ? (
+                            <TableRow>
+                                <TableCell colSpan={4} className="h-24 text-center">
+                                    <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+                                </TableCell>
+                            </TableRow>
+                        ) : logs.length === 0 ? (
+                             <TableRow>
+                                <TableCell colSpan={4} className="h-24 text-center">
+                                    No hay registros de logs para mostrar.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            logs.map((log) => (
+                                <TableRow key={log.id}>
+                                    <TableCell className="font-medium">
+                                        <div className="font-semibold">{log.userName}</div>
+                                        <div className="text-xs text-muted-foreground">{log.userEmail}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={getLogActionBadgeVariant(log.action)}>
+                                            {log.action.replace('_', ' ').toUpperCase()}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {log.details.ticketCode ? (
+                                            <>
+                                                Ticket <Link href={`/tickets/${log.details.ticketId}`} className="text-primary hover:underline">{log.details.ticketCode}</Link>
+                                                {log.details.field && <span> - Campo: {log.details.field}</span>}
+                                                {log.details.oldValue && <span>, Antes: '{log.details.oldValue}'</span>}
+                                                {log.details.newValue && <span>, Ahora: '{log.details.newValue}'</span>}
+                                            </>
+                                        ) : (
+                                            log.action === 'login' && 'Inicio de sesión exitoso.'
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <ClientFormattedDate date={log.timestamp?.toDate()} options={{ dateStyle: 'medium', timeStyle: 'short' }} />
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
         </TabsContent>
 
         <TabsContent value="system">
