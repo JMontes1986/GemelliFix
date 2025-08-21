@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -41,10 +40,10 @@ import { PlusCircle, Loader2, Camera, UploadCloud } from 'lucide-react';
 import { categories as initialCategories, sites as initialSites, zones as initialZones } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy, writeBatch, getDoc } from 'firebase/firestore';
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, type User as FirebaseUser } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, type User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
 import type { User, Zone, Site, Category, Log } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -70,7 +69,10 @@ const getLogActionBadgeVariant = (action: Log['action']) => {
 }
 
 
-export default function SettingsPage({ currentUser }: { currentUser: User | null }) {
+export default function SettingsPage() {
+    const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+    const [isLoadingUser, setIsLoadingUser] = React.useState(true);
+    
     const [allUsers, setAllUsers] = React.useState<User[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
     const [isUpdating, setIsUpdating] = React.useState(false);
@@ -123,32 +125,57 @@ export default function SettingsPage({ currentUser }: { currentUser: User | null
     });
 
     React.useEffect(() => {
-        if (!currentUser) {
-            // This is handled by the main layout, but provides a safeguard.
+        const unsubscribe = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
+            if (fbUser) {
+                try {
+                    const userDocRef = doc(db, 'users', fbUser.uid);
+                    const userDocSnap = await getDoc(userDocRef);
+                    if (userDocSnap.exists()) {
+                        setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
+                    } else {
+                        setCurrentUser(null);
+                        toast({ variant: 'destructive', title: 'Error de Usuario', description: 'No se encontraron datos de perfil para este usuario.' });
+                    }
+                } catch (error) {
+                    console.error("Error fetching current user data:", error);
+                    setCurrentUser(null);
+                } finally {
+                    setIsLoadingUser(false);
+                }
+            } else {
+                setCurrentUser(null);
+                setIsLoadingUser(false);
+                router.push('/login');
+            }
+        });
+
+        return () => unsubscribe();
+    }, [router, toast]);
+
+
+    React.useEffect(() => {
+        if (!currentUser || currentUser.role !== 'Administrador') {
+            setIsLoadingUsers(false);
             return;
-        }
+        };
 
-        if (currentUser.role === 'Administrador') {
-            const usersQuery = query(collection(db, 'users'), orderBy('name'));
-            const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
-                const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-                setAllUsers(fetchedUsers);
-                setIsLoadingUsers(false);
-            }, (error) => {
-                console.error("Error fetching users:", error);
-                toast({
-                    variant: "destructive",
-                    title: "Error de Permisos",
-                    description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
-                    duration: 10000,
-                });
-                setIsLoadingUsers(false);
+        const usersQuery = query(collection(db, 'users'), orderBy('name'));
+        const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
+            const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+            setAllUsers(fetchedUsers);
+            setIsLoadingUsers(false);
+        }, (error) => {
+            console.error("Error fetching users:", error);
+            toast({
+                variant: "destructive",
+                title: "Error de Permisos",
+                description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
+                duration: 10000,
             });
-            return () => unsubUsers();
-        } else {
-             setIsLoadingUsers(false);
-        }
-
+            setIsLoadingUsers(false);
+        });
+        
+        return () => unsubUsers();
     }, [currentUser, toast]);
 
 
@@ -410,21 +437,30 @@ export default function SettingsPage({ currentUser }: { currentUser: User | null
             setIsUpdating(false);
         }
     };
+
+    if (isLoadingUser) {
+        return (
+            <div className="flex h-64 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
+    }
     
     if (!currentUser) {
-        // This case is handled by the layout which shows a global loader.
+        // This case is handled by the useEffect redirecting to /login
         return null;
     }
     
     if (currentUser.role !== 'Administrador') {
-        // This case should ideally be handled by router middleware or layout checks.
-        // But as a fallback:
         return (
             <Card>
                 <CardHeader>
                     <CardTitle>Acceso Denegado</CardTitle>
                     <CardDescription>No tienes permisos para ver esta página.</CardDescription>
                 </CardHeader>
+                 <CardContent>
+                    <Button onClick={() => router.push('/tickets')}>Ir a Mis Tickets</Button>
+                </CardContent>
             </Card>
         )
     }
