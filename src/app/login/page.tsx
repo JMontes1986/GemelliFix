@@ -123,7 +123,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm mx-auto">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center">
-            <div className="w-48">
+            <div className="w-48 mx-auto">
               <GemelliFixLogo />
             </div>
           </div>

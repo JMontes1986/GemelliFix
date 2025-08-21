@@ -1,5 +1,7 @@
-import { redirect } from 'next/navigation';
+
+import LoginPage from './login/page';
 
 export default function Home() {
-  redirect('/login');
+  // Render the login page directly to avoid redirection issues on startup
+  return <LoginPage />;
 }
