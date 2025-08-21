@@ -94,7 +94,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 // Force a token refresh to get the latest custom claims.
                 await firebaseUser.getIdToken(true);
                 
-                const userDocRef = doc(db, 'users', firebaseUser.uid);
+                const userDocRef = doc(db, 'user', firebaseUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
@@ -329,3 +329,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    

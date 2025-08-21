@@ -37,7 +37,7 @@ export default function NotificationsPage() {
     React.useEffect(() => {
         const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
             if (user) {
-                const userDocRef = doc(db, 'users', user.uid);
+                const userDocRef = doc(db, 'user', user.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);

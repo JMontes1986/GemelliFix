@@ -44,7 +44,7 @@ export default function ProfilePage() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setFirebaseUser(user);
-        const userDocRef = doc(db, 'users', user.uid);
+        const userDocRef = doc(db, 'user', user.uid);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
@@ -96,7 +96,7 @@ export default function ProfilePage() {
             newAvatarUrl = await getDownloadURL(uploadResult.ref);
         }
 
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocRef = doc(db, 'user', firebaseUser.uid);
         
         const updates: Partial<User> = {};
         if (name !== currentUser.name) updates.name = name;
@@ -201,3 +201,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    

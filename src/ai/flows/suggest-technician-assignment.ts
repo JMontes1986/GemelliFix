@@ -43,7 +43,7 @@ const techniciansTool = ai.defineTool(
         })),
     },
     async () => {
-        const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        const q = query(collection(db, 'user'), where('role', '==', 'Servicios Generales'));
         const querySnapshot = await getDocs(q);
         const technicians = querySnapshot.docs.map(doc => {
             const data = doc.data() as User;
@@ -101,3 +101,5 @@ const suggestTechnicianAssignmentFlow = ai.defineFlow(
     return output!;
   }
 );
+
+    

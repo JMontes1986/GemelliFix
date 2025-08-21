@@ -125,7 +125,7 @@ export default function SettingsPage() {
     React.useEffect(() => {
         const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
             if (user) {
-                const userDocRef = doc(db, 'users', user.uid);
+                const userDocRef = doc(db, 'user', user.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
@@ -149,7 +149,7 @@ export default function SettingsPage() {
     React.useEffect(() => {
         if (!currentUser) return;
         
-        const qUsers = query(collection(db, 'users'), orderBy('name'));
+        const qUsers = query(collection(db, 'user'), orderBy('name'));
         const unsubUsers = onSnapshot(qUsers, (snapshot) => {
             const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
             setAllUsers(fetchedUsers);
@@ -315,7 +315,7 @@ export default function SettingsPage() {
 
             await updateProfile(user, { displayName: newUserForm.name, photoURL: newAvatarUrl });
 
-            await setDoc(doc(db, "users", user.uid), {
+            await setDoc(doc(db, "user", user.uid), {
                 id: user.uid,
                 uid: user.uid,
                 name: newUserForm.name,
@@ -346,7 +346,7 @@ export default function SettingsPage() {
         if (!editingUser) return;
 
         setIsUpdating(true);
-        const userRef = doc(db, "users", editingUser.id);
+        const userRef = doc(db, "user", editingUser.id);
         
         try {
             await updateDoc(userRef, {
@@ -949,3 +949,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    

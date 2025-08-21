@@ -39,10 +39,10 @@ const setRoleClaim = async (uid: string, role: string) => {
 };
 
 /**
- * Triggered when a new document is created in the 'users' collection.
+ * Triggered when a new document is created in the 'user' collection.
  * This function reads the new user's role and sets a custom claim.
  */
-export const onUserCreated = onDocumentCreated('users/{userId}', async (event) => {
+export const onUserCreated = onDocumentCreated('user/{userId}', async (event) => {
     const user = event.data?.data();
     if (!user) {
         console.log('No user data found in the creation event.');
@@ -54,10 +54,10 @@ export const onUserCreated = onDocumentCreated('users/{userId}', async (event) =
 });
 
 /**
- * Triggered when a document in the 'users' collection is updated.
+ * Triggered when a document in the 'user' collection is updated.
  * This function checks if the 'role' field has changed and updates the custom claim accordingly.
  */
-export const onUserUpdated = onDocumentUpdated('users/{userId}', async (event) => {
+export const onUserUpdated = onDocumentUpdated('user/{userId}', async (event) => {
     const dataAfter = event.data?.after.data();
     const dataBefore = event.data?.before.data();
     
@@ -75,4 +75,4 @@ export const onUserUpdated = onDocumentUpdated('users/{userId}', async (event) =
     }
 });
 
-
+    
