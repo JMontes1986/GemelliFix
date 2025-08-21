@@ -318,6 +318,7 @@ export default function TicketsPage() {
     let ticketsQuery;
     switch (currentUser.role) {
         case 'Administrador':
+        case 'SST':
             ticketsQuery = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
             break;
         case 'Servicios Generales':

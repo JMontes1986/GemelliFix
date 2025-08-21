@@ -293,6 +293,7 @@ export default function TicketDetailPage() {
 
 
   const canEdit = currentUser?.role === 'Administrador';
+  const isSST = currentUser?.role === 'SST';
   const isRequester = currentUser?.id === ticket?.requesterId;
   const isAssignedToCurrentUser = ticket?.assignedToIds?.includes(currentUser?.id ?? '') ?? false;
 
@@ -323,6 +324,10 @@ export default function TicketDetailPage() {
 
   const handleUpdate = async (field: keyof Ticket, value: any) => {
     if (!ticket || !currentUser) return;
+    if (isSST) {
+      toast({ variant: 'destructive', title: 'Acción no permitida', description: 'El rol SST no puede modificar tickets.'});
+      return;
+    }
 
     if (field === 'status') {
       if (!isStateChangeAllowed(ticket.status, value, currentUser.role)) {
@@ -396,6 +401,10 @@ export default function TicketDetailPage() {
 
   const handleProgressUpdate = async () => {
     if (!ticket || !currentUser) return;
+    if (isSST) {
+      toast({ variant: 'destructive', title: 'Acción no permitida', description: 'El rol SST no puede modificar tickets.'});
+      return;
+    }
 
     if (filesToUpload.length === 0) {
         toast({
@@ -459,6 +468,10 @@ export default function TicketDetailPage() {
   
    const handleAssignPersonnel = async (personnel: CurrentUser[]) => {
     if(!ticket || !currentUser) return;
+    if (isSST) {
+      toast({ variant: 'destructive', title: 'Acción no permitida', description: 'El rol SST no puede modificar tickets.'});
+      return;
+    }
 
     const oldValue = ticket.assignedTo || [];
 
@@ -485,7 +498,11 @@ export default function TicketDetailPage() {
   }
 
   const handleApproval = async (approve: boolean) => {
-    if (!ticket || !currentUser || currentUser.role !== 'Administrador') return;
+    if (!ticket || !currentUser || (currentUser.role !== 'Administrador' && !isSST)) return;
+    if (isSST) {
+      toast({ variant: 'destructive', title: 'Acción no permitida', description: 'El rol SST no puede modificar tickets.'});
+      return;
+    }
     
     const newStatus = approve ? 'Cerrado' : 'Asignado'; // Si se rechaza, vuelve a 'Asignado'
     await handleUpdate('status', newStatus);
@@ -586,7 +603,7 @@ export default function TicketDetailPage() {
                     <strong>Estado:</strong>
                      <div className="flex items-center gap-1">
                         {(canEdit || isAssignedToCurrentUser) ? (
-                            <Select value={ticket.status} onValueChange={(value) => handleUpdate('status', value)} disabled={isUpdating}>
+                            <Select value={ticket.status} onValueChange={(value) => handleUpdate('status', value)} disabled={isUpdating || isSST}>
                                 <SelectTrigger className="w-[150px] h-8 text-xs">
                                     <SelectValue placeholder="Cambiar estado" />
                                 </SelectTrigger>
@@ -746,7 +763,7 @@ export default function TicketDetailPage() {
           )}
         </Card>
 
-        {(isAssignedToCurrentUser || canEdit) && ['Asignado', 'En Progreso'].includes(ticket.status) && (
+        {(isAssignedToCurrentUser || canEdit) && !isSST && ['Asignado', 'En Progreso'].includes(ticket.status) && (
             <Card className="mb-6">
                  <CardHeader>
                     <CardTitle className="font-headline text-lg flex items-center gap-2"><Edit className="w-5 h-5" /> Actualizar Progreso</CardTitle>

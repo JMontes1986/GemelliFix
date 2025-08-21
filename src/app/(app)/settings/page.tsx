@@ -2,6 +2,7 @@
 'use client';
 
 import * as React from 'react';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import {
   Tabs,
   TabsContent,
@@ -43,7 +44,7 @@ import { Badge } from '@/components/ui/badge';
 import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy, writeBatch, getDoc } from 'firebase/firestore';
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, type User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import type { User, Zone, Site, Category, Log } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -59,7 +60,7 @@ import Link from 'next/link';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 
 
-const userRoles: User['role'][] = ['Administrador', 'Servicios Generales', 'Docentes', 'Coordinadores', 'Administrativos'];
+const userRoles: User['role'][] = ['Administrador', 'SST', 'Servicios Generales', 'Docentes', 'Coordinadores', 'Administrativos'];
 
 
 const getLogActionBadgeVariant = (action: Log['action']) => {
@@ -1038,5 +1039,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    

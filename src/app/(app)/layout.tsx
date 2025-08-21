@@ -133,6 +133,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const isAdmin = currentUser?.role === 'Administrador';
   const isServiceUser = currentUser?.role === 'Servicios Generales';
+  const isSST = currentUser?.role === 'SST';
 
   return (
     <SidebarProvider defaultOpen={false}>
@@ -141,7 +142,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {isAdmin && (
+            {(isAdmin || isSST) && (
                 <>
                     <SidebarMenuItem>
                       <SidebarMenuButton
@@ -155,19 +156,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive('/diagnosis')}
-                        tooltip="Diagnóstico"
-                      >
-                        <Link href="/diagnosis">
-                          <HeartPulse />
-                          <span className="group-data-[collapsible=icon]:hidden">Diagnóstico</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
                 </>
+            )}
+            {isAdmin && (
+                 <SidebarMenuItem>
+                    <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/diagnosis')}
+                    tooltip="Diagnóstico"
+                    >
+                    <Link href="/diagnosis">
+                        <HeartPulse />
+                        <span className="group-data-[collapsible=icon]:hidden">Diagnóstico</span>
+                    </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
             )}
             <SidebarMenuItem>
               <SidebarMenuButton

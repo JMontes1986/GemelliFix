@@ -23,7 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import type { User } from '@/lib/types';
 
-const userRoles: User['role'][] = ['Administrador', 'Servicios Generales', 'Docentes', 'Coordinadores', 'Administrativos'];
+const userRoles: User['role'][] = ['Administrador', 'SST', 'Servicios Generales', 'Docentes', 'Coordinadores', 'Administrativos'];
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -168,5 +168,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-    
