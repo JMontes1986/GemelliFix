@@ -95,6 +95,7 @@ export type Log = {
         oldValue?: any;
         newValue?: any;
         description: string;
+        comment?: string;
     }
 }
     

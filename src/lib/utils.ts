@@ -41,6 +41,7 @@ export async function createLog(
 
     if (action === 'add_comment' && details.comment) {
       logDetails.description = `<strong>${user.name}</strong> comentó: "${details.comment}"`;
+      logDetails.comment = details.comment;
     }
 
     if (details.ticket) {

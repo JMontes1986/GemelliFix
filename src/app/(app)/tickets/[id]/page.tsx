@@ -817,7 +817,12 @@ export default function TicketDetailPage() {
                                 </div>
                                 <div>
                                     <p dangerouslySetInnerHTML={{ __html: log.details.description }} />
-                                    <p className="text-xs text-muted-foreground">
+                                    {log.details.comment && (
+                                        <blockquote className="mt-1 pl-3 border-l-2 border-border italic text-muted-foreground">
+                                            {log.details.comment}
+                                        </blockquote>
+                                    )}
+                                    <p className="text-xs text-muted-foreground mt-1">
                                         <ClientFormattedDate date={log.timestamp?.toDate()} options={{ dateStyle: 'medium', timeStyle: 'short' }} />
                                     </p>
                                 </div>
