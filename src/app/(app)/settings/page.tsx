@@ -124,9 +124,9 @@ export default function SettingsPage({ currentUser }: { currentUser: User | null
 
     React.useEffect(() => {
         if (!currentUser) {
-            router.push('/login');
             return;
         }
+
         if (currentUser.role !== 'Administrador') {
             toast({ variant: 'destructive', title: 'Acceso Denegado', description: 'No tienes permisos para ver esta página.'});
             router.push('/tickets');

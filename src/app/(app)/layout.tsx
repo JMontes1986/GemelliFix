@@ -92,26 +92,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
         setIsLoadingUser(true);
         if (firebaseUser) {
+            // Attempt to refresh the token to get the latest claims, but don't fail hard.
             try {
-                // Force refresh the token to get custom claims
-                await firebaseUser.getIdToken(true);
-                
-                const userDocRef = doc(db, 'users', firebaseUser.uid);
-                const userDocSnap = await getDoc(userDocRef);
+              await firebaseUser.getIdToken(true);
+            } catch (tokenError) {
+              console.warn("Could not refresh token:", tokenError);
+              // The user is still authenticated, so we can proceed.
+              // Firestore rules will ultimately decide what they can access.
+            }
 
-                if (userDocSnap.exists()) {
-                    setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
-                } else {
-                    console.warn("User data not found in Firestore, logging out.");
-                    await auth.signOut();
-                    router.push('/login');
-                }
-            } catch (error) {
-                 console.error("Error fetching user data or refreshing token:", error);
-                 await auth.signOut();
-                 router.push('/login');
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const userDocSnap = await getDoc(userDocRef);
+
+            if (userDocSnap.exists()) {
+                setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
+            } else {
+                console.warn("User data not found in Firestore for authenticated user, logging out.");
+                await auth.signOut();
+                router.push('/login');
             }
         } else {
+            // No user is signed in, redirect to login.
             router.push('/login');
         }
         setIsLoadingUser(false);
