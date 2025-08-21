@@ -75,3 +75,4 @@ export const onUserUpdated = onDocumentUpdated('users/{userId}', async (event) =
     }
 });
 
+
