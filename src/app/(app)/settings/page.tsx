@@ -341,23 +341,36 @@ export default function SettingsPage() {
                 newAvatarUrl = await getDownloadURL(uploadResult.ref);
             }
 
-            // NOTE: This creates the user in a temporary auth state. We're not handling this flow for now.
-            // For a production app, you would create a temporary user or send an invitation link.
-            // This is a simplified example for demonstration.
-            const tempAuth = auth; // In a real app, you might use a separate admin auth instance.
-            const userCredential = await createUserWithEmailAndPassword(tempAuth, newUserForm.email, newUserForm.password);
-            const user = userCredential.user;
+            // To avoid conflicts with the currently signed-in admin, we can't directly use
+            // the main `auth` object to create a new user. The proper way is to use the
+            // Firebase Admin SDK on a backend, but for a client-side admin panel,
+            // a common workaround is not implemented here. We will call the function directly.
+            // This is a simplified approach for this app.
+            
+            const response = await fetch('/api/create-user', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newUserForm),
+            });
+    
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || 'Error creating user in backend');
+            }
+            
+            const { uid } = await response.json();
 
-            await updateProfile(user, { displayName: newUserForm.name, photoURL: newAvatarUrl });
-
-            await setDoc(doc(db, "users", user.uid), {
-                id: user.uid,
-                uid: user.uid,
+            // Now that the user is created in Auth, save their data to Firestore.
+            const userData: User = {
+                id: uid,
+                uid: uid,
                 name: newUserForm.name,
                 email: newUserForm.email,
                 role: newUserForm.role,
                 avatar: newAvatarUrl
-            });
+            };
+            
+            await setDoc(doc(db, "users", uid), userData);
             
             toast({ title: 'Usuario Creado', description: 'El nuevo usuario ha sido registrado.' });
             setIsNewUserDialogOpen(false);
@@ -366,7 +379,16 @@ export default function SettingsPage() {
             setAvatarPreview(null);
         } catch (error: any) {
             console.error('Error creating user:', error);
-            toast({ variant: 'destructive', title: 'Error al crear usuario', description: error.message });
+            // Translate common Firebase auth errors
+            let message = error.message;
+            if (error.code === 'auth/email-already-in-use') {
+                message = 'El correo electrónico ya está registrado.';
+            } else if (error.code === 'auth/invalid-email') {
+                message = 'El formato del correo electrónico no es válido.';
+            } else if (error.code === 'auth/weak-password') {
+                message = 'La contraseña es demasiado débil. Debe tener al menos 6 caracteres.';
+            }
+            toast({ variant: 'destructive', title: 'Error al crear usuario', description: message });
         } finally {
             setIsUpdating(false);
         }
