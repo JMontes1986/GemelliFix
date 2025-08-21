@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -120,24 +119,53 @@ export default function SettingsPage() {
         slaRisk: true,
         resolved: false,
     });
-    
+    const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+
     React.useEffect(() => {
-        const usersQuery = query(collection(db, 'users'), orderBy('name'));
-        const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
-            const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-            setAllUsers(fetchedUsers);
-            setIsLoadingUsers(false);
-        }, (error) => {
-            console.error("Error fetching users:", error);
-            toast({
-                variant: "destructive",
-                title: "Error de Permisos",
-                description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
-                duration: 10000,
-            });
-            setIsLoadingUsers(false);
+        const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+            if (firebaseUser) {
+                const userDocRef = doc(db, 'users', firebaseUser.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+                     if (userData.role !== 'Administrador') {
+                        toast({ variant: 'destructive', title: 'Acceso Denegado', description: 'No tienes permisos para ver esta página.'});
+                        router.push('/tickets');
+                    } else {
+                        setCurrentUser(userData);
+                        
+                        // User is admin, now fetch all users
+                        const usersQuery = query(collection(db, 'users'), orderBy('name'));
+                        const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
+                            const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+                            setAllUsers(fetchedUsers);
+                            setIsLoadingUsers(false);
+                        }, (error) => {
+                            console.error("Error fetching users:", error);
+                            toast({
+                                variant: "destructive",
+                                title: "Error de Permisos",
+                                description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
+                                duration: 10000,
+                            });
+                            setIsLoadingUsers(false);
+                        });
+
+                        return () => unsubUsers();
+                    }
+                } else {
+                    router.push('/login');
+                }
+            } else {
+                router.push('/login');
+            }
         });
 
+        return () => unsubscribeAuth();
+    }, [router, toast]);
+
+
+    React.useEffect(() => {
         const qZones = query(collection(db, 'zones'), orderBy('name'));
         const unsubZones = onSnapshot(qZones, (snapshot) => {
             const fetchedZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
@@ -172,13 +200,12 @@ export default function SettingsPage() {
 
 
         return () => {
-            unsubUsers();
             unsubZones();
             unsubSites();
             unsubCategories();
             unsubLogs();
         };
-    }, [toast]);
+    }, []);
     
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
@@ -396,6 +423,14 @@ export default function SettingsPage() {
             setIsUpdating(false);
         }
     };
+    
+    if (!currentUser) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
+    }
 
   return (
     <div className="space-y-6">
