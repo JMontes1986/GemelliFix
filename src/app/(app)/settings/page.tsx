@@ -40,7 +40,7 @@ import { PlusCircle, Loader2, Camera, UploadCloud } from 'lucide-react';
 import { categories as initialCategories, sites as initialSites, zones as initialZones } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy, writeBatch, getDoc } from 'firebase/firestore';
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
@@ -853,5 +853,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
