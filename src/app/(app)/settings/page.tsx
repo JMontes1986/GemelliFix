@@ -124,34 +124,32 @@ export default function SettingsPage({ currentUser }: { currentUser: User | null
 
     React.useEffect(() => {
         if (!currentUser) {
+            // This is handled by the main layout, but provides a safeguard.
             return;
         }
 
-        if (currentUser.role !== 'Administrador') {
-            toast({ variant: 'destructive', title: 'Acceso Denegado', description: 'No tienes permisos para ver esta página.'});
-            router.push('/tickets');
-            return;
-        }
-
-        // User is admin, now fetch all users
-        const usersQuery = query(collection(db, 'users'), orderBy('name'));
-        const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
-            const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-            setAllUsers(fetchedUsers);
-            setIsLoadingUsers(false);
-        }, (error) => {
-            console.error("Error fetching users:", error);
-            toast({
-                variant: "destructive",
-                title: "Error de Permisos",
-                description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
-                duration: 10000,
+        if (currentUser.role === 'Administrador') {
+            const usersQuery = query(collection(db, 'users'), orderBy('name'));
+            const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
+                const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+                setAllUsers(fetchedUsers);
+                setIsLoadingUsers(false);
+            }, (error) => {
+                console.error("Error fetching users:", error);
+                toast({
+                    variant: "destructive",
+                    title: "Error de Permisos",
+                    description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
+                    duration: 10000,
+                });
+                setIsLoadingUsers(false);
             });
-            setIsLoadingUsers(false);
-        });
+            return () => unsubUsers();
+        } else {
+             setIsLoadingUsers(false);
+        }
 
-        return () => unsubUsers();
-    }, [currentUser, router, toast]);
+    }, [currentUser, toast]);
 
 
     React.useEffect(() => {
@@ -414,11 +412,21 @@ export default function SettingsPage({ currentUser }: { currentUser: User | null
     };
     
     if (!currentUser) {
+        // This case is handled by the layout which shows a global loader.
+        return null;
+    }
+    
+    if (currentUser.role !== 'Administrador') {
+        // This case should ideally be handled by router middleware or layout checks.
+        // But as a fallback:
         return (
-            <div className="flex h-screen w-full items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        );
+            <Card>
+                <CardHeader>
+                    <CardTitle>Acceso Denegado</CardTitle>
+                    <CardDescription>No tienes permisos para ver esta página.</CardDescription>
+                </CardHeader>
+            </Card>
+        )
     }
 
   return (
