@@ -201,12 +201,6 @@ export default function LoginPage() {
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Ingresar'}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            ¿No tienes cuenta?{' '}
-            <Link href="/register" className="underline font-bold">
-              Regístrate
-            </Link>
-          </div>
         </CardContent>
       </Card>
     </div>
