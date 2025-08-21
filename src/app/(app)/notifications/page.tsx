@@ -45,7 +45,7 @@ export default function NotificationsPage() {
             } else {
                 setCurrentUser(null);
             }
-            setIsLoading(false);
+            // We keep isLoading true until we try to fetch notifications
         });
 
         return () => unsubscribeAuth();
@@ -54,10 +54,11 @@ export default function NotificationsPage() {
     React.useEffect(() => {
         if (!currentUser) return;
 
-        // Simplified query to remove the composite index dependency
+        setIsLoading(true);
         const q = query(
             collection(db, 'notifications'),
-            where('userId', '==', currentUser.id)
+            where('userId', '==', currentUser.id),
+            orderBy('createdAt', 'desc')
         );
 
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -70,14 +71,7 @@ export default function NotificationsPage() {
                 } as Notification);
             });
             
-            // Sort notifications on the client-side
-            const sortedNotifications = fetchedNotifications.sort((a, b) => {
-                const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-                const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-                return dateB - dateA;
-            });
-
-            setNotifications(sortedNotifications);
+            setNotifications(fetchedNotifications);
             setIsLoading(false);
         }, (error) => {
             console.error("Error fetching notifications: ", error);
@@ -197,3 +191,5 @@ export default function NotificationsPage() {
     </div>
   );
 }
+
+    

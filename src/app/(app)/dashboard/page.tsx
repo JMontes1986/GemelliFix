@@ -120,17 +120,23 @@ export default function DashboardPage() {
    React.useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
         if (user) {
-            const userDocRef = doc(db, 'users', user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists()) {
-                const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-                if (userData.role !== 'Administrador') {
-                    router.push('/tickets');
+            try {
+                await user.getIdToken(true); // Force refresh of the token
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+                    if (userData.role !== 'Administrador') {
+                        router.push('/tickets');
+                    } else {
+                        setCurrentUser(userData);
+                    }
                 } else {
-                    setCurrentUser(userData);
+                     router.push('/login');
                 }
-            } else {
-                 router.push('/login');
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+                router.push('/login');
             }
         } else {
             router.push('/login');
@@ -140,9 +146,10 @@ export default function DashboardPage() {
     return () => unsubscribeAuth();
   }, [router]);
 
-   React.useEffect(() => {
-    if (!currentUser) return; // Don't fetch data if user is not authorized admin
+  React.useEffect(() => {
+    if (!currentUser) return; 
 
+    setIsLoading(true);
     const q = query(collection(db, 'tickets'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const ticketsData: Ticket[] = [];
@@ -166,7 +173,7 @@ export default function DashboardPage() {
     });
     
     return () => unsubscribe();
-  }, [toast, currentUser]);
+  }, [currentUser, toast]);
 
   const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto').length;
   const overdueTickets = tickets.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Cerrado' && t.status !== 'Resuelto').length;
