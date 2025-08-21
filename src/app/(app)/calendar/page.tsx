@@ -843,7 +843,7 @@ export default function CalendarPage() {
                                     <div>
                                         <Label>Repetir los días</Label>
                                         <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
-                                            {[{id: 1, label: 'Lu'}, {id: 2, label: 'Ma'}, {id: 3, label: 'Mi'}, {id: 4, label: 'Ju'}, {id: 5, label: 'Vi'}, {id: 6, label: 'Sá'}, {id: 0, label: 'Do'}].map(day => (
+                                            {[{id: 1, label: 'Lu'}, {id: 2, label: 'Ma'}, {id: 3, label: 'Mi'}, {id: 4, label: 'Ju'}, {id: 5, label: 'Vi'}].map(day => (
                                                 <div key={day.id} className="flex items-center space-x-2">
                                                     <Checkbox
                                                         id={`day-${day.id}`}
