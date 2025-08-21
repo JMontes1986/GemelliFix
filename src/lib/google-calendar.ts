@@ -1,28 +1,32 @@
 
 import { google } from 'googleapis';
+import { config } from 'dotenv';
+
+// Load environment variables from .env file
+config();
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
 const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
 
-if (!CALENDAR_ID || !privateKey || !clientEmail) {
-  console.error('Google Calendar API credentials are not set in environment variables. Check .env file.');
-  // We don't throw an error here to prevent crashing the server during build if credentials are not yet set.
-  // The functions below will handle the uninitialized client.
-}
-
 // Initialize the JWT client
 const getJwtClient = () => {
     if (!CALENDAR_ID || !privateKey || !clientEmail) {
+        console.error('Google Calendar API credentials are not set in environment variables. Check .env file.');
         return null;
     }
-    return new google.auth.JWT(
-        clientEmail,
-        undefined,
-        privateKey,
-        SCOPES
-    );
+    try {
+        return new google.auth.JWT(
+            clientEmail,
+            undefined,
+            privateKey,
+            SCOPES
+        );
+    } catch(error) {
+        console.error("Failed to create Google JWT client:", error);
+        return null;
+    }
 };
 
 
@@ -39,7 +43,7 @@ export async function createGoogleCalendarEvent(event: {
 }) {
   const jwtClient = getJwtClient();
   if (!jwtClient) {
-    throw new Error('Google Calendar API client is not initialized. Please check credentials.');
+    throw new Error('Google Calendar API client is not initialized. Please check credentials in your .env file.');
   }
 
   const calendar = google.calendar({
