@@ -93,6 +93,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         setIsLoadingUser(true);
         if (firebaseUser) {
             try {
+                // Force refresh the token to get custom claims
                 await firebaseUser.getIdToken(true);
                 
                 const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -122,9 +123,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) => pathname === path;
   const showFab = isMounted && pathname !== '/tickets/create';
   
-  const isAdmin = currentUser?.role === 'Administrador';
-  const isServiceUser = currentUser?.role === 'Servicios Generales';
-
   if (isLoadingUser || !currentUser) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
@@ -132,6 +130,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
     );
   }
+  
+  const isAdmin = currentUser?.role === 'Administrador';
+  const isServiceUser = currentUser?.role === 'Servicios Generales';
 
   return (
     <SidebarProvider defaultOpen={false}>
@@ -300,7 +301,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </DropdownMenu>
         </header>
         <main className="flex-1 p-4 sm:px-6 sm:py-0 space-y-4">
-          {children}
+          {React.cloneElement(children as React.ReactElement, { currentUser })}
         </main>
          {showFab && (
           <TooltipProvider>

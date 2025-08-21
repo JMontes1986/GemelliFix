@@ -41,10 +41,10 @@ import { PlusCircle, Loader2, Camera, UploadCloud } from 'lucide-react';
 import { categories as initialCategories, sites as initialSites, zones as initialZones } from '@/lib/data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy, writeBatch } from 'firebase/firestore';
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, type User as FirebaseUser } from 'firebase/auth';
 import type { User, Zone, Site, Category, Log } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -70,7 +70,7 @@ const getLogActionBadgeVariant = (action: Log['action']) => {
 }
 
 
-export default function SettingsPage() {
+export default function SettingsPage({ currentUser }: { currentUser: User | null }) {
     const [allUsers, setAllUsers] = React.useState<User[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
     const [isUpdating, setIsUpdating] = React.useState(false);
@@ -121,50 +121,37 @@ export default function SettingsPage() {
         slaRisk: true,
         resolved: false,
     });
-    const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
     React.useEffect(() => {
-        const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-            if (firebaseUser) {
-                const userDocRef = doc(db, 'users', firebaseUser.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if (userDocSnap.exists()) {
-                    const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-                     if (userData.role !== 'Administrador') {
-                        toast({ variant: 'destructive', title: 'Acceso Denegado', description: 'No tienes permisos para ver esta página.'});
-                        router.push('/tickets');
-                    } else {
-                        setCurrentUser(userData);
-                        
-                        // User is admin, now fetch all users
-                        const usersQuery = query(collection(db, 'users'), orderBy('name'));
-                        const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
-                            const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-                            setAllUsers(fetchedUsers);
-                            setIsLoadingUsers(false);
-                        }, (error) => {
-                            console.error("Error fetching users:", error);
-                            toast({
-                                variant: "destructive",
-                                title: "Error de Permisos",
-                                description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
-                                duration: 10000,
-                            });
-                            setIsLoadingUsers(false);
-                        });
+        if (!currentUser) {
+            router.push('/login');
+            return;
+        }
+        if (currentUser.role !== 'Administrador') {
+            toast({ variant: 'destructive', title: 'Acceso Denegado', description: 'No tienes permisos para ver esta página.'});
+            router.push('/tickets');
+            return;
+        }
 
-                        return () => unsubUsers();
-                    }
-                } else {
-                    router.push('/login');
-                }
-            } else {
-                router.push('/login');
-            }
+        // User is admin, now fetch all users
+        const usersQuery = query(collection(db, 'users'), orderBy('name'));
+        const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
+            const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+            setAllUsers(fetchedUsers);
+            setIsLoadingUsers(false);
+        }, (error) => {
+            console.error("Error fetching users:", error);
+            toast({
+                variant: "destructive",
+                title: "Error de Permisos",
+                description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
+                duration: 10000,
+            });
+            setIsLoadingUsers(false);
         });
 
-        return () => unsubscribeAuth();
-    }, [router, toast]);
+        return () => unsubUsers();
+    }, [currentUser, router, toast]);
 
 
     React.useEffect(() => {
