@@ -273,7 +273,20 @@ export default function TicketsPage() {
                 const userDocRef = doc(db, 'users', firebaseUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
-                    setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
+                    const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+                    setCurrentUser(userData);
+
+                    if (userData.role === 'Administrador') {
+                        const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+                        const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
+                            const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+                            setTechnicians(techData);
+                        }, (err) => {
+                            console.error("Error fetching technicians: ", err);
+                            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
+                        });
+                        return () => unsubscribeTechs();
+                    }
                 } else {
                    setError("Usuario no encontrado en la base de datos.");
                    setIsLoading(false);
@@ -288,42 +301,39 @@ export default function TicketsPage() {
         }
     });
     return () => unsubscribeAuth();
-  }, []);
-
-  React.useEffect(() => {
-    if (currentUser?.role === 'Administrador') {
-        const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-        const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
-            const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-            setTechnicians(techData);
-        }, (err) => {
-            console.error("Error fetching technicians: ", err);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
-        });
-        return () => unsubscribeTechs();
-    }
-  }, [currentUser, toast]);
+  }, [toast]);
 
   React.useEffect(() => {
     if (!currentUser) {
-        setIsLoading(false);
+        if (!auth.currentUser) setIsLoading(false);
         return;
     }
     
-    let q;
-    if (currentUser.role === 'Administrador') {
-        q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
-    } else if (currentUser.role === 'Servicios Generales') {
-        q = query(collection(db, 'tickets'), where('assignedToIds', 'array-contains', currentUser.id), orderBy('createdAt', 'desc'));
-    } else if (['Docentes', 'Coordinadores', 'Administrativos'].includes(currentUser.role)) {
-        q = query(collection(db, 'tickets'), where('requesterId', '==', currentUser.id), orderBy('createdAt', 'desc'));
-    } else {
-        setTickets([]);
-        setIsLoading(false);
-        return;
+    setIsLoading(true);
+    let ticketsQuery;
+
+    switch (currentUser.role) {
+        case 'Administrador':
+            ticketsQuery = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
+            break;
+        case 'Servicios Generales':
+            ticketsQuery = query(collection(db, 'tickets'), 
+                where('assignedToIds', 'array-contains', currentUser.id),
+                orderBy('createdAt', 'desc')
+            );
+            break;
+        case 'Docentes':
+        case 'Coordinadores':
+        case 'Administrativos':
+            ticketsQuery = query(collection(db, 'tickets'), where('requesterId', '==', currentUser.id), orderBy('createdAt', 'desc'));
+            break;
+        default:
+            setTickets([]);
+            setIsLoading(false);
+            return;
     }
     
-    const unsubscribeTickets = onSnapshot(q, (querySnapshot) => {
+    const unsubscribeTickets = onSnapshot(ticketsQuery, (querySnapshot) => {
       const ticketsData: Ticket[] = querySnapshot.docs.map(doc => {
           const data = doc.data();
           const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
