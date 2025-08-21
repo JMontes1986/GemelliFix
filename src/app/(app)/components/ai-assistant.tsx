@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { askAiAssistant } from '@/ai/flows/ask-ai-assistant';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
@@ -101,6 +101,7 @@ export default function AiAssistant() {
                     >
                     {message.role === 'assistant' && (
                         <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                         <AvatarImage src="/molly-ia-avatar.png" alt="Molly IA" />
                          <AvatarFallback><Bot className="h-5 w-5" /></AvatarFallback>
                         </Avatar>
                     )}
@@ -132,6 +133,7 @@ export default function AiAssistant() {
                 {isLoading && (
                     <div className="flex items-start gap-3 justify-start">
                         <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                            <AvatarImage src="/molly-ia-avatar.png" alt="Molly IA" />
                             <AvatarFallback><Bot className="h-5 w-5" /></AvatarFallback>
                         </Avatar>
                         <div className="max-w-xs rounded-lg px-4 py-2 text-sm bg-muted flex items-center">
