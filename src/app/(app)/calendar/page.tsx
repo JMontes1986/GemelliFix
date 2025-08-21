@@ -70,6 +70,9 @@ const generateColorFromString = (str: string, name?: string): string => {
     if (name === 'Robinson') {
       return '#0075F2';
     }
+    if (name === 'Gloria') {
+      return '#FFEAEE';
+    }
     let hash = 0;
     if (!str) return `hsl(0, 60%, 70%)`;
     for (let i = 0; i < str.length; i++) {
