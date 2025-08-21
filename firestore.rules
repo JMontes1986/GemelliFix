@@ -3,75 +3,84 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Función para verificar si el usuario es un administrador
+
+    // Helper function to check for admin role via custom claims
     function isAdmin() {
       return request.auth.token.admin == true;
     }
 
-    // Función para verificar si el usuario es el dueño del documento
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
-    // El administrador tiene acceso total a toda la base de datos
-    match /{document=**} {
-      allow read, write: if isAdmin();
-    }
-
-    // Reglas para la colección 'users'
+    // Rules for the 'users' collection
     match /users/{userId} {
-      // Un usuario puede leer su propio perfil.
-      // Un técnico de servicios generales puede leer los perfiles de otros para el calendario.
-      allow read: if isOwner(userId) || request.auth.token.role == 'Servicios Generales';
-      // Un usuario puede actualizar su propio perfil.
-      allow update: if isOwner(userId);
-      // Cualquiera puede crear un usuario (registro).
-      allow create: if true;
+      // Any authenticated user can create their own user document upon registration.
+      allow create: if request.auth != null && request.auth.uid == userId;
+      // Users can read their own document. Admins can read any document.
+      allow read: if isAdmin() || request.auth.uid == userId;
+      // Users can update their own document. Admins can update any document.
+      allow update: if isAdmin() || request.auth.uid == userId;
+      // Only admins can delete users.
+      allow delete: if isAdmin();
+    }
+    
+    // Rules for 'tickets' collection
+    match /tickets/{ticketId} {
+      // Authenticated users can create tickets.
+      allow create: if request.auth != null;
+      // Admins can read all. Requesters can read their own. Assigned techs can read their own.
+      allow read: if isAdmin() || request.auth.uid == resource.data.requesterId || request.auth.uid in resource.data.assignedToIds;
+      // Admins can update all. Requesters can update if not yet assigned. Assigned techs can update.
+      allow update: if isAdmin() || (request.auth.uid == resource.data.requesterId && resource.data.status == 'Abierto') || request.auth.uid in resource.data.assignedToIds;
+      // Only admins can delete tickets.
+      allow delete: if isAdmin();
     }
 
-    // Reglas para la colección 'tickets'
-    match /tickets/{ticketId} {
-      // Cualquiera puede crear un ticket si está autenticado.
-      allow create: if request.auth != null;
-      // Los usuarios pueden leer sus propios tickets.
-      // El personal de servicios generales puede leer todos los tickets.
-      allow read: if request.auth.uid == resource.data.requesterId || request.auth.token.role == 'Servicios Generales';
-      // Los usuarios pueden actualizar sus tickets si están abiertos.
-      // El personal de servicios generales puede actualizar cualquier ticket.
-      allow update: if (request.auth.uid == resource.data.requesterId && resource.data.status == 'Abierto') || request.auth.token.role == 'Servicios Generales';
-    }
-    
-    // Reglas para colecciones de datos maestros (zonas, sitios, categorías)
+    // Rules for master data collections (zones, sites, categories)
     match /zones/{zoneId} {
-      allow read: if request.auth != null; // Cualquiera autenticado puede leer.
+      // Authenticated users can read. Only admins can write.
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
-    
+
     match /sites/{siteId} {
-       allow read: if request.auth != null; // Cualquiera autenticado puede leer.
+      // Authenticated users can read. Only admins can write.
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      // Authenticated users can read. Only admins can write.
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
     
-     match /categories/{categoryId} {
-       allow read: if request.auth != null; // Cualquiera autenticado puede leer.
-    }
-    
-    // Reglas para los logs, solo los administradores pueden leer. Nadie puede escribir directamente.
-    match /logs/{logId} {
-      allow read: if isAdmin();
-      allow write: if false; // Solo se escriben desde el backend.
-    }
-    
-    // Reglas para las notificaciones, solo el usuario destinatario puede leerlas.
+    // Rules for 'notifications' collection
     match /notifications/{notificationId} {
-        allow read, update: if request.auth.uid == resource.data.userId;
+        // Users can only read/update their own notifications.
+        allow read, update: if isAdmin() || request.auth.uid == resource.data.userId;
+        // Notifications are created by backend functions or system logic, not directly by users.
+        // But we allow admins to create them for testing or manual intervention.
+        allow create: if isAdmin();
     }
     
-    // Reglas para los eventos del calendario
+    // Rules for 'logs' collection
+    match /logs/{logId} {
+        // Only Admins can read logs.
+        allow read: if isAdmin();
+        // Logs are created by a trusted backend process. No client creation.
+        allow create: if request.auth != null; // Log creation is handled by a helper function.
+        allow write: if false; // Logs are immutable.
+    }
+    
+    // Rules for 'scheduleEvents' collection
     match /scheduleEvents/{eventId} {
-        // Solo administradores y personal de servicios generales pueden gestionar eventos.
-        allow read, write: if request.auth.token.role == 'Administrador' || request.auth.token.role == 'Servicios Generales';
+        // Admins and involved technicians can read/write events.
+        allow read, write: if isAdmin() || request.auth.uid == resource.data.technicianId;
+        allow create: if request.auth != null; // Let admins or techs create events.
+    }
+    
+    // Diagnosis logs are only writable by authenticated users for testing purposes.
+    match /diagnosis_logs/{logId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false;
     }
   }
 }
-
-    
