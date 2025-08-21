@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import * as React from 'react';
@@ -292,7 +290,10 @@ export default function TicketsPage() {
   }, []);
 
   React.useEffect(() => {
-    if (currentUser?.role === 'Administrador') {
+    if (!currentUser) {
+        return; // Don't fetch technicians if there's no user
+    }
+    if (currentUser.role === 'Administrador') {
         const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
         const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
             const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
@@ -311,20 +312,17 @@ export default function TicketsPage() {
         return;
     }
     
+    setIsLoading(true);
     let ticketsQuery;
     switch (currentUser.role) {
         case 'Administrador':
             ticketsQuery = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
             break;
         case 'Servicios Generales':
-            // Techs see tickets assigned to them OR created by them
             ticketsQuery = query(collection(db, 'tickets'), 
                 where('assignedToIds', 'array-contains', currentUser.id),
                 orderBy('createdAt', 'desc')
             );
-            // Note: Firestore does not support multiple array-contains or OR conditions on different fields in a single query.
-            // A more complex setup or separate queries would be needed to also show tickets created by them if that's a requirement.
-            // For now, we focus on assigned tickets.
             break;
         case 'Docentes':
         case 'Coordinadores':
