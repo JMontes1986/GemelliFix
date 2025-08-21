@@ -301,7 +301,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </DropdownMenu>
         </header>
         <main className="flex-1 p-4 sm:px-6 sm:py-0 space-y-4">
-          {React.cloneElement(children as React.ReactElement, { currentUser })}
+          {children}
         </main>
          {showFab && (
           <TooltipProvider>

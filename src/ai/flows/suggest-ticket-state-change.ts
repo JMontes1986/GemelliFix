@@ -73,7 +73,6 @@ The current date is ${new Date().toISOString()}.
     -   **Recommendation:** Suggest the next valid status based on this logic:
         -   If status is 'Abierto': The next step is 'Asignado'.
         -   If status is 'Asignado': The next step is 'Requiere Aprobación'.
-        -   If status is 'Requiere Aprobación': The next step for the technician is 'En Progreso'.
         -   If status is 'En Progreso': The next step is 'Resuelto'.
         -   If status is 'Resuelto': The next step is 'Cerrado'.
         -   If status is 'Cerrado' or 'Cancelado': There are no further actions. State this clearly.

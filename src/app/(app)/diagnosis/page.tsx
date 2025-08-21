@@ -317,7 +317,7 @@ export default function DiagnosisPage() {
         </CardContent>
       </Card>
       
-      <Card className="w-full max-w-2xl border-yellow-500 border-2 bg-yellow-50">
+       <Card className="w-full max-w-2xl border-yellow-500 border-2 bg-yellow-50">
           <CardHeader>
               <CardTitle className="font-headline text-2xl flex items-center gap-3">
                   <AlertTriangle className="text-yellow-600 h-8 w-8" />
