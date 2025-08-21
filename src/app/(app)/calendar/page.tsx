@@ -58,7 +58,10 @@ import { useRouter } from 'next/navigation';
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 
-const generateColorFromString = (str: string): string => {
+const generateColorFromString = (str: string, name?: string): string => {
+    if (name === 'Alfredo') {
+      return '#F7EF81';
+    }
     let hash = 0;
     if (!str) return `hsl(0, 60%, 70%)`;
     for (let i = 0; i < str.length; i++) {
@@ -788,7 +791,7 @@ export default function CalendarPage() {
                 <CardContent className="p-2 flex-1 overflow-y-auto">
                   {techniciansToDisplay.length > 0 ? techniciansToDisplay.map(tech => (
                     <div key={tech.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-background/80">
-                         <Avatar className="h-10 w-10 border-2" style={{ borderColor: generateColorFromString(tech.id) }}>
+                         <Avatar className="h-10 w-10 border-2" style={{ borderColor: generateColorFromString(tech.id, tech.name) }}>
                             <AvatarImage src={tech.avatar} alt={tech.name} />
                             <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
                         </Avatar>
@@ -849,7 +852,7 @@ export default function CalendarPage() {
                       >
                         {/* Events for this technician on this day */}
                         {eventsByTechnicianAndDay(tech.id, date).map(event => (
-                            <EventCard key={event.id} event={event} color={generateColorFromString(tech.id)} onClick={() => handleEventClick(event)} />
+                            <EventCard key={event.id} event={event} color={generateColorFromString(tech.id, tech.name)} onClick={() => handleEventClick(event)} />
                         ))}
                       </div>
                     ))}
