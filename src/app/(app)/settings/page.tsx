@@ -120,35 +120,10 @@ export default function SettingsPage() {
         slaRisk: true,
         resolved: false,
     });
-    const [currentUser, setCurrentUser] = React.useState<User | null>(null);
-
+    
     React.useEffect(() => {
-        const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
-            if (user) {
-                const userDocRef = doc(db, 'users', user.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if (userDocSnap.exists()) {
-                    const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-                     if (userData.role !== 'Administrador') {
-                        router.push('/tickets');
-                    } else {
-                        setCurrentUser(userData);
-                    }
-                } else {
-                    router.push('/login');
-                }
-            } else {
-                router.push('/login');
-            }
-        });
-
-        return () => unsubscribeAuth();
-    }, [router]);
-
-
-    React.useEffect(() => {
-        const qUsers = query(collection(db, 'users'), orderBy('name'));
-        const unsubUsers = onSnapshot(qUsers, (snapshot) => {
+        const usersQuery = query(collection(db, 'users'), orderBy('name'));
+        const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
             const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
             setAllUsers(fetchedUsers);
             setIsLoadingUsers(false);
@@ -421,14 +396,6 @@ export default function SettingsPage() {
             setIsUpdating(false);
         }
     };
-    
-    if (!currentUser) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        );
-    }
 
   return (
     <div className="space-y-6">
@@ -945,5 +912,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    

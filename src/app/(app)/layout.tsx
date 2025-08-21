@@ -89,13 +89,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     setIsMounted(true);
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        setIsLoadingUser(true);
         if (firebaseUser) {
             try {
-                // Force a token refresh to get the latest custom claims.
                 await firebaseUser.getIdToken(true);
                 
                 const userDocRef = doc(db, 'users', firebaseUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
+
                 if (userDocSnap.exists()) {
                     setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
                 } else {
@@ -123,18 +124,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAdmin = currentUser?.role === 'Administrador';
   const isServiceUser = currentUser?.role === 'Servicios Generales';
 
-  if (isLoadingUser) {
+  if (isLoadingUser || !currentUser) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
         </div>
     );
-  }
-
-  if (!currentUser) {
-    // This case should be handled by the redirect in onAuthStateChanged,
-    // but as a fallback, we can return null or a loading state.
-    return null;
   }
 
   return (
@@ -329,5 +324,3 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    

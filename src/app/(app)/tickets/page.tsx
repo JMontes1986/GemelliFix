@@ -273,35 +273,38 @@ export default function TicketsPage() {
                 const userDocRef = doc(db, 'users', firebaseUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
-                    const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-                    setCurrentUser(userData);
-
-                    if (userData.role === 'Administrador') {
-                        const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-                        const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
-                            const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-                            setTechnicians(techData);
-                        }, (err) => {
-                            console.error("Error fetching technicians: ", err);
-                            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
-                        });
-                        return () => unsubscribeTechs();
-                    }
+                    setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
                 } else {
                    setError("Usuario no encontrado en la base de datos.");
-                   setIsLoading(false);
                 }
             } catch (err) {
                  setError("Error al cargar datos del usuario.");
-                 setIsLoading(false);
             }
         } else {
-            setIsLoading(false);
             setError("No hay un usuario autenticado.");
         }
     });
     return () => unsubscribeAuth();
-  }, [toast]);
+  }, []);
+
+  React.useEffect(() => {
+    if (!currentUser) {
+        if (!auth.currentUser) setIsLoading(false);
+        return;
+    };
+
+    if (currentUser.role === 'Administrador') {
+        const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
+            const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+            setTechnicians(techData);
+        }, (err) => {
+            console.error("Error fetching technicians: ", err);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
+        });
+        return () => unsubscribeTechs();
+    }
+  }, [currentUser, toast]);
 
   React.useEffect(() => {
     if (!currentUser) {
@@ -489,5 +492,3 @@ export default function TicketsPage() {
     </Tabs>
   );
 }
-
-    

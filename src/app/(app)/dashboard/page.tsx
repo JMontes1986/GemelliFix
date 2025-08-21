@@ -113,42 +113,8 @@ export default function DashboardPage() {
   const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
   const [analysisResult, setAnalysisResult] = React.useState<AnalyzeDashboardOutput | null>(null);
   const { toast } = useToast();
-  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
-  const router = useRouter();
-
-
-   React.useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
-        if (user) {
-            try {
-                await user.getIdToken(true); // Force refresh of the token
-                const userDocRef = doc(db, 'users', user.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if (userDocSnap.exists()) {
-                    const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-                    if (userData.role !== 'Administrador') {
-                        router.push('/tickets');
-                    } else {
-                        setCurrentUser(userData);
-                    }
-                } else {
-                     router.push('/login');
-                }
-            } catch (error) {
-                console.error("Error fetching user data:", error);
-                router.push('/login');
-            }
-        } else {
-            router.push('/login');
-        }
-    });
-
-    return () => unsubscribeAuth();
-  }, [router]);
 
   React.useEffect(() => {
-    if (!currentUser) return; 
-
     setIsLoading(true);
     const q = query(collection(db, 'tickets'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -173,7 +139,7 @@ export default function DashboardPage() {
     });
     
     return () => unsubscribe();
-  }, [currentUser, toast]);
+  }, [toast]);
 
   const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto').length;
   const overdueTickets = tickets.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Cerrado' && t.status !== 'Resuelto').length;
@@ -247,7 +213,7 @@ export default function DashboardPage() {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
   
-  if (isLoading || !currentUser) {
+  if (isLoading) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -441,5 +407,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
