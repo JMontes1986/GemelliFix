@@ -240,9 +240,11 @@ const TicketsTable: React.FC<TicketsTableProps> = ({
                                             <DropdownMenuItem asChild>
                                               <Link href={`/tickets/${ticket.id}`}>Ver Detalles</Link>
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>
-                                              Asignar
-                                            </DropdownMenuItem>
+                                            {currentUser?.role === 'Administrador' && (
+                                                <DropdownMenuItem onClick={() => router.push(`/tickets/${ticket.id}`)}>
+                                                Asignar
+                                                </DropdownMenuItem>
+                                            )}
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>
