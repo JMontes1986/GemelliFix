@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -166,7 +167,7 @@ export default function CreateTicketPage() {
     }
     setIsLoading(true);
     try {
-      const userDocRef = doc(db, 'user', currentUser.uid);
+      const userDocRef = doc(db, 'users', currentUser.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
@@ -538,5 +539,3 @@ export default function CreateTicketPage() {
     </div>
   );
 }
-
-    
