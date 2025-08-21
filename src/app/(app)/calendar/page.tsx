@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -61,6 +60,9 @@ const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 const generateColorFromString = (str: string, name?: string): string => {
     if (name === 'Alfredo') {
       return '#F7EF81';
+    }
+    if (name === 'Guillermo Corrales') {
+      return '#CFE795';
     }
     let hash = 0;
     if (!str) return `hsl(0, 60%, 70%)`;
