@@ -27,7 +27,12 @@ interface Message {
 
 export default function AiAssistant() {
   const [isOpen, setIsOpen] = React.useState(false);
-  const [messages, setMessages] = React.useState<Message[]>([]);
+  const [messages, setMessages] = React.useState<Message[]>([
+    {
+      role: 'assistant',
+      content: '¡Hola! Soy tu asistente de ayuda. ¿En qué puedo colaborarte hoy? Puedes preguntarme cómo crear un ticket, quiénes pueden aprobar solicitudes y más.'
+    }
+  ]);
   const [input, setInput] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
