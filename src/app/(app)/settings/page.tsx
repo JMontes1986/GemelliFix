@@ -43,7 +43,7 @@ import { Badge } from '@/components/ui/badge';
 import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy, writeBatch } from 'firebase/firestore';
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import type { User, Zone, Site, Category } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -54,6 +54,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useRouter } from 'next/navigation';
 
 
 const userRoles: User['role'][] = ['Administrador', 'Servicios Generales', 'Docentes', 'Coordinadores', 'Administrativos'];
@@ -64,6 +65,7 @@ export default function SettingsPage() {
     const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
     const [isUpdating, setIsUpdating] = React.useState(false);
     const { toast } = useToast();
+    const router = useRouter();
     
     // State for avatar management in dialog
     const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
@@ -105,9 +107,35 @@ export default function SettingsPage() {
         slaRisk: true,
         resolved: false,
     });
+    const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+
+    React.useEffect(() => {
+        const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
+            if (user) {
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+                     if (userData.role !== 'Administrador') {
+                        router.push('/tickets');
+                    } else {
+                        setCurrentUser(userData);
+                    }
+                } else {
+                    router.push('/login');
+                }
+            } else {
+                router.push('/login');
+            }
+        });
+
+        return () => unsubscribeAuth();
+    }, [router]);
 
 
     React.useEffect(() => {
+        if (!currentUser) return;
+        
         const qUsers = query(collection(db, 'users'), orderBy('name'));
         const unsubUsers = onSnapshot(qUsers, (snapshot) => {
             const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
@@ -151,7 +179,7 @@ export default function SettingsPage() {
             unsubSites();
             unsubCategories();
         };
-    }, [toast]);
+    }, [toast, currentUser]);
     
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
@@ -369,6 +397,14 @@ export default function SettingsPage() {
             setIsUpdating(false);
         }
     };
+    
+    if (!currentUser) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
+    }
 
   return (
     <div className="space-y-6">
@@ -817,3 +853,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    

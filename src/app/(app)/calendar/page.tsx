@@ -51,6 +51,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { createCalendarEvent } from '@/ai/flows/create-calendar-event';
 import { Textarea } from '@/components/ui/textarea';
+import { useRouter } from 'next/navigation';
 
 
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
@@ -297,6 +298,7 @@ export default function CalendarPage() {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [isLoadingData, setIsLoadingData] = useState(true);
     const { toast } = useToast();
+    const router = useRouter();
     const [allTechnicians, setAllTechnicians] = useState<User[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
 
@@ -320,6 +322,12 @@ export default function CalendarPage() {
                     const userDocSnap = await getDoc(userDocRef);
                     if (userDocSnap.exists()) {
                         const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+                        
+                        if (userData.role !== 'Administrador' && userData.role !== 'Servicios Generales') {
+                            router.push('/tickets');
+                            return;
+                        }
+                        
                         setCurrentUser(userData);
 
                         // Fetch technicians based on role
@@ -331,12 +339,24 @@ export default function CalendarPage() {
                         } else if (userData.role === 'Servicios Generales') {
                             setAllTechnicians([userData]);
                         }
+                    } else {
+                        router.push('/login');
                     }
                 } catch (error) {
                      console.error("Error fetching user data:", error);
+                     router.push('/login');
                 }
+            } else {
+                router.push('/login');
             }
         });
+        
+        return () => unsubscribeAuth();
+    }, [router]);
+
+
+    useEffect(() => {
+        if (!currentUser) return;
 
         const ticketsQuery = query(collection(db, 'tickets'), where('status', 'in', ['Abierto', 'Asignado']));
         const unsubscribeTickets = onSnapshot(ticketsQuery, (snapshot) => {
@@ -373,11 +393,10 @@ export default function CalendarPage() {
         });
 
         return () => {
-            unsubscribeAuth();
             unsubscribeEvents();
             unsubscribeTickets();
         };
-    }, [toast]);
+    }, [toast, currentUser]);
 
     const techniciansToDisplay = allTechnicians;
 
@@ -622,7 +641,7 @@ export default function CalendarPage() {
         setSelectedEvent(event);
     };
 
-  if (isLoadingData) {
+  if (isLoadingData || !currentUser) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -845,3 +864,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    

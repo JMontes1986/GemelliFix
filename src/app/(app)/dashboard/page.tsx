@@ -9,7 +9,6 @@ import {
   Clock,
   CalendarPlus,
   Sparkles,
-  Users,
   MapPin,
 } from 'lucide-react';
 import {
@@ -54,12 +53,14 @@ import {
   type AnalyzeDashboardInput,
   type AnalyzeDashboardOutput,
 } from '@/ai/flows/analyze-dashboard-data';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, where, getDoc, doc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
 import type { Ticket, User } from '@/lib/types';
 import { GemelliFixLogo } from '@/components/icons';
 import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
 
 function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
@@ -107,14 +108,41 @@ const getSlaProgressColor = (priority: string) => {
 
 export default function DashboardPage() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
-  const [technicians, setTechnicians] = React.useState<User[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isAnalysisOpen, setAnalysisOpen] = React.useState(false);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
   const [analysisResult, setAnalysisResult] = React.useState<AnalyzeDashboardOutput | null>(null);
   const { toast } = useToast();
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const router = useRouter();
+
 
    React.useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
+        if (user) {
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+                const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+                if (userData.role !== 'Administrador') {
+                    router.push('/tickets');
+                } else {
+                    setCurrentUser(userData);
+                }
+            } else {
+                 router.push('/login');
+            }
+        } else {
+            router.push('/login');
+        }
+    });
+
+    return () => unsubscribeAuth();
+  }, [router]);
+
+   React.useEffect(() => {
+    if (!currentUser) return; // Don't fetch data if user is not authorized admin
+
     const q = query(collection(db, 'tickets'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const ticketsData: Ticket[] = [];
@@ -137,17 +165,8 @@ export default function DashboardPage() {
       setIsLoading(false);
     });
     
-    const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-    const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
-        const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-        setTechnicians(techData);
-    });
-    
-    return () => {
-      unsubscribe();
-      unsubscribeTechs();
-    };
-  }, [toast]);
+    return () => unsubscribe();
+  }, [toast, currentUser]);
 
   const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto').length;
   const overdueTickets = tickets.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Cerrado' && t.status !== 'Resuelto').length;
@@ -220,7 +239,14 @@ export default function DashboardPage() {
   }
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
-
+  
+  if (isLoading || !currentUser) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -408,3 +434,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
