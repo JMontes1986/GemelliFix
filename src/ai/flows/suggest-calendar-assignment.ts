@@ -72,7 +72,7 @@ const techniciansTool = ai.defineTool(
     },
     async ({startDate, endDate}) => {
         // 1. Get all technicians with role "Servicios Generales"
-        const techQuery = query(collection(db, 'user'), where('role', '==', 'Servicios Generales'));
+        const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
         const techSnapshot = await getDocs(techQuery);
         const technicians = techSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
 

@@ -260,7 +260,7 @@ function EventDetailsDialog({
 
 async function createCalendarNotification(technicianName: string, event: Omit<ScheduleEvent, 'id'>) {
     try {
-        const usersRef = collection(db, "user");
+        const usersRef = collection(db, "users");
         const q = query(usersRef, where("name", "==", technicianName));
         const querySnapshot = await getDocs(q);
 
@@ -318,7 +318,7 @@ export default function CalendarPage() {
         const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
             if (firebaseUser) {
                 try {
-                    const userDocRef = doc(db, 'user', firebaseUser.uid);
+                    const userDocRef = doc(db, 'users', firebaseUser.uid);
                     const userDocSnap = await getDoc(userDocRef);
                     if (userDocSnap.exists()) {
                         const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
@@ -332,7 +332,7 @@ export default function CalendarPage() {
 
                         // Fetch technicians based on role
                         if (userData.role === 'Administrador') {
-                            const techQuery = query(collection(db, 'user'), where('role', '==', 'Servicios Generales'));
+                            const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
                             const querySnapshot = await getDocs(techQuery);
                             const techData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
                             setAllTechnicians(techData);

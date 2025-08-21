@@ -55,7 +55,7 @@ export default function RegisterPage() {
       await updateProfile(user, { displayName: name });
 
       // Guardar información adicional en Firestore, usando el UID como ID del documento.
-      await setDoc(doc(db, 'user', user.uid), {
+      await setDoc(doc(db, 'users', user.uid), {
         id: user.uid, // Usamos el uid como id para consistencia
         uid: user.uid,
         name: name,

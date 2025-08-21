@@ -270,7 +270,7 @@ export default function TicketsPage() {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
         if (firebaseUser) {
             try {
-                const userDocRef = doc(db, 'user', firebaseUser.uid);
+                const userDocRef = doc(db, 'users', firebaseUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
@@ -292,7 +292,7 @@ export default function TicketsPage() {
 
   React.useEffect(() => {
     if (currentUser?.role === 'Administrador') {
-        const techQuery = query(collection(db, 'user'), where('role', '==', 'Servicios Generales'));
+        const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
         const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
             const techData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
             setTechnicians(techData);

@@ -3,72 +3,58 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check for Admin role via token claims
+    
     function isAdmin() {
       return request.auth.token.admin == true;
     }
 
-    // Rules for the 'user' collection
-    match /user/{userId} {
-      // Admins can read and write any user document
-      // Any authenticated user can create their own profile
-      // Users can only read/update their own profile
-      allow read, update: if isAdmin() || request.auth.uid == userId;
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId || isAdmin();
       allow list: if isAdmin();
-      allow create: if request.auth.uid == userId;
-    }
-
-    // Rules for master data collections (zones, sites, categories)
-    // Any authenticated user can read these lists to populate forms
-    match /{collection}/{docId} where collection in ['zones', 'sites', 'categories'] {
-      allow read: if request.auth != null;
-      // Only Admins can create, update, or delete master data
-      allow write: if isAdmin();
+      allow create: if request.auth.uid != null;
+      allow update: if request.auth.uid == userId || isAdmin();
     }
     
-    // Rules for the 'tickets' collection
     match /tickets/{ticketId} {
-      // Admins can perform any action on any ticket
-      // Any authenticated user can create a ticket
-      // Authenticated users can read/update their own tickets
-      // Assigned technicians can read/update tickets they are assigned to
       allow read: if isAdmin() || request.auth.uid == resource.data.requesterId || request.auth.uid in resource.data.assignedToIds;
-      allow create: if request.auth.uid == request.resource.data.requesterId;
+      allow list: if isAdmin() || request.auth.uid != null;
+      allow create: if request.auth.uid != null;
       allow update: if isAdmin() || request.auth.uid == resource.data.requesterId || request.auth.uid in resource.data.assignedToIds;
-      allow delete: if isAdmin();
+    }
+    
+    match /scheduleEvents/{eventId} {
+       allow read, write: if isAdmin() || request.auth.token.role == 'Servicios Generales';
+       allow create: if request.auth != null;
     }
 
-    // Rules for the 'notifications' collection
+    match /zones/{zoneId} {
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
+    }
+    
+    match /sites/{siteId} {
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
+    }
+
     match /notifications/{notificationId} {
-        // Admins can read all notifications for debugging
-        // Users can only read/update their own notifications
-        allow read, update: if isAdmin() || request.auth.uid == resource.data.userId;
-        // Anyone can create a notification (actions in the app will trigger this)
-        allow create: if request.auth != null;
+        allow read, write: if request.auth.uid == resource.data.userId;
+        allow list: if request.auth.uid != null;
     }
-    
-    // Rules for 'logs' collection
+
     match /logs/{logId} {
-        // Only admins can read the full log history
-        allow read, list: if isAdmin();
-        // Any authenticated user can create a log entry (actions will trigger this)
-        allow create: if request.auth != null;
+      allow read, list: if isAdmin();
+      allow create: if request.auth.uid != null;
     }
     
-    // Rules for 'scheduleEvents' collection
-    match /scheduleEvents/{eventId} {
-        // Admins and assigned technicians can read/write calendar events
-        allow read, write: if isAdmin() || request.auth.uid == resource.data.technicianId;
-        // Any authenticated user from 'Servicios Generales' can create events
-        allow create: if request.auth != null && get(/databases/$(database)/documents/user/$(request.auth.uid)).data.role in ['Administrador', 'Servicios Generales'];
-    }
-    
-    // Rules for 'diagnosis_logs' collection for testing
-    match /diagnosis_logs/{logId} {
-        // Allow any authenticated user to write for diagnosis purposes
-        allow write: if request.auth != null;
-    }
+     match /diagnosis_logs/{logId} {
+        allow read, write: if request.auth != null;
+     }
   }
 }
 

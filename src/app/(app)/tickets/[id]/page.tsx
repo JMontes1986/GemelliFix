@@ -120,7 +120,7 @@ const LogIcon = ({ action }: { action: Log['action'] }) => {
 
 async function createNotification(ticket: Ticket, assignedPersonnelIds: string[]) {
     try {
-        const usersRef = collection(db, "user");
+        const usersRef = collection(db, "users");
         const q = query(usersRef, where("id", "in", assignedPersonnelIds));
         const querySnapshot = await getDocs(q);
 
@@ -182,7 +182,7 @@ export default function TicketDetailPage() {
 
 
   useEffect(() => {
-    const q_technicians = query(collection(db, 'user'), where('role', '==', 'Servicios Generales'));
+    const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
     const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
         const fetchedTechnicians: CurrentUser[] = [];
         querySnapshot.forEach((doc) => {
@@ -201,7 +201,7 @@ export default function TicketDetailPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
-            const userDocRef = doc(db, 'user', firebaseUser.uid);
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
             const userDocSnap = await getDoc(userDocRef);
             if (userDocSnap.exists()) {
                 setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as CurrentUser);
