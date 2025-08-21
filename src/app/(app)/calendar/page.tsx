@@ -300,7 +300,7 @@ export default function CalendarPage() {
     const [isLoadingData, setIsLoadingData] = useState(true);
     const { toast } = useToast();
     const router = useRouter();
-    const [allTechnicians, setAllTechnicians] = useState<User[]>([]);
+    const [techniciansToDisplay, setTechniciansToDisplay] = useState<User[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
 
     // State for manual event creation dialog
@@ -336,9 +336,9 @@ export default function CalendarPage() {
                             const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
                             const querySnapshot = await getDocs(techQuery);
                             const techData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-                            setAllTechnicians(techData);
+                            setTechniciansToDisplay(techData);
                         } else if (userData.role === 'Servicios Generales') {
-                            setAllTechnicians([userData]);
+                            setTechniciansToDisplay([userData]);
                         }
                     } else {
                         router.push('/login');
@@ -398,8 +398,6 @@ export default function CalendarPage() {
             unsubscribeTickets();
         };
     }, [toast, currentUser]);
-
-    const techniciansToDisplay = allTechnicians;
 
     const handleDrop = async (e: React.DragEvent<HTMLDivElement>, technicianId: string, day: Date, hour: number) => {
         e.preventDefault();
@@ -482,7 +480,7 @@ export default function CalendarPage() {
               await createLog(currentUser, 'update_assignment', { ticket: { ...ticket, assignedTo: [technician.name] } as Ticket, oldValue: 'Sin Asignar', newValue: technician.name });
             }
 
-            const tech = allTechnicians.find(t => t.id === technician.id);
+            const tech = techniciansToDisplay.find(t => t.id === technician.id);
             if (tech) {
               await createCalendarNotification(tech.name, newEvent);
             }
@@ -539,7 +537,7 @@ export default function CalendarPage() {
                 end: newEvent.end
             });
             
-            const tech = allTechnicians.find(t => t.id === newEventTechnicianId);
+            const tech = techniciansToDisplay.find(t => t.id === newEventTechnicianId);
             if (tech) {
                 await createCalendarNotification(tech.name, newEvent);
             }
@@ -593,7 +591,7 @@ export default function CalendarPage() {
                     createdAt: new Date().toISOString(),
                 },
                 targetDate: new Date().toISOString(),
-                targetTechnicianId: allTechnicians[0]?.id || '', // Default to first technician
+                targetTechnicianId: techniciansToDisplay[0]?.id || '', // Default to first technician
             };
             
             const result = await suggestCalendarAssignment(input);
@@ -663,7 +661,7 @@ export default function CalendarPage() {
         isOpen={!!selectedEvent}
         onOpenChange={(open) => !open && setSelectedEvent(null)}
         event={selectedEvent}
-        technician={allTechnicians.find(t => t.id === selectedEvent?.technicianId)}
+        technician={techniciansToDisplay.find(t => t.id === selectedEvent?.technicianId)}
       />
       <div className="flex items-center justify-between pb-4">
         <div>
@@ -720,7 +718,7 @@ export default function CalendarPage() {
                                   <SelectValue placeholder="Seleccionar personal" />
                               </SelectTrigger>
                               <SelectContent>
-                                  {allTechnicians.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                  {techniciansToDisplay.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                               </SelectContent>
                           </Select>
                       </div>
