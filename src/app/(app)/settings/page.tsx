@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -70,9 +69,12 @@ const getLogActionBadgeVariant = (action: Log['action']) => {
 }
 
 
-export default function SettingsPage({ currentUser }: { currentUser: User | null }) {
+export default function SettingsPage() {
     const router = useRouter();
     const { toast } = useToast();
+
+    const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+    const [authReady, setAuthReady] = React.useState(false);
     
     const [allUsers, setAllUsers] = React.useState<User[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
@@ -122,14 +124,31 @@ export default function SettingsPage({ currentUser }: { currentUser: User | null
         slaRisk: true,
         resolved: false,
     });
+
+    React.useEffect(() => {
+        const unsub = onAuthStateChanged(auth, async (fbUser) => {
+          if (!fbUser) {
+            setCurrentUser(null);
+            setAuthReady(true);
+            return;
+          }
+          try {
+            const snap = await getDoc(doc(db, 'users', fbUser.uid));
+            setCurrentUser(snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null);
+          } finally {
+            setAuthReady(true);
+          }
+        });
+        return () => unsub();
+      }, []);
     
     React.useEffect(() => {
-        if (!currentUser) return;
-        
-        if (currentUser.role !== 'Administrador') {
+        if (!currentUser || currentUser.role !== 'Administrador') {
             setIsLoadingUsers(false);
+            setIsLoadingLocations(false);
+            setIsLoadingLogs(false);
             return;
-        }
+        };
 
         const usersQuery = query(collection(db, 'users'), orderBy('name'));
         const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
@@ -146,12 +165,7 @@ export default function SettingsPage({ currentUser }: { currentUser: User | null
             });
             setIsLoadingUsers(false);
         });
-        
-        return () => unsubUsers();
-    }, [currentUser, toast]);
 
-
-    React.useEffect(() => {
         const qZones = query(collection(db, 'zones'), orderBy('name'));
         const unsubZones = onSnapshot(qZones, (snapshot) => {
             const fetchedZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
@@ -184,14 +198,14 @@ export default function SettingsPage({ currentUser }: { currentUser: User | null
             setIsLoadingLogs(false);
         });
 
-
         return () => {
+            unsubUsers();
             unsubZones();
             unsubSites();
             unsubCategories();
             unsubLogs();
         };
-    }, []);
+    }, [currentUser, toast]);
     
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
@@ -410,27 +424,41 @@ export default function SettingsPage({ currentUser }: { currentUser: User | null
         }
     };
 
-    if (!currentUser) {
-        return (
-            <div className="flex h-64 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        );
-    }
+  if (!authReady) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Acceso Denegado</CardTitle>
+                <CardDescription>Debes iniciar sesión para acceder a la Configuración.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={() => router.push('/login')}>Ir a Iniciar Sesión</Button>
+            </CardContent>
+        </Card>
+    )
+  }
         
-    if (currentUser.role !== 'Administrador') {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Acceso Denegado</CardTitle>
-                    <CardDescription>No tienes permisos para ver esta página.</CardDescription>
-                </CardHeader>
-                 <CardContent>
-                    <Button onClick={() => router.push('/tickets')}>Ir a Mis Tickets</Button>
-                </CardContent>
-            </Card>
-        )
-    }
+  if (currentUser.role !== 'Administrador') {
+      return (
+          <Card>
+              <CardHeader>
+                  <CardTitle>Acceso Denegado</CardTitle>
+                  <CardDescription>No tienes permisos para ver esta página.</CardDescription>
+              </CardHeader>
+               <CardContent>
+                  <Button onClick={() => router.push('/tickets')}>Ir a Mis Tickets</Button>
+              </CardContent>
+          </Card>
+      )
+  }
 
   return (
     <div className="space-y-6">
@@ -947,3 +975,5 @@ export default function SettingsPage({ currentUser }: { currentUser: User | null
     </div>
   );
 }
+
+    
