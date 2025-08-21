@@ -182,34 +182,37 @@ export default function TicketDetailPage() {
 
 
   useEffect(() => {
-    const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-    const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
-        const fetchedTechnicians: CurrentUser[] = [];
-        querySnapshot.forEach((doc) => {
-            fetchedTechnicians.push({ id: doc.id, ...doc.data() } as CurrentUser);
-        });
-        setTechnicians(fetchedTechnicians);
-    }, (error) => {
-        console.error("Error fetching technicians:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
-    });
-    
-    return () => unsubscribe_technicians();
-  }, [toast]);
-
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
             const userDocRef = doc(db, 'users', firebaseUser.uid);
             const userDocSnap = await getDoc(userDocRef);
             if (userDocSnap.exists()) {
-                setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as CurrentUser);
+                const userData = { id: userDocSnap.id, ...userDocSnap.data() } as CurrentUser;
+                setCurrentUser(userData);
+
+                // Fetch technicians only if the user is an admin
+                if (userData.role === 'Administrador') {
+                    const q_technicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+                    const unsubscribe_technicians = onSnapshot(q_technicians, (querySnapshot) => {
+                        const fetchedTechnicians: CurrentUser[] = [];
+                        querySnapshot.forEach((doc) => {
+                            fetchedTechnicians.push({ id: doc.id, ...doc.data() } as CurrentUser);
+                        });
+                        setTechnicians(fetchedTechnicians);
+                    }, (error) => {
+                        console.error("Error fetching technicians:", error);
+                        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
+                    });
+                    
+                    return () => unsubscribe_technicians();
+                }
             }
         }
     });
-    return () => unsubscribe();
-  }, []);
+
+    return () => unsubscribeAuth();
+  }, [toast]);
+
 
   useEffect(() => {
     if (!ticketId) {
