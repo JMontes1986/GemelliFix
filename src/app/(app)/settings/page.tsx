@@ -147,8 +147,6 @@ export default function SettingsPage() {
 
 
     React.useEffect(() => {
-        if (!currentUser) return;
-        
         const qUsers = query(collection(db, 'users'), orderBy('name'));
         const unsubUsers = onSnapshot(qUsers, (snapshot) => {
             const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
@@ -156,14 +154,12 @@ export default function SettingsPage() {
             setIsLoadingUsers(false);
         }, (error) => {
             console.error("Error fetching users:", error);
-            if (error.code === 'failed-precondition') {
-                 toast({
-                    variant: "destructive",
-                    title: "Índice requerido",
-                    description: "La consulta de usuarios necesita un índice en Firestore. Por favor, créalo.",
-                    duration: 10000,
-                });
-            }
+            toast({
+                variant: "destructive",
+                title: "Error de Permisos",
+                description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
+                duration: 10000,
+            });
             setIsLoadingUsers(false);
         });
 
@@ -207,7 +203,7 @@ export default function SettingsPage() {
             unsubCategories();
             unsubLogs();
         };
-    }, [toast, currentUser]);
+    }, [toast]);
     
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {

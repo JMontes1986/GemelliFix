@@ -23,11 +23,7 @@ const setRoleClaim = async (uid: string, role: string) => {
     const claims: {[key: string]: any} = {};
 
     // Set the 'admin' claim to true only if the role is 'Administrador'.
-    if (role === 'Administrador') {
-        claims['admin'] = true;
-    } else {
-        claims['admin'] = false; // Explicitly set to false for other roles
-    }
+    claims['admin'] = role === 'Administrador';
 
     try {
         // Set the custom claims on the user's auth token.
