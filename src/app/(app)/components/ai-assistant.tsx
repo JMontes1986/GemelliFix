@@ -30,7 +30,7 @@ export default function AiAssistant() {
   const [messages, setMessages] = React.useState<Message[]>([
     {
       role: 'assistant',
-      content: '¡Hola! Soy tu asistente de ayuda. ¿En qué puedo colaborarte hoy? Puedes preguntarme cómo crear un ticket, quiénes pueden aprobar solicitudes y más.'
+      content: '¡Hola! Soy Molly IA, tu asistente de ayuda. ¿En qué puedo colaborarte hoy? Puedes preguntarme cómo crear un ticket, quiénes pueden aprobar solicitudes y más.'
     }
   ]);
   const [input, setInput] = React.useState('');
@@ -64,7 +64,7 @@ export default function AiAssistant() {
       console.error('Error asking AI assistant:', error);
       toast({
         variant: 'destructive',
-        title: 'Error del Asistente',
+        title: 'Error de Molly IA',
         description: 'No se pudo obtener una respuesta. Por favor, inténtalo de nuevo.',
       });
        const errorMessage: Message = { role: 'assistant', content: 'Lo siento, he tenido un problema al procesar tu solicitud.' };
@@ -86,7 +86,7 @@ export default function AiAssistant() {
         <SheetHeader>
           <SheetTitle className="font-headline flex items-center gap-2">
             <Sparkles />
-            Asistente de Ayuda GemelliFix
+            Asistente Molly IA
           </SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1 pr-4 -mr-4 my-4" ref={scrollAreaRef}>
@@ -146,7 +146,7 @@ export default function AiAssistant() {
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="¿Cómo creo un ticket?"
+              placeholder="Pregúntale a Molly IA..."
               className="flex-1 min-h-[40px] max-h-24"
               rows={1}
               onKeyDown={(e) => {
