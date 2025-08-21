@@ -89,7 +89,7 @@ export default function SettingsPage() {
     const [categories, setCategories] = React.useState<Category[]>([]);
     const [isLoadingLocations, setIsLoadingLocations] = React.useState(true);
     const [isLocationDialogOpen, setIsLocationDialogOpen] = React.useState(false);
-    const [editingLocation, setEditingLocation] = React.useState<{type: 'zone' | 'site', data: Zone | Site} | null>(null);
+    const [editingLocation, setEditingLocation] = React.useState<{type: 'zone' | 'site' | 'category', data: Zone | Site | Category} | null>(null);
     
     // State for creating new locations
     const [isNewZoneDialogOpen, setIsNewZoneDialogOpen] = React.useState(false);
@@ -97,6 +97,9 @@ export default function SettingsPage() {
     const [isNewSiteDialogOpen, setIsNewSiteDialogOpen] = React.useState(false);
     const [newSiteName, setNewSiteName] = React.useState('');
     const [newSiteZoneId, setNewSiteZoneId] = React.useState('');
+    const [isNewCategoryDialogOpen, setIsNewCategoryDialogOpen] = React.useState(false);
+    const [newCategoryName, setNewCategoryName] = React.useState('');
+
     
     // State for creating new user
     const [isNewUserDialogOpen, setIsNewUserDialogOpen] = React.useState(false);
@@ -133,14 +136,25 @@ export default function SettingsPage() {
             return;
           }
           try {
+            await fbUser.getIdToken(true);
             const snap = await getDoc(doc(db, 'users', fbUser.uid));
             setCurrentUser(snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null);
+          } catch(error) {
+            console.warn('Error refreshing token, using cached user data', error);
+            // Fallback to cached data if token refresh fails, to prevent logout loops
+            const snap = await getDoc(doc(db, 'users', fbUser.uid));
+            if (snap.exists()) {
+                setCurrentUser({ id: snap.id, ...snap.data() } as User);
+            } else {
+                setCurrentUser(null);
+                router.push('/login'); // only redirect if user doc is confirmed missing
+            }
           } finally {
             setAuthReady(true);
           }
         });
         return () => unsub();
-      }, []);
+      }, [router]);
     
     React.useEffect(() => {
         if (!currentUser || currentUser.role !== 'Administrador') {
@@ -159,7 +173,7 @@ export default function SettingsPage() {
             console.error("Error fetching users:", error);
             toast({
                 variant: "destructive",
-                title: "Error de Permisos",
+                title: "Error al Cargar Usuarios",
                 description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
                 duration: 10000,
             });
@@ -219,7 +233,7 @@ export default function SettingsPage() {
       }
     };
     
-    const handleLocationEditClick = (type: 'zone' | 'site', data: Zone | Site) => {
+    const handleLocationEditClick = (type: 'zone' | 'site' | 'category', data: Zone | Site | Category) => {
         setEditingLocation({ type, data: { ...data } });
         setIsLocationDialogOpen(true);
     };
@@ -228,17 +242,17 @@ export default function SettingsPage() {
         if (!editingLocation) return;
         setIsUpdating(true);
         const { type, data } = editingLocation;
-        const collectionName = type === 'zone' ? 'zones' : 'sites';
+        const collectionName = type === 'zone' ? 'zones' : type === 'site' ? 'sites' : 'categories';
         const docRef = doc(db, collectionName, data.id);
 
         try {
             await updateDoc(docRef, { name: data.name });
-            toast({ title: `${type === 'zone' ? 'Zona' : 'Sitio'} Actualizado`, description: 'El nombre se ha guardado.' });
+            toast({ title: `${type === 'zone' ? 'Zona' : type === 'site' ? 'Sitio' : 'Categoría'} Actualizada`, description: 'El nombre se ha guardado.' });
             setIsLocationDialogOpen(false);
             setEditingLocation(null);
         } catch (error) {
             console.error(`Error updating ${type}:`, error);
-            toast({ variant: 'destructive', title: 'Error', description: `No se pudo actualizar ${type === 'zone' ? 'la zona' : 'el sitio'}.` });
+            toast({ variant: 'destructive', title: 'Error', description: `No se pudo actualizar.` });
         } finally {
             setIsUpdating(false);
         }
@@ -285,6 +299,28 @@ export default function SettingsPage() {
         } catch (error) {
             console.error('Error creating site:', error);
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear el nuevo sitio.' });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const handleCreateCategory = async () => {
+        if (!newCategoryName.trim()) {
+            toast({ variant: 'destructive', title: 'Error', description: 'El nombre de la categoría no puede estar vacío.' });
+            return;
+        }
+        setIsUpdating(true);
+        try {
+            await addDoc(collection(db, 'categories'), {
+                name: newCategoryName,
+                createdAt: serverTimestamp()
+            });
+            toast({ title: 'Categoría Creada', description: 'La nueva categoría se ha guardado correctamente.' });
+            setIsNewCategoryDialogOpen(false);
+            setNewCategoryName('');
+        } catch (error) {
+            console.error('Error creating category:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la nueva categoría.' });
         } finally {
             setIsUpdating(false);
         }
@@ -466,7 +502,7 @@ export default function SettingsPage() {
        <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Editar {editingLocation?.type === 'zone' ? 'Zona' : 'Sitio'}</DialogTitle>
+                    <DialogTitle>Editar {editingLocation?.type}</DialogTitle>
                 </DialogHeader>
                 {editingLocation && (
                     <div className="grid gap-4 py-4">
@@ -475,10 +511,10 @@ export default function SettingsPage() {
                             <Input
                                 id="location-name"
                                 value={editingLocation.data.name}
-                                onChange={(e) => setEditingLocation({
-                                    ...editingLocation,
-                                    data: { ...editingLocation.data, name: e.target.value }
-                                })}
+                                onChange={(e) => setEditingLocation(prev => prev ? {
+                                    ...prev,
+                                    data: { ...prev.data, name: e.target.value }
+                                } : null)}
                                 className="col-span-3"
                             />
                         </div>
@@ -516,6 +552,33 @@ export default function SettingsPage() {
                     <Button onClick={handleCreateZone} disabled={isUpdating}>
                         {isUpdating && <Loader2 className="mr-2 animate-spin" />}
                         Guardar Zona
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog open={isNewCategoryDialogOpen} onOpenChange={setIsNewCategoryDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Crear Nueva Categoría</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="new-category-name" className="text-right">Nombre</Label>
+                        <Input
+                            id="new-category-name"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            className="col-span-3"
+                            placeholder="Ej: Aires Acondicionados"
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsNewCategoryDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleCreateCategory} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 animate-spin" />}
+                        Guardar Categoría
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -791,7 +854,7 @@ export default function SettingsPage() {
                                 Administra las categorías para las solicitudes de mantenimiento.
                             </CardDescription>
                         </div>
-                        <Button disabled>
+                        <Button onClick={() => setIsNewCategoryDialogOpen(true)}>
                             <PlusCircle className="mr-2" /> Nueva Categoría
                         </Button>
                     </div>
@@ -811,7 +874,7 @@ export default function SettingsPage() {
                         <TableRow key={category.id}>
                           <TableCell className="font-medium">{category.name}</TableCell>
                           <TableCell>
-                            <Button variant="outline" size="sm" disabled>Editar</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleLocationEditClick('category', category)}>Editar</Button>
                           </TableCell>
                         </TableRow>
                       ))}
