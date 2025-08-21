@@ -754,7 +754,7 @@ export default function CalendarPage() {
                         Crea un nuevo turno, tarea o asigna un ticket.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
+                <div className="space-y-4 py-4 max-h-[90vh] overflow-y-auto pr-6">
                     <div className="space-y-2">
                         <Label htmlFor="title">Título</Label>
                         <Input id="title" placeholder="Ej: Mantenimiento Aires" value={newEventTitle} onChange={(e) => setNewEventTitle(e.target.value)} />
