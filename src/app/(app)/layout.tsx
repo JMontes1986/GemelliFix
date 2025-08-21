@@ -20,7 +20,8 @@ import {
   HeartPulse,
   Loader2,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Sparkles
 } from 'lucide-react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -60,6 +61,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import type { User } from '@/lib/types';
+import AiAssistant from './components/ai-assistant';
 
 function CollapseToggle() {
     const { state, toggleSidebar } = useSidebar();
@@ -107,8 +109,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               }
             } catch (tokenError) {
               console.warn("Could not refresh token or get user data:", tokenError);
-              // We don't sign out here to avoid loops, but we'll have a user without claims.
-              // Security rules will ultimately decide what they can access.
+              // Fallback to cached data if token refresh fails, to prevent logout loops
+              const userDocRef = doc(db, 'users', firebaseUser.uid);
+              const userDocSnap = await getDoc(userDocRef);
+              if (userDocSnap.exists()) {
+                  setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
+              } else {
+                  await auth.signOut();
+                  router.push('/login');
+              }
             }
         } else {
             // No user is signed in, redirect to login.
@@ -262,6 +271,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <span className="sr-only">Notificaciones</span>
             </Button>
           </Link>
+           <AiAssistant />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
