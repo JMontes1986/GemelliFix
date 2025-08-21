@@ -20,10 +20,9 @@ initializeApp();
  * @param {string} role - The user's role from the Firestore document.
  */
 const setRoleClaim = async (uid: string, role: string) => {
-    const claims: {[key: string]: any} = {};
-
-    // Set the 'admin' claim to true only if the role is 'Administrador'.
-    claims['admin'] = role === 'Administrador';
+    const claims: {[key: string]: any} = {
+        admin: role === 'Administrador'
+    };
 
     try {
         // Set the custom claims on the user's auth token.

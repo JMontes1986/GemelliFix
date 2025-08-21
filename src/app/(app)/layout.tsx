@@ -92,24 +92,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
         setIsLoadingUser(true);
         if (firebaseUser) {
-            // Attempt to refresh the token to get the latest claims, but don't fail hard.
             try {
+              // Force refresh of the token to get the latest custom claims.
               await firebaseUser.getIdToken(true);
+              const userDocRef = doc(db, 'users', firebaseUser.uid);
+              const userDocSnap = await getDoc(userDocRef);
+
+              if (userDocSnap.exists()) {
+                  setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
+              } else {
+                  console.warn("User data not found in Firestore for authenticated user, logging out.");
+                  await auth.signOut();
+                  router.push('/login');
+              }
             } catch (tokenError) {
-              console.warn("Could not refresh token:", tokenError);
-              // The user is still authenticated, so we can proceed.
-              // Firestore rules will ultimately decide what they can access.
-            }
-
-            const userDocRef = doc(db, 'users', firebaseUser.uid);
-            const userDocSnap = await getDoc(userDocRef);
-
-            if (userDocSnap.exists()) {
-                setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
-            } else {
-                console.warn("User data not found in Firestore for authenticated user, logging out.");
-                await auth.signOut();
-                router.push('/login');
+              console.warn("Could not refresh token or get user data:", tokenError);
+              // We don't sign out here to avoid loops, but we'll have a user without claims.
+              // Security rules will ultimately decide what they can access.
             }
         } else {
             // No user is signed in, redirect to login.

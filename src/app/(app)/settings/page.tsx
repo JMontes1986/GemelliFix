@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -69,15 +70,13 @@ const getLogActionBadgeVariant = (action: Log['action']) => {
 }
 
 
-export default function SettingsPage() {
-    const [currentUser, setCurrentUser] = React.useState<User | null>(null);
-    const [isLoadingUser, setIsLoadingUser] = React.useState(true);
+export default function SettingsPage({ currentUser }: { currentUser: User | null }) {
+    const router = useRouter();
+    const { toast } = useToast();
     
     const [allUsers, setAllUsers] = React.useState<User[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = React.useState(true);
     const [isUpdating, setIsUpdating] = React.useState(false);
-    const { toast } = useToast();
-    const router = useRouter();
     
     // State for avatar management in dialog
     const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
@@ -123,41 +122,14 @@ export default function SettingsPage() {
         slaRisk: true,
         resolved: false,
     });
-
+    
     React.useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
-            if (fbUser) {
-                try {
-                    const userDocRef = doc(db, 'users', fbUser.uid);
-                    const userDocSnap = await getDoc(userDocRef);
-                    if (userDocSnap.exists()) {
-                        setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
-                    } else {
-                        setCurrentUser(null);
-                        toast({ variant: 'destructive', title: 'Error de Usuario', description: 'No se encontraron datos de perfil para este usuario.' });
-                    }
-                } catch (error) {
-                    console.error("Error fetching current user data:", error);
-                    setCurrentUser(null);
-                } finally {
-                    setIsLoadingUser(false);
-                }
-            } else {
-                setCurrentUser(null);
-                setIsLoadingUser(false);
-                router.push('/login');
-            }
-        });
-
-        return () => unsubscribe();
-    }, [router, toast]);
-
-
-    React.useEffect(() => {
-        if (!currentUser || currentUser.role !== 'Administrador') {
+        if (!currentUser) return;
+        
+        if (currentUser.role !== 'Administrador') {
             setIsLoadingUsers(false);
             return;
-        };
+        }
 
         const usersQuery = query(collection(db, 'users'), orderBy('name'));
         const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
@@ -438,19 +410,14 @@ export default function SettingsPage() {
         }
     };
 
-    if (isLoadingUser) {
+    if (!currentUser) {
         return (
             <div className="flex h-64 items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin" />
             </div>
         );
     }
-    
-    if (!currentUser) {
-        // This case is handled by the useEffect redirecting to /login
-        return null;
-    }
-    
+        
     if (currentUser.role !== 'Administrador') {
         return (
             <Card>
