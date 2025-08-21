@@ -123,16 +123,36 @@ export default function SettingsPage() {
     const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
     React.useEffect(() => {
-        const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
-            if (user) {
-                const userDocRef = doc(db, 'users', user.uid);
+        const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+            if (firebaseUser) {
+                const userDocRef = doc(db, 'users', firebaseUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
                      if (userData.role !== 'Administrador') {
+                        toast({ variant: 'destructive', title: 'Acceso Denegado', description: 'No tienes permisos para ver esta página.'});
                         router.push('/tickets');
                     } else {
                         setCurrentUser(userData);
+                        
+                        // User is admin, now fetch all users
+                        const usersQuery = query(collection(db, 'users'), orderBy('name'));
+                        const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
+                            const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+                            setAllUsers(fetchedUsers);
+                            setIsLoadingUsers(false);
+                        }, (error) => {
+                            console.error("Error fetching users:", error);
+                            toast({
+                                variant: "destructive",
+                                title: "Error de Permisos",
+                                description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad y los índices de Firestore.",
+                                duration: 10000,
+                            });
+                            setIsLoadingUsers(false);
+                        });
+
+                        return () => unsubUsers();
                     }
                 } else {
                     router.push('/login');
@@ -143,52 +163,10 @@ export default function SettingsPage() {
         });
 
         return () => unsubscribeAuth();
-    }, [router]);
+    }, [router, toast]);
 
 
     React.useEffect(() => {
-        if (!currentUser) return;
-        
-        let usersQuery;
-        // Admins can see everyone
-        if (currentUser.role === 'Administrador') {
-            usersQuery = query(collection(db, 'users'), orderBy('name'));
-        } 
-        // Techs can see other techs for assignment purposes
-        else if (currentUser.role === 'Servicios Generales') {
-            usersQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'), orderBy('name'));
-        }
-        // Other roles don't need to see the list, but we'll prevent the query just in case.
-        else {
-            setAllUsers([]);
-            setIsLoadingUsers(false);
-            return;
-        }
-
-        const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
-            const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-            setAllUsers(fetchedUsers);
-            setIsLoadingUsers(false);
-        }, (error) => {
-            console.error("Error fetching users:", error);
-            if (error.code === 'failed-precondition') {
-                 toast({
-                    variant: "destructive",
-                    title: "Índice requerido",
-                    description: "La consulta de usuarios necesita un índice en Firestore. Por favor, créalo en la consola de Firebase.",
-                    duration: 10000,
-                });
-            } else {
-                toast({
-                    variant: "destructive",
-                    title: "Error de Permisos",
-                    description: "No se pudieron cargar los usuarios. Revisa las reglas de seguridad de Firestore.",
-                    duration: 10000,
-                });
-            }
-            setIsLoadingUsers(false);
-        });
-
         const qZones = query(collection(db, 'zones'), orderBy('name'));
         const unsubZones = onSnapshot(qZones, (snapshot) => {
             const fetchedZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
@@ -223,13 +201,12 @@ export default function SettingsPage() {
 
 
         return () => {
-            unsubUsers();
             unsubZones();
             unsubSites();
             unsubCategories();
             unsubLogs();
         };
-    }, [toast, currentUser]);
+    }, []);
     
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {

@@ -9,67 +9,98 @@ service cloud.firestore {
       return request.auth.token.admin == true;
     }
 
-    // Users can read/update their own profile.
-    // Admins can read/update/list all profiles.
+    // Rules for the 'users' collection
     match /users/{userId} {
-      allow read: if request.auth.uid == userId || isAdmin();
+      // Admins can read the full list of users.
       allow list: if isAdmin();
-      allow create, update: if request.auth.uid == userId || isAdmin();
+      
+      // A user can read their own profile. Admins can read any profile.
+      allow read: if isAdmin() || request.auth.uid == userId;
+      
+      // A user can update their own profile. Admins can update any profile.
+      allow update: if isAdmin() || request.auth.uid == userId;
+      
+      // Only admins can create or delete users through this rule.
+      // (Actual creation is handled by server-side logic).
+      allow create, delete: if isAdmin();
     }
-    
-    // Tickets:
-    // - Requesters can create tickets.
-    // - Requesters can read/update their OWN tickets (until assigned).
-    // - Assigned techs can read/update tickets assigned to them.
-    // - Admins have full access.
+
+    // Rules for the 'tickets' collection
     match /tickets/{ticketId} {
-      allow create: if request.auth.uid != null;
-      allow read: if isAdmin() || request.auth.uid == resource.data.requesterId || request.auth.uid in resource.data.assignedToIds;
-      allow list: if isAdmin() || request.auth.uid != null; // Allow logged-in users to list their own tickets
-      allow update: if isAdmin() || request.auth.uid == resource.data.requesterId || request.auth.uid in resource.data.assignedToIds;
+      // Admins can read all tickets.
+      // General Services can read tickets assigned to them.
+      // Other users can read tickets they created.
+      allow read: if isAdmin() || 
+                  request.auth.uid in resource.data.assignedToIds ||
+                  request.auth.uid == resource.data.requesterId;
+                  
+      // Allow listing of tickets based on specific queries.
+      allow list: if request.auth != null;
+                  
+      // Any authenticated user can create a ticket.
+      allow create: if request.auth != null;
+
+      // Admins can update any ticket.
+      // General Services can update tickets assigned to them.
+      allow update: if isAdmin() || 
+                    (request.auth.uid in resource.data.assignedToIds);
+
+      // Only admins can delete tickets.
       allow delete: if isAdmin();
     }
 
-    // Anyone authenticated can read zones, sites, categories (master data).
-    // Only admins can modify them.
-    match /zones/{zoneId} {
-      allow read: if request.auth.uid != null;
-      allow write: if isAdmin();
-    }
-    match /sites/{siteId} {
-      allow read: if request.auth.uid != null;
-      allow write: if isAdmin();
-    }
-    match /categories/{categoryId} {
-      allow read: if request.auth.uid != null;
-      allow write: if isAdmin();
-    }
-    
-    // Notifications can only be read/updated by the target user or admin.
-    match /notifications/{notificationId} {
-      allow read, update, delete: if isAdmin() || request.auth.uid == resource.data.userId;
-      allow create: if request.auth.uid != null;
-    }
-    
-    // Schedule Events:
-    // - Admins can read/write all events.
-    // - Assigned techs can read events assigned to them.
-    match /scheduleEvents/{eventId} {
-      allow read, list: if isAdmin() || request.auth.uid == resource.data.technicianId;
-      allow create, update, delete: if isAdmin();
-    }
-
-    // Logs can only be written by authenticated users (via backend logic).
-    // Only admins can read the full log collection.
+    // Rules for the 'logs' collection
     match /logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if request.auth.uid != null;
+      // Only admins can read the full log history.
+      allow read, list: if isAdmin();
+      // Writing logs is handled by a secure server-side function,
+      // but we allow any authenticated user to create a log entry as a fallback.
+      allow create: if request.auth != null;
+    }
+    
+    // Rules for general data collections
+    match /zones/{zoneId} {
+      // Anyone can read zones.
+      allow read: if true;
+      // Only admins can modify zones.
+      allow write: if isAdmin();
+    }
+    
+    match /sites/{siteId} {
+        // Anyone can read sites.
+        allow read: if true;
+        // Only admins can modify sites.
+        allow write: if isAdmin();
+    }
+    
+    match /categories/{categoryId} {
+        // Anyone can read categories.
+        allow read: if true;
+        // Only admins can modify categories.
+        allow write: if isAdmin();
+    }
+    
+    // Rules for notifications
+    match /notifications/{notificationId} {
+        // A user can read their own notifications.
+        allow read, list: if request.auth.uid == resource.data.userId;
+        // A user can update their own notifications (e.g., mark as read).
+        allow update: if request.auth.uid == resource.data.userId;
+        // Server-side logic handles creation.
+        allow create: if request.auth != null;
+    }
+    
+    // Rules for calendar events
+    match /scheduleEvents/{eventId} {
+        // Any authenticated user can read/list events (for the calendar view).
+        allow read, list: if request.auth != null;
+        // Only admins can create/update/delete events directly.
+        // Technicians create events via specific logic handled by security rules on ticket updates.
+        allow write: if isAdmin();
     }
     
      match /diagnosis_logs/{logId} {
-      allow read, write: if request.auth.uid != null;
+      allow read, write: if request.auth != null;
     }
   }
 }
-
-    
