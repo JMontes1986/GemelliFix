@@ -7,22 +7,23 @@ const getServiceAccountCredentials = () => {
     const base64Key = process.env.FB_SERVICE_ACCOUNT_B64;
     if (!base64Key) {
         // Stop execution if the critical environment variable is missing.
-        throw new Error("Google Calendar integration failed: FB_SERVICE_ACCOUNT_B64 is not set.");
+        throw new Error("Google Calendar integration failed: FB_SERVICE_ACCOUNT_B64 is not set in your .env file.");
     }
     
     try {
         const decodedKey = Buffer.from(base64Key, 'base64').toString('utf8');
         const serviceAccount = JSON.parse(decodedKey);
+        const calendarId = process.env.GOOGLE_CALENDAR_ID;
         
         // Validate that the necessary fields exist for Google Calendar API.
-        if (!serviceAccount.client_email || !serviceAccount.private_key || !process.env.GOOGLE_CALENDAR_ID) {
+        if (!serviceAccount.client_email || !serviceAccount.private_key || !calendarId) {
             throw new Error("The service account key is missing required fields (client_email, private_key) or GOOGLE_CALENDAR_ID is not set.");
         }
         
         return {
             clientEmail: serviceAccount.client_email,
             privateKey: serviceAccount.private_key,
-            calendarId: process.env.GOOGLE_CALENDAR_ID
+            calendarId: calendarId
         };
     } catch(error: any) {
         console.error("Failed to parse Google service account credentials from Base64:", error.message);
