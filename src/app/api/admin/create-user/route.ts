@@ -65,11 +65,8 @@ export async function POST(req: Request) {
       photoURL: avatar || undefined,
     });
     
-    // Set custom claims for the new user (for role-based access)
-    // This is handled by the onUserCreated Cloud Function now.
-
     // Create user document in Firestore (Admin SDK ignores security rules)
-    // This action will trigger the onUserCreated Cloud Function.
+    // This action will trigger the onUserCreated Cloud Function to set the custom claim.
     await dbAdmin.collection('users').doc(userRecord.uid).set({
       id: userRecord.uid,
       uid: userRecord.uid,
