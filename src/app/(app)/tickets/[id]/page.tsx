@@ -355,6 +355,10 @@ export default function TicketDetailPage() {
     
     let updates: { [key: string]: any } = { [field]: value };
 
+    if (field === 'status' && (value === 'Cerrado' || value === 'Resuelto')) {
+        updates.resolvedAt = new Date().toISOString();
+    }
+
     let logDetails: any = { ticket, oldValue, newValue: value };
 
     if (field === 'priority') {

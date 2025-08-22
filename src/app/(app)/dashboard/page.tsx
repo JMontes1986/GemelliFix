@@ -152,7 +152,8 @@ export default function DashboardPage() {
 
   const resolutionTimes = closedTickets
     .map(t => {
-        const resolvedAt = t.resolvedAt ? new Date(t.resolvedAt).getTime() : new Date().getTime();
+        // Fallback to dueDate for old tickets without resolvedAt to avoid incorrect calculation with new Date()
+        const resolvedAt = t.resolvedAt ? new Date(t.resolvedAt).getTime() : new Date(t.dueDate).getTime();
         const createdAt = new Date(t.createdAt).getTime();
         return resolvedAt - createdAt;
     })
