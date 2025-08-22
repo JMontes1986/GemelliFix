@@ -78,8 +78,8 @@ export default function AiAssistant() {
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full">
-          <Image unoptimized src="/molly-ia-icon.png" alt="Asistente Molly IA" width={24} height={24} className="h-6 w-6" />
+        <Button variant="ghost" size="icon" className="rounded-full group">
+          <Image unoptimized src="/molly-ia-icon.png" alt="Asistente Molly IA" width={24} height={24} className="h-6 w-6 transition-transform duration-300 ease-in-out group-hover:scale-110 group-hover:animate-bounce" />
           <span className="sr-only">Asistente de Ayuda IA</span>
         </Button>
       </SheetTrigger>
