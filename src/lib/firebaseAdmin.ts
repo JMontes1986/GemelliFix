@@ -1,6 +1,5 @@
-
 import { cert, getApps, initializeApp, getApp, App } from 'firebase-admin/app';
-import { serviceAccount } from '@/lib/firebase-admin-config';
+import { serviceAccount } from './firebase-admin-config';
 
 // Singleton pattern: Initialize the admin app only if it doesn't already exist.
 // This prevents errors during hot-reloading in development.

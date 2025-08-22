@@ -1,4 +1,3 @@
-
 import { google } from 'googleapis';
 import { serviceAccount } from './firebase-admin-config';
 
