@@ -11,6 +11,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 
 // Initialize the Firebase Admin SDK.
+// En el entorno de Cloud Functions, esto funciona automáticamente sin pasar credenciales.
 initializeApp();
 
 /**
@@ -19,7 +20,11 @@ initializeApp();
  * @param {string} uid - The user's ID.
  * @param {string} role - The user's role from the Firestore document.
  */
-const setRoleClaim = async (uid: string, role: string) => {
+const setRoleClaim = async (uid: string, role: string | undefined) => {
+    if (!role) {
+        console.log(`User ${uid} has no role. Skipping claims.`);
+        return;
+    }
     const claims: {[key: string]: any} = {
         role: role, // Set the role directly
     };

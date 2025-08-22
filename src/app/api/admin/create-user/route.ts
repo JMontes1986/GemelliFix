@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import { adminApp } from '@/lib/firebaseAdmin';
+import { adminApp } from '@/lib/firebaseAdmin'; // Importar la instancia única
 
 export async function POST(req: Request) {
   try {
@@ -16,13 +16,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
     }
     
-    const decodedToken = await getAuth(adminApp).verifyIdToken(idToken);
+    // Usamos el `adminApp` ya inicializado
+    const auth = getAuth(adminApp);
+    const db = getFirestore(adminApp);
+
+    const decodedToken = await auth.verifyIdToken(idToken);
+    
+    // Se verifica el rol usando el custom claim del token, que es más seguro.
     if (decodedToken.role !== 'Administrador') {
         return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
     }
-
-    const auth = getAuth(adminApp);
-    const db = getFirestore(adminApp);
 
     const userRec = await auth.createUser({
       email,
@@ -31,8 +34,8 @@ export async function POST(req: Request) {
       photoURL: avatar || undefined,
     });
 
-    // Set custom claims for the new user, which will be handled by the onUserCreated function
-    // This function will trigger the Cloud Function to set the claims.
+    // La Cloud Function `onUserCreated` se encargará de poner el custom claim.
+    // Aquí solo guardamos el documento en Firestore.
     await db.collection('users').doc(userRec.uid).set({
       id: userRec.uid,
       uid: userRec.uid,
@@ -45,13 +48,16 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, uid: userRec.uid });
   } catch (err: any) {
-    console.error('create-user error', err);
+    console.error('create-user error:', err.message);
     let message = 'An unknown error occurred.';
     if (err.code === 'auth/email-already-exists') {
         message = 'The email address is already in use by another account.';
     } else if (err.code === 'auth/invalid-password') {
         message = 'The password must be a string with at least 6 characters.';
+    } else if (err.message.includes('Must be a valid')) { // Captura errores de credenciales
+        message = 'Firebase Admin SDK credentials error. ' + err.message;
     }
+    
     return NextResponse.json(
       { error: message },
       { status: 500 }
