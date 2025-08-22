@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, type DocumentReference } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, BrainCircuit, AlertTriangle, CalendarPlus } from 'lucide-react';
+import { Loader2, Zap, BrainCircuit, AlertTriangle, CalendarPlus, UserPlus } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { User as FirebaseAuthUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -238,6 +238,65 @@ export default function DiagnosisPage() {
             setIsLoading(false);
         }
     };
+    
+    const handleUserCreationTest = async () => {
+      setAiDiagnosis(null);
+      setIsLoading(true);
+  
+      if (!currentUser) {
+        const authErrorMsg = 'Debes iniciar sesión para realizar esta prueba. El sistema no detecta un usuario autenticado.';
+        setExecutionResult({ status: 'Error de Autenticación', message: authErrorMsg });
+        setIsLoading(false);
+        return;
+      }
+      
+      const testUser = {
+        name: `Usuario de Prueba ${Date.now()}`,
+        email: `test-${Date.now()}@gemellifix.com`,
+        password: 'password123',
+        role: 'Docentes',
+        avatar: 'https://placehold.co/100x100.png'
+      };
+
+      setExecutionResult({ status: 'Enviando...', message: `Intentando crear usuario de prueba: ${testUser.email}` });
+
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch('/api/admin/create-user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+          },
+          body: JSON.stringify(testUser),
+        });
+  
+        const contentType = res.headers.get('content-type') || '';
+        const payload = contentType.includes('application/json')
+          ? await res.json()
+          : { error: await res.text() };
+  
+        if (!res.ok) {
+          throw new Error(payload.error || `Error HTTP: ${res.status}`);
+        }
+  
+        const successMsg = `¡Éxito! Se ha creado el usuario de prueba con UID: ${payload.uid}. Revisa Authentication y Firestore.`;
+        setExecutionResult({ status: 'Éxito', message: successMsg });
+        toast({ title: 'Prueba Exitosa', description: successMsg });
+  
+      } catch (error: any) {
+        console.error('Error en la prueba de creación de usuario:', error);
+        setExecutionResult({ status: 'Error', message: error.message });
+        toast({
+          variant: 'destructive',
+          title: 'Error en la Prueba',
+          description: error.message,
+          duration: 9000,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
 
   const form = useForm<DiagnosisFormValues>({
@@ -348,7 +407,6 @@ export default function DiagnosisPage() {
           </CardContent>
       </Card>
 
-
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="font-headline text-2xl">Prueba de Conexión Rápida</CardTitle>
@@ -386,6 +444,30 @@ export default function DiagnosisPage() {
             {(isLoading || isAuthLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             <CalendarPlus className="mr-2 h-4 w-4" />
             Probar Creación de Evento
+          </Button>
+        </CardContent>
+      </Card>
+      
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle className="font-headline text-2xl">Prueba de Creación de Usuario (Admin API)</CardTitle>
+          <CardDescription>
+            Este botón simula la creación de un usuario nuevo a través del endpoint seguro de la API. Esto verifica que las credenciales de administrador del backend y la lógica de la API funcionen correctamente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleUserCreationTest} disabled={isLoading || isAuthLoading} className="w-full">
+            {(isLoading || isAuthLoading) ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isAuthLoading ? 'Verificando Auth...' : 'Probando...'}
+                </>
+            ) : (
+                <>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Ejecutar Prueba de Creación de Usuario
+                </>
+            )}
           </Button>
         </CardContent>
       </Card>
