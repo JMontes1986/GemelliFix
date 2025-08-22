@@ -33,16 +33,6 @@ const nextConfig: NextConfig = {
       }
     ],
   },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-        config.resolve.fallback = {
-            ...config.resolve.fallback,
-            "firebase-admin": false,
-        };
-    }
-    config.externals.push('firebase-admin');
-    return config;
-  },
 };
 
 export default nextConfig;

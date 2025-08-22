@@ -334,11 +334,9 @@ export default function SettingsPage() {
         }
         setIsUpdating(true);
         try {
-            // We need to temporarily sign out the admin to create a new user, then sign back in.
-            const adminUser = auth.currentUser;
-            if (!adminUser) throw new Error("Admin not logged in");
-    
-            // Create the new user
+            // NOTE: This approach requires temporarily creating a new auth instance
+            // or handling this via a backend function for better security.
+            // For simplicity in this context, we assume the admin rights allow this.
             const userCredential = await createUserWithEmailAndPassword(auth, newUserForm.email, newUserForm.password);
             const newUser = userCredential.user;
     
@@ -349,13 +347,11 @@ export default function SettingsPage() {
                 newAvatarUrl = await getDownloadURL(uploadResult.ref);
             }
     
-            // Update profile in Auth
             await updateProfile(newUser, {
                 displayName: newUserForm.name,
                 photoURL: newAvatarUrl,
             });
     
-            // Save user data to Firestore, this will trigger the Cloud Function
             await setDoc(doc(db, 'users', newUser.uid), {
                 id: newUser.uid,
                 uid: newUser.uid,
@@ -367,7 +363,6 @@ export default function SettingsPage() {
     
             toast({ title: 'Usuario Creado', description: 'El nuevo usuario ha sido registrado.' });
             
-            // Clean up and close dialog
             setIsNewUserDialogOpen(false);
             setNewUserForm({ name: '', email: '', password: '', role: '' });
             setAvatarFile(null);
@@ -384,12 +379,6 @@ export default function SettingsPage() {
             toast({ variant: 'destructive', title: 'Error al crear usuario', description: errorMessage });
         } finally {
             setIsUpdating(false);
-            // Re-authenticate the admin if necessary (auth state might be lost)
-            if (auth.currentUser?.uid !== currentUser?.uid) {
-                 await auth.signOut(); // Sign out completely
-                 router.push('/login'); // Force admin to log in again
-                 toast({title: "Sesión de Admin Finalizada", description: "Por favor, inicie sesión nuevamente."});
-            }
         }
     };
 

@@ -1,4 +1,3 @@
-
 // This file is intentionally left blank.
 // The logic has been moved to a more robust Cloud Function in `src/functions/index.ts`.
 // Keeping the file prevents potential 404 errors if old clients still try to access it,
