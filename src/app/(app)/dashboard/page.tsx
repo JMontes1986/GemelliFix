@@ -124,8 +124,9 @@ export default function DashboardPage() {
         const data = doc.data();
         const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
         const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
+        const resolvedAt = data.resolvedAt?.toDate ? data.resolvedAt.toDate().toISOString() : undefined;
 
-        ticketsData.push({ ...data, id: doc.id, createdAt, dueDate } as Ticket);
+        ticketsData.push({ ...data, id: doc.id, createdAt, dueDate, resolvedAt } as Ticket);
       });
       setTickets(ticketsData);
       setIsLoading(false);
@@ -146,18 +147,23 @@ export default function DashboardPage() {
   const overdueTickets = tickets.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Cerrado' && t.status !== 'Resuelto').length;
   
   const closedTickets = tickets.filter(t => t.status === 'Cerrado' || t.status === 'Resuelto');
+  
+  const slaCompliantTickets = closedTickets.filter(t => 
+    t.resolvedAt && new Date(t.resolvedAt) <= new Date(t.dueDate)
+  );
+
   const slaCompliance = closedTickets.length > 0
-    ? Math.round((closedTickets.filter(t => new Date(t.resolvedAt || t.dueDate) <= new Date(t.dueDate)).length / closedTickets.length) * 100)
+    ? Math.round((slaCompliantTickets.length / closedTickets.length) * 100)
     : 100;
 
   const resolutionTimes = closedTickets
     .map(t => {
-        // Fallback to dueDate for old tickets without resolvedAt to avoid incorrect calculation with new Date()
-        const resolvedAt = t.resolvedAt ? new Date(t.resolvedAt).getTime() : new Date(t.dueDate).getTime();
+        if (!t.resolvedAt) return null;
+        const resolvedAt = new Date(t.resolvedAt).getTime();
         const createdAt = new Date(t.createdAt).getTime();
         return resolvedAt - createdAt;
     })
-    .filter(time => !isNaN(time));
+    .filter((time): time is number => time !== null && !isNaN(time));
     
   const averageResolutionTime = resolutionTimes.length > 0 ? resolutionTimes.reduce((a, b) => a + b, 0) / resolutionTimes.length : 0;
   const mttrHours = Math.round(averageResolutionTime / (1000 * 60 * 60));
@@ -174,7 +180,11 @@ export default function DashboardPage() {
   const calculateSlaByPriority = (priority: Ticket['priority']): number => {
     const priorityTickets = closedTickets.filter(t => t.priority === priority);
     if (priorityTickets.length === 0) return 100;
-    const compliantTickets = priorityTickets.filter(t => new Date(t.resolvedAt || t.dueDate) <= new Date(t.dueDate));
+    
+    const compliantTickets = priorityTickets.filter(t => 
+      t.resolvedAt && new Date(t.resolvedAt) <= new Date(t.dueDate)
+    );
+    
     return Math.round((compliantTickets.length / priorityTickets.length) * 100);
   };
 
@@ -284,7 +294,7 @@ export default function DashboardPage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-             {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold">{mttrHours}h</div>}
+             {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold">{mttrHours}</div>}
             <p className="text-xs text-muted-foreground">Tiempo medio de resolución</p>
           </CardContent>
         </Card>
