@@ -1,26 +1,29 @@
 
 // /app/api/admin/create-user/route.ts
 import { NextResponse } from 'next/server';
-import { getApps, initializeApp, cert } from 'firebase-admin/app';
+import { getApps, initializeApp, cert, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { headers } from 'next/headers';
+import { serviceAccount } from '@/lib/firebase-admin-config';
 
 // This is very important. The Admin SDK does not work in the Edge runtime.
 export const runtime = 'nodejs';
 export const dynamic = 'force_dynamic';
 
 // Initialize Admin SDK once
+let adminApp: App;
 if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FB_PROJECT_ID!,
-      clientEmail: process.env.FB_CLIENT_EMAIL!,
-      // When using .env.local, the private key needs to be parsed correctly
-      privateKey: (process.env.FB_PRIVATE_KEY as string).replace(/\\n/g, '\n'),
-    }),
-  });
+    adminApp = initializeApp({
+        credential: cert(serviceAccount)
+    });
+} else {
+    adminApp = getApps()[0];
 }
+
+const authAdmin = getAuth(adminApp);
+const dbAdmin = getFirestore(adminApp);
+
 
 export async function POST(req: Request) {
   try {
@@ -37,7 +40,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Bearer token is missing.' }, { status: 401 });
     }
 
-    const decodedToken = await getAuth().verifyIdToken(token);
+    const decodedToken = await authAdmin.verifyIdToken(token);
     if (decodedToken.role !== 'Administrador') {
         return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
     }
@@ -50,7 +53,7 @@ export async function POST(req: Request) {
     }
 
     // Create the user in Firebase Authentication
-    const userRecord = await getAuth().createUser({
+    const userRecord = await authAdmin.createUser({
       displayName: name,
       email,
       password,
@@ -58,10 +61,10 @@ export async function POST(req: Request) {
     });
 
     // Set custom claims for the new user (for role-based access)
-    await getAuth().setCustomUserClaims(userRecord.uid, { role: role });
+    await authAdmin.setCustomUserClaims(userRecord.uid, { role: role });
 
     // Create user document in Firestore (Admin SDK ignores security rules)
-    await getFirestore().collection('users').doc(userRecord.uid).set({
+    await dbAdmin.collection('users').doc(userRecord.uid).set({
       id: userRecord.uid,
       uid: userRecord.uid,
       name,
@@ -89,5 +92,3 @@ export async function POST(req: Request) {
 export async function GET() {
   return NextResponse.json({ ok: true, message: 'Admin user creation endpoint is active.' });
 }
-
-    
