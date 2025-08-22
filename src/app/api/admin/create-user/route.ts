@@ -1,13 +1,30 @@
 // /app/api/admin/create-user/route.ts
 import { NextResponse } from 'next/server';
+import { getApps, initializeApp, cert, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { headers } from 'next/headers';
-import { adminApp } from '@/lib/firebaseAdmin';
 
 // This is very important. The Admin SDK does not work in the Edge runtime.
 export const runtime = 'nodejs';
-export const dynamic = 'force_dynamic';
+export const dynamic = 'force-dynamic';
+
+
+let adminApp: App;
+// Initialize Firebase Admin SDK if not already initialized
+if (!getApps().length) {
+    const privateKey = process.env.FB_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    adminApp = initializeApp({
+        credential: cert({
+            projectId: process.env.FB_PROJECT_ID,
+            clientEmail: process.env.FB_CLIENT_EMAIL,
+            privateKey,
+        }),
+    });
+} else {
+    adminApp = getApps()[0];
+}
+
 
 const authAdmin = getAuth(adminApp);
 const dbAdmin = getFirestore(adminApp);
@@ -47,9 +64,9 @@ export async function POST(req: Request) {
       password,
       photoURL: avatar || undefined,
     });
-
-    // NOTE: The custom claim is now set by the onUserCreated Cloud Function.
-    // No need to call setCustomUserClaims here.
+    
+    // Set custom claims for the new user (for role-based access)
+    // This is handled by the onUserCreated Cloud Function now.
 
     // Create user document in Firestore (Admin SDK ignores security rules)
     // This action will trigger the onUserCreated Cloud Function.
