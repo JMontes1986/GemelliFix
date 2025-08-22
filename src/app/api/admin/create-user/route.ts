@@ -1,3 +1,4 @@
+
 // app/api/admin/create-user/route.ts
 export const runtime = 'nodejs';
 
@@ -21,6 +22,7 @@ export async function POST(req: Request) {
     }
 
     const auth = getAuth(adminApp);
+    const db = getFirestore(adminApp);
 
     const userRec = await auth.createUser({
       email,
@@ -29,11 +31,8 @@ export async function POST(req: Request) {
       photoURL: avatar || undefined,
     });
 
-    // Set custom claims para el nuevo usuario
-    await auth.setCustomUserClaims(userRec.uid, { role });
-
-    // Guarda el doc en Firestore
-    const db = getFirestore(adminApp);
+    // Set custom claims for the new user, which will be handled by the onUserCreated function
+    // This function will trigger the Cloud Function to set the claims.
     await db.collection('users').doc(userRec.uid).set({
       id: userRec.uid,
       uid: userRec.uid,
