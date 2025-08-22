@@ -44,7 +44,7 @@ import { Badge } from '@/components/ui/badge';
 import { collection, onSnapshot, doc, updateDoc, query, where, addDoc, serverTimestamp, setDoc, orderBy, writeBatch, getDoc } from 'firebase/firestore';
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import type { User, Zone, Site, Category, Log } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -333,34 +333,33 @@ export default function SettingsPage() {
             return;
         }
         setIsUpdating(true);
+        
+        let newAvatarUrl = 'https://placehold.co/100x100.png';
+
         try {
-            // NOTE: This approach requires temporarily creating a new auth instance
-            // or handling this via a backend function for better security.
-            // For simplicity in this context, we assume the admin rights allow this.
-            const userCredential = await createUserWithEmailAndPassword(auth, newUserForm.email, newUserForm.password);
-            const newUser = userCredential.user;
-    
-            let newAvatarUrl = 'https://placehold.co/100x100.png';
             if (avatarFile) {
-                const avatarRef = ref(storage, `avatars/${newUser.uid}/${avatarFile.name}`);
-                const uploadResult = await uploadBytes(avatarRef, avatarFile);
+                // Temporarily upload avatar with a placeholder name, will rename folder after user creation
+                const tempAvatarRef = ref(storage, `avatars/temp/${Date.now()}-${avatarFile.name}`);
+                const uploadResult = await uploadBytes(tempAvatarRef, avatarFile);
                 newAvatarUrl = await getDownloadURL(uploadResult.ref);
             }
-    
-            await updateProfile(newUser, {
-                displayName: newUserForm.name,
-                photoURL: newAvatarUrl,
+            
+            const idToken = await auth.currentUser?.getIdToken();
+
+            const response = await fetch('/api/create-user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({ ...newUserForm, avatar: newAvatarUrl }),
             });
-    
-            await setDoc(doc(db, 'users', newUser.uid), {
-                id: newUser.uid,
-                uid: newUser.uid,
-                name: newUserForm.name,
-                email: newUserForm.email,
-                role: newUserForm.role,
-                avatar: newAvatarUrl,
-            });
-    
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Error en el servidor');
+            }
+
             toast({ title: 'Usuario Creado', description: 'El nuevo usuario ha sido registrado.' });
             
             setIsNewUserDialogOpen(false);
@@ -370,13 +369,7 @@ export default function SettingsPage() {
     
         } catch (error: any) {
             console.error('Error creating user:', error);
-            let errorMessage = error.message;
-            if (error.code === 'auth/email-already-in-use') {
-                errorMessage = 'El correo electrónico ya está en uso por otra cuenta.';
-            } else if (error.code === 'auth/weak-password') {
-                errorMessage = 'La contraseña debe tener al menos 6 caracteres.';
-            }
-            toast({ variant: 'destructive', title: 'Error al crear usuario', description: errorMessage });
+            toast({ variant: 'destructive', title: 'Error al crear usuario', description: error.message });
         } finally {
             setIsUpdating(false);
         }
