@@ -346,7 +346,7 @@ export default function SettingsPage() {
             
             const idToken = await auth.currentUser?.getIdToken();
 
-            const response = await fetch('/api/admin/create-user', {
+            const res = await fetch('/api/admin/create-user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -355,9 +355,13 @@ export default function SettingsPage() {
                 body: JSON.stringify({ ...newUserForm, avatar: newAvatarUrl }),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Error en el servidor');
+            const contentType = res.headers.get('content-type') || '';
+            const payload = contentType.includes('application/json')
+              ? await res.json()
+              : { error: await res.text() };
+        
+            if (!res.ok) {
+              throw new Error(payload.error || `HTTP error! status: ${res.status}`);
             }
 
             toast({ title: 'Usuario Creado', description: 'El nuevo usuario ha sido registrado.' });
@@ -368,7 +372,7 @@ export default function SettingsPage() {
             setAvatarPreview(null);
     
         } catch (error: any) {
-            console.error('Error creating user:', error);
+            console.error('Error creando usuario:', error);
             toast({ variant: 'destructive', title: 'Error al crear usuario', description: error.message });
         } finally {
             setIsUpdating(false);
