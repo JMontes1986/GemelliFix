@@ -1,23 +1,15 @@
 
 import { google } from 'googleapis';
+import { serviceAccount } from './firebase-admin-config';
 
-// This function safely retrieves the service account credentials.
-// It will throw an error if the credentials are not set or are malformed.
+// This function safely retrieves the service account credentials directly from the config file.
 const getServiceAccountCredentials = () => {
-    const base64Key = process.env.FB_SERVICE_ACCOUNT_B64;
-    if (!base64Key) {
-        // Stop execution if the critical environment variable is missing.
-        throw new Error("Google Calendar integration failed: FB_SERVICE_ACCOUNT_B64 is not set in your .env file.");
-    }
-    
     try {
-        const decodedKey = Buffer.from(base64Key, 'base64').toString('utf8');
-        const serviceAccount = JSON.parse(decodedKey);
         const calendarId = process.env.GOOGLE_CALENDAR_ID;
         
         // Validate that the necessary fields exist for Google Calendar API.
         if (!serviceAccount.client_email || !serviceAccount.private_key || !calendarId) {
-            throw new Error("The service account key is missing required fields (client_email, private_key) or GOOGLE_CALENDAR_ID is not set.");
+            throw new Error("The service account object in firebase-admin-config.ts is missing required fields (client_email, private_key) or GOOGLE_CALENDAR_ID is not set in .env.");
         }
         
         return {
@@ -26,7 +18,7 @@ const getServiceAccountCredentials = () => {
             calendarId: calendarId
         };
     } catch(error: any) {
-        console.error("Failed to parse Google service account credentials from Base64:", error.message);
+        console.error("Failed to parse Google service account credentials from config file:", error.message);
         // Throw a more specific error to make debugging easier.
         throw new Error(`Failed to initialize Google Calendar client. ${error.message}`);
     }
@@ -39,6 +31,7 @@ const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 const getJwtClient = () => {
     try {
         const { clientEmail, privateKey } = getServiceAccountCredentials();
+        // The private key from the direct import does not need escaping fixes.
         return new google.auth.JWT(
             clientEmail,
             undefined,
