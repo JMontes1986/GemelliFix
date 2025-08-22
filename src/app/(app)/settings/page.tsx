@@ -346,7 +346,7 @@ export default function SettingsPage() {
             
             const idToken = await auth.currentUser?.getIdToken();
 
-            const response = await fetch('/api/create-user', {
+            const response = await fetch('/api/admin/create-user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -357,7 +357,7 @@ export default function SettingsPage() {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || 'Error en el servidor');
+                throw new Error(errorData.error || 'Error en el servidor');
             }
 
             toast({ title: 'Usuario Creado', description: 'El nuevo usuario ha sido registrado.' });
@@ -1042,3 +1042,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
