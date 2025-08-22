@@ -1,27 +1,37 @@
 import { cert, getApps, initializeApp, getApp, App } from 'firebase-admin/app';
+import { ServiceAccount } from 'firebase-admin';
 
-// Asegúrate de que tus variables de entorno estén configuradas en tu entorno de hosting (Vercel, etc.)
-const projectId = process.env.FB_PROJECT_ID;
-const clientEmail = process.env.FB_CLIENT_EMAIL;
+// This function decodes the Base64 encoded service account key from environment variables.
+// This is the most robust method for handling multi-line JSON credentials in cloud environments.
+function getServiceAccount(): ServiceAccount {
+    const base64Key = process.env.FB_SERVICE_ACCOUNT_B64;
 
-// Esta es la corrección clave: Reemplaza los caracteres \\n con saltos de línea reales.
-const privateKey = process.env.FB_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-if (!projectId || !clientEmail || !privateKey) {
-  // En un entorno de servidor, es mejor lanzar un error si las credenciales no están.
-  // En desarrollo, esto te alertará inmediatamente si falta algo en tu .env.local
-  console.error("Missing Firebase Admin SDK credentials. Check FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY environment variables.");
-  // No inicializamos la app si faltan credenciales para evitar errores posteriores.
+    if (!base64Key) {
+        // This error will be thrown if the environment variable is not set.
+        // It provides clear instructions for the developer.
+        throw new Error(
+            'The FB_SERVICE_ACCOUNT_B64 environment variable is not set. ' +
+            'Please encode your service account JSON file to Base64 and set it.'
+        );
+    }
+    
+    try {
+        // Decode the Base64 string to get the original JSON string.
+        const decodedKey = Buffer.from(base64Key, 'base64').toString('utf8');
+        // Parse the JSON string into an object.
+        const serviceAccount = JSON.parse(decodedKey);
+        return serviceAccount as ServiceAccount;
+    } catch (error: any) {
+        console.error("Failed to parse the decoded service account key:", error);
+        throw new Error("The Base64 encoded service account is malformed or invalid.");
+    }
 }
 
-// Patrón Singleton: Inicializa la app de admin solo si no existe ya una.
-// Esto previene errores de "app ya inicializada" en entornos de hot-reloading (desarrollo).
+
+// Singleton pattern: Initialize the admin app only if it doesn't already exist.
+// This prevents errors during hot-reloading in development.
 export const adminApp: App = getApps().length
   ? getApp()
   : initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
+      credential: cert(getServiceAccount()),
     });

@@ -1,22 +1,43 @@
 
 import { google } from 'googleapis';
-import { config } from 'dotenv';
 
-// Load environment variables from .env file
-config();
+// This function safely retrieves the service account credentials.
+// It will throw an error if the credentials are not set or are malformed.
+const getServiceAccountCredentials = () => {
+    const base64Key = process.env.FB_SERVICE_ACCOUNT_B64;
+    if (!base64Key) {
+        // Stop execution if the critical environment variable is missing.
+        throw new Error("Google Calendar integration failed: FB_SERVICE_ACCOUNT_B64 is not set.");
+    }
+    
+    try {
+        const decodedKey = Buffer.from(base64Key, 'base64').toString('utf8');
+        const serviceAccount = JSON.parse(decodedKey);
+        
+        // Validate that the necessary fields exist for Google Calendar API.
+        if (!serviceAccount.client_email || !serviceAccount.private_key || !process.env.GOOGLE_CALENDAR_ID) {
+            throw new Error("The service account key is missing required fields (client_email, private_key) or GOOGLE_CALENDAR_ID is not set.");
+        }
+        
+        return {
+            clientEmail: serviceAccount.client_email,
+            privateKey: serviceAccount.private_key,
+            calendarId: process.env.GOOGLE_CALENDAR_ID
+        };
+    } catch(error: any) {
+        console.error("Failed to parse Google service account credentials from Base64:", error.message);
+        // Throw a more specific error to make debugging easier.
+        throw new Error(`Failed to initialize Google Calendar client. ${error.message}`);
+    }
+};
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
-const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
-const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+
 
 // Initialize the JWT client
 const getJwtClient = () => {
-    if (!CALENDAR_ID || !privateKey || !clientEmail) {
-        console.error('Google Calendar API credentials are not set in environment variables. Check .env file.');
-        return null;
-    }
     try {
+        const { clientEmail, privateKey } = getServiceAccountCredentials();
         return new google.auth.JWT(
             clientEmail,
             undefined,
@@ -24,7 +45,8 @@ const getJwtClient = () => {
             SCOPES
         );
     } catch(error) {
-        console.error("Failed to create Google JWT client:", error);
+        // The error from getServiceAccountCredentials will be more descriptive.
+        console.error("Could not create Google JWT client:", error);
         return null;
     }
 };
@@ -43,8 +65,10 @@ export async function createGoogleCalendarEvent(event: {
 }) {
   const jwtClient = getJwtClient();
   if (!jwtClient) {
-    throw new Error('Google Calendar API client is not initialized. Please check credentials in your .env file.');
+    throw new Error('Google Calendar API client is not initialized. Please check credentials.');
   }
+
+  const { calendarId } = getServiceAccountCredentials();
 
   const calendar = google.calendar({
     version: 'v3',
@@ -53,7 +77,7 @@ export async function createGoogleCalendarEvent(event: {
 
   try {
     const response = await calendar.events.insert({
-      calendarId: CALENDAR_ID,
+      calendarId: calendarId,
       requestBody: {
         ...event,
         // You can add default properties here, e.g., default reminders
@@ -86,6 +110,8 @@ export async function listGoogleCalendarEvents(timeMin: string, timeMax: string)
         throw new Error('Google Calendar API client is not initialized. Please check credentials.');
     }
     
+    const { calendarId } = getServiceAccountCredentials();
+
     const calendar = google.calendar({
       version: 'v3',
       auth: jwtClient,
@@ -93,7 +119,7 @@ export async function listGoogleCalendarEvents(timeMin: string, timeMax: string)
 
     try {
         const response = await calendar.events.list({
-            calendarId: CALENDAR_ID,
+            calendarId: calendarId,
             timeMin,
             timeMax,
             singleEvents: true,
