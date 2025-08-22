@@ -10,7 +10,6 @@ export async function POST(req: Request) {
   try {
     const { name, email, password, role, avatar } = await req.json();
 
-    // (Opcional pero recomendado) validar Authorization: Bearer <idToken> y que sea admin
     const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
     if (!idToken) {
         return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
