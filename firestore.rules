@@ -1,111 +1,60 @@
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check for admin role from custom claims
+  
+    function isAuth() {
+      return request.auth != null;
+    }
+    
     function isAdmin() {
-      return request.auth.token.role == 'Administrador';
+      return isAuth() && request.auth.token.role == 'Administrador';
     }
 
-    // =================================
-    //         USER PROFILES
-    // =================================
+    // Allow users to read their own data
     match /users/{userId} {
-      // Admins can see all user profiles
-      allow list: if isAdmin();
-      
-      // Users can see their own profile, Admins can see any
-      allow get: if request.auth.uid == userId || isAdmin();
-
-      // Only Admins can create new users through the backend endpoint
-      // Only Admins can update user roles or details
-      // Only users can update their own profile (e.g., name, avatar)
-      allow create: if isAdmin();
-      allow update: if request.auth.uid == userId || isAdmin();
-      
-      // Generally, users shouldn't be able to delete their own account from here
-      allow delete: if isAdmin();
+      allow read: if isAuth() && request.auth.uid == userId;
+      allow list, create, update, delete: if isAdmin();
     }
-    
-    // =================================
-    //         TICKETS
-    // =================================
+
     match /tickets/{ticketId} {
-      // Any authenticated user can create a ticket
-      allow create: if request.auth != null;
-
-      // Who can read tickets?
-      // - The user who created it (requester)
-      // - Any admin
-      // - Any user with the SST (auditor) role
-      // - A technician (Servicios Generales) if they are assigned to it
-      allow read: if request.auth.uid == resource.data.requesterId
-                   || isAdmin()
-                   || request.auth.token.role == 'SST'
-                   || request.auth.uid in resource.data.assignedToIds;
-
-      // Who can update tickets?
-      // - Admins can update anything
-      // - Technicians can update status, add comments, add evidence
-      // - Requesters can only update before it's assigned
-      allow update: if isAdmin()
-                    || (request.auth.token.role == 'Servicios Generales' && request.auth.uid in resource.data.assignedToIds)
-                    || (request.auth.uid == resource.data.requesterId && resource.data.status == 'Abierto');
-                    
-      // Only admins can delete tickets
+      allow read: if isAuth(); // All authenticated users can read tickets
+      allow create: if isAuth();
+      allow update: if isAuth() && (isAdmin() || request.auth.uid == resource.data.requesterId || request.auth.uid in resource.data.assignedToIds);
       allow delete: if isAdmin();
     }
     
-    // =================================
-    //     SCHEDULE EVENTS (CALENDAR)
-    // =================================
-    match /scheduleEvents/{eventId} {
-      // Admins and Technicians can create, update, and delete calendar events.
-      allow read, write: if isAdmin() || request.auth.token.role == 'Servicios Generales';
+    match /zones/{zoneId} {
+      allow read: if isAuth();
+      allow list, create, update, delete: if isAdmin();
     }
 
-    // =================================
-    //     MASTER DATA (ZONES, SITES, CATEGORIES)
-    // =================================
-    match /{collectionName}/{docId} where collectionName in ['zones', 'sites', 'categories'] {
-      // Anyone can read this master data to populate dropdowns
-      allow get;
-      allow list;
-      // Only admins can create, update or delete them
-      allow write: if isAdmin();
+    match /sites/{siteId} {
+      allow read: if isAuth();
+      allow list, create, update, delete: if isAdmin();
     }
     
-    // =================================
-    //          NOTIFICATIONS
-    // =================================
+    match /categories/{categoryId} {
+      allow read: if isAuth();
+      allow list, create, update, delete: if isAdmin();
+    }
+
     match /notifications/{notificationId} {
-       // Users can only read or update their own notifications
-      allow read, update: if request.auth.uid == resource.data.userId;
-      // Notifications are created by backend functions or server logic
-      allow create: if isAdmin() || request.auth.token.role == 'Servicios Generales';
-      allow delete: if isAdmin();
+        allow read, list, update: if isAuth() && request.auth.uid == resource.data.userId;
+        allow create: if isAuth(); // Allow any authenticated user to create (e.g. for system notifications)
+    }
+
+    match /scheduleEvents/{eventId} {
+        allow read: if isAuth();
+        allow create, update, delete: if isAuth() && (isAdmin() || request.auth.uid == resource.data.technicianId);
     }
     
-     // =================================
-    //          SYSTEM LOGS
-    // =================================
     match /logs/{logId} {
-      // Only admins can read logs
-      allow read: if isAdmin();
-      // Logs are created by the system/server, not directly by clients
-      allow write: if request.auth != null; // Allow any logged in user to trigger a log
-      allow delete: if isAdmin(); // Only admins can clear logs
+        allow read, list: if isAdmin();
+        allow create: if isAuth();
     }
-     // =================================
-    //          DIAGNOSIS LOGS
-    // =================================
-    match /diagnosis_logs/{logId} {
-        // Allow any authenticated user to write for testing purposes
-        allow write: if request.auth != null;
+    
+     match /diagnosis_logs/{logId} {
+        allow read, write: if isAuth();
     }
   }
 }
-
-    
