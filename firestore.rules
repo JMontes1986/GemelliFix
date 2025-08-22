@@ -1,60 +1,102 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    function isAuth() {
+
+    // --- Funciones de Ayuda ---
+    function isSignedIn() {
       return request.auth != null;
     }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
     
+    // Función para verificar si el usuario tiene un rol específico leyendo su documento
+    function hasRole(role) {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    // Función específica para administradores, para mayor claridad
     function isAdmin() {
-      return isAuth() && request.auth.token.role == 'Administrador';
+      return hasRole('Administrador');
+    }
+    
+    function isServiciosGenerales() {
+        return hasRole('Servicios Generales');
     }
 
-    // Allow users to read their own data
+    // --- Reglas por Colección ---
+    
+    // Colección de Usuarios
     match /users/{userId} {
-      allow read: if isAuth() && request.auth.uid == userId;
-      allow list, create, update, delete: if isAdmin();
+      // Un usuario puede leer su propio perfil, un admin puede leer cualquiera.
+      allow get: if isSignedIn() && (isOwner(userId) || isAdmin());
+      
+      // Solo un admin puede listar todos los usuarios (para la tabla de configuración).
+      allow list: if isAdmin();
+      
+      // Solo un admin puede crear, actualizar o eliminar perfiles de usuario (excepto el propio).
+      allow create, delete: if isAdmin();
+      allow update: if isOwner(userId) || isAdmin();
     }
 
+    // Colección de Tickets
     match /tickets/{ticketId} {
-      allow read: if isAuth(); // All authenticated users can read tickets
-      allow create: if isAuth();
-      allow update: if isAuth() && (isAdmin() || request.auth.uid == resource.data.requesterId || request.auth.uid in resource.data.assignedToIds);
+      // Cualquier usuario autenticado puede leer y crear tickets. La UI filtra la visibilidad.
+      allow read, create: if isSignedIn();
+      
+      // La actualización tiene lógica compleja:
+      // - Admins pueden siempre.
+      // - Técnicos pueden siempre (para cambiar estado, añadir evidencia).
+      // - El creador del ticket solo puede editar mientras esté en estado 'Abierto'.
+      allow update: if isAdmin() || isServiciosGenerales() || (isOwner(resource.data.requesterId) && resource.data.status == 'Abierto');
+      
+      // Solo admins pueden borrar tickets.
       allow delete: if isAdmin();
     }
-    
-    match /zones/{zoneId} {
-      allow read: if isAuth();
-      allow list, create, update, delete: if isAdmin();
-    }
 
+    // Colección de Eventos del Calendario
+    match /scheduleEvents/{eventId} {
+        // Cualquiera puede crear un evento (para drag-and-drop y pruebas de diagnóstico).
+        allow create: if isSignedIn();
+        // Solo el admin o el técnico asignado pueden leer, actualizar o borrar.
+        allow read, update, delete: if isAdmin() || (isServiciosGenerales() && request.auth.uid == resource.data.technicianId);
+    }
+    
+    // Colecciones de Configuración (Zonas, Sitios, Categorías)
+    match /zones/{zoneId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+    
     match /sites/{siteId} {
-      allow read: if isAuth();
-      allow list, create, update, delete: if isAdmin();
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
     
     match /categories/{categoryId} {
-      allow read: if isAuth();
-      allow list, create, update, delete: if isAdmin();
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
-    match /notifications/{notificationId} {
-        allow read, list, update: if isAuth() && request.auth.uid == resource.data.userId;
-        allow create: if isAuth(); // Allow any authenticated user to create (e.g. for system notifications)
-    }
-
-    match /scheduleEvents/{eventId} {
-        allow read: if isAuth();
-        allow create, update, delete: if isAuth() && (isAdmin() || request.auth.uid == resource.data.technicianId);
-    }
-    
+    // Colección de Logs de Auditoría
     match /logs/{logId} {
-        allow read, list: if isAdmin();
-        allow create: if isAuth();
+      allow read, create: if isSignedIn(); // La creación es desde el cliente, la lectura solo para admins en la UI.
+      allow list, update, delete: if isAdmin();
+    }
+
+    // Colección de Notificaciones
+    match /notifications/{notificationId} {
+        // Un usuario solo puede interactuar con sus propias notificaciones.
+        allow read, update: if isOwner(resource.data.userId);
+        allow list: if isSignedIn(); // La UI se encarga de filtrar por userId
+        allow create: if isSignedIn(); // La creación es del lado del servidor o cliente.
+        allow delete: if isAdmin() || isOwner(resource.data.userId);
     }
     
-     match /diagnosis_logs/{logId} {
-        allow read, write: if isAuth();
+    // Colección de Diagnóstico (para pruebas)
+    match /diagnosis_logs/{logId} {
+      allow read, write: if isSignedIn();
     }
   }
 }
