@@ -1,21 +1,29 @@
-
 // /app/api/admin/create-user/route.ts
 import { NextResponse } from 'next/server';
 import { getApps, initializeApp, cert, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { headers } from 'next/headers';
-import { serviceAccount } from '@/lib/firebase-admin-config';
 
 // This is very important. The Admin SDK does not work in the Edge runtime.
 export const runtime = 'nodejs';
 export const dynamic = 'force_dynamic';
 
+function getPrivateKey() {
+  const raw = process.env.FIREBASE_PRIVATE_KEY || '';
+  // Convierte \n en saltos reales y limpia CR
+  return raw.replace(/\\n/g, '\n').replace(/\r/g, '');
+}
+
 // Initialize Admin SDK once
 let adminApp: App;
 if (!getApps().length) {
     adminApp = initializeApp({
-        credential: cert(serviceAccount)
+        credential: cert({
+          projectId: process.env.FB_PROJECT_ID!,
+          clientEmail: process.env.FB_CLIENT_EMAIL!,
+          privateKey: getPrivateKey(),
+        }),
     });
 } else {
     adminApp = getApps()[0];
