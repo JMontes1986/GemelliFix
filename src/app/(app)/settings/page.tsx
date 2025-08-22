@@ -329,41 +329,67 @@ export default function SettingsPage() {
     
     const handleCreateUser = async () => {
         if (!newUserForm.name || !newUserForm.email || !newUserForm.password || !newUserForm.role) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Todos los campos son requeridos para crear un usuario.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Todos los campos son requeridos.' });
             return;
         }
         setIsUpdating(true);
-        let newAvatarUrl = 'https://placehold.co/100x100.png';
         try {
+            // We need to temporarily sign out the admin to create a new user, then sign back in.
+            const adminUser = auth.currentUser;
+            if (!adminUser) throw new Error("Admin not logged in");
+    
+            // Create the new user
+            const userCredential = await createUserWithEmailAndPassword(auth, newUserForm.email, newUserForm.password);
+            const newUser = userCredential.user;
+    
+            let newAvatarUrl = 'https://placehold.co/100x100.png';
             if (avatarFile) {
-                const avatarRef = ref(storage, `avatars/temp_${Date.now()}/${avatarFile.name}`);
+                const avatarRef = ref(storage, `avatars/${newUser.uid}/${avatarFile.name}`);
                 const uploadResult = await uploadBytes(avatarRef, avatarFile);
                 newAvatarUrl = await getDownloadURL(uploadResult.ref);
             }
-            
-            const response = await fetch('/api/create-user', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...newUserForm, avatar: newAvatarUrl }),
+    
+            // Update profile in Auth
+            await updateProfile(newUser, {
+                displayName: newUserForm.name,
+                photoURL: newAvatarUrl,
             });
     
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Error creating user in backend');
-            }
-            
-            const { uid } = await response.json();
-            
+            // Save user data to Firestore, this will trigger the Cloud Function
+            await setDoc(doc(db, 'users', newUser.uid), {
+                id: newUser.uid,
+                uid: newUser.uid,
+                name: newUserForm.name,
+                email: newUserForm.email,
+                role: newUserForm.role,
+                avatar: newAvatarUrl,
+            });
+    
             toast({ title: 'Usuario Creado', description: 'El nuevo usuario ha sido registrado.' });
+            
+            // Clean up and close dialog
             setIsNewUserDialogOpen(false);
             setNewUserForm({ name: '', email: '', password: '', role: '' });
             setAvatarFile(null);
             setAvatarPreview(null);
+    
         } catch (error: any) {
             console.error('Error creating user:', error);
-            toast({ variant: 'destructive', title: 'Error al crear usuario', description: error.message });
+            let errorMessage = error.message;
+            if (error.code === 'auth/email-already-in-use') {
+                errorMessage = 'El correo electrónico ya está en uso por otra cuenta.';
+            } else if (error.code === 'auth/weak-password') {
+                errorMessage = 'La contraseña debe tener al menos 6 caracteres.';
+            }
+            toast({ variant: 'destructive', title: 'Error al crear usuario', description: errorMessage });
         } finally {
             setIsUpdating(false);
+            // Re-authenticate the admin if necessary (auth state might be lost)
+            if (auth.currentUser?.uid !== currentUser?.uid) {
+                 await auth.signOut(); // Sign out completely
+                 router.push('/login'); // Force admin to log in again
+                 toast({title: "Sesión de Admin Finalizada", description: "Por favor, inicie sesión nuevamente."});
+            }
         }
     };
 

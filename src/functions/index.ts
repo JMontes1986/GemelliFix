@@ -8,7 +8,7 @@
 
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { onDocumentUpdated, onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 
 // Initialize the Firebase Admin SDK.
 initializeApp();
@@ -21,7 +21,7 @@ initializeApp();
  */
 const setRoleClaim = async (uid: string, role: string) => {
     const claims: {[key: string]: any} = {
-        admin: role === 'Administrador'
+        role: role, // Set the role directly
     };
 
     try {
@@ -69,5 +69,3 @@ export const onUserUpdated = onDocumentUpdated('users/{userId}', async (event) =
         await setRoleClaim(uid, newRole);
     }
 });
-
-    
