@@ -2,6 +2,7 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -78,7 +79,7 @@ export default function AiAssistant() {
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full">
-          <Sparkles className="h-5 w-5 text-primary" />
+          <Image src="/molly-ia-icon.png" alt="Asistente Molly IA" width={24} height={24} className="h-6 w-6" />
           <span className="sr-only">Asistente de Ayuda IA</span>
         </Button>
       </SheetTrigger>
