@@ -1,11 +1,13 @@
-import { google } from 'googleapis';
-import { getAdminApp } from './firebaseAdmin';
 
-// Esta función ahora depende de las variables de entorno directamente,
-// al igual que la inicialización del Admin SDK.
+import { google } from 'googleapis';
+import { getAdminApp } from './firebaseAdmin'; // Using the central admin app to get credentials is not standard.
+                                           // This file should source credentials from env vars directly.
+
+// This function sources credentials directly from environment variables.
 const getServiceAccountCredentials = () => {
     try {
         const clientEmail = process.env.FB_CLIENT_EMAIL;
+        // Crucial: Format the private key correctly by replacing escaped newlines.
         const privateKey = process.env.FB_PRIVATE_KEY?.replace(/\\n/g, '\n');
         const calendarId = process.env.GOOGLE_CALENDAR_ID;
         
@@ -23,7 +25,7 @@ const getServiceAccountCredentials = () => {
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
 
-// Inicializa el cliente JWT para la API de Google Calendar
+// Initializes the JWT client for the Google Calendar API
 const getJwtClient = () => {
     try {
         const { clientEmail, privateKey } = getServiceAccountCredentials();
