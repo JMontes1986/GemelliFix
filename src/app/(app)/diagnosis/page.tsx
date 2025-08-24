@@ -26,14 +26,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { db, auth } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, type DocumentReference } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, type DocumentReference, query, where, getDocs, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, BrainCircuit, AlertTriangle, CalendarPlus, UserPlus } from 'lucide-react';
+import { Loader2, Zap, BrainCircuit, AlertTriangle, CalendarPlus, UserPlus, Fingerprint } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { User as FirebaseAuthUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { diagnoseFirebaseConnection, type FirebaseDiagnosisOutput } from '@/ai/flows/diagnose-firebase-connection';
 import { diagnoseCalendarCreation } from '@/ai/flows/diagnose-calendar-creation';
+import { diagnoseRequesterAccess } from '@/ai/flows/diagnose-requester-access';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar } from '@/components/ui/calendar';
 import { addDays } from 'date-fns';
@@ -71,15 +72,17 @@ export default function DiagnosisPage() {
     return () => unsubscribe();
   }, []);
 
-  const runAiDiagnosis = async (params: { flow: 'connection' | 'calendar', errorCode?: string, errorMessage?: string, symptom?: string }) => {
+  const runAiDiagnosis = async (params: { flow: 'connection' | 'calendar' | 'requester_access', errorCode?: string, errorMessage?: string, symptom?: string }) => {
       setIsAiLoading(true);
       setAiDiagnosis(null);
       try {
         let diagnosis;
         if (params.flow === 'connection') {
             diagnosis = await diagnoseFirebaseConnection(params);
-        } else {
+        } else if (params.flow === 'calendar') {
             diagnosis = await diagnoseCalendarCreation(params);
+        } else {
+            diagnosis = await diagnoseRequesterAccess(params);
         }
         setAiDiagnosis(diagnosis);
       } catch (aiError) {
@@ -298,6 +301,48 @@ export default function DiagnosisPage() {
       }
     };
 
+    const handleRequesterAccessTest = async () => {
+        setAiDiagnosis(null);
+        setIsLoading(true);
+    
+        if (!currentUser) {
+          const authErrorMsg = 'Debes iniciar sesión para realizar esta prueba.';
+          setExecutionResult({ status: 'Error de Autenticación', message: authErrorMsg });
+          setIsLoading(false);
+          runAiDiagnosis({ flow: 'requester_access', errorCode: 'unauthenticated', errorMessage: authErrorMsg });
+          return;
+        }
+    
+        setExecutionResult({ status: 'Consultando...', message: `Intentando leer la lista de tickets para el usuario ${currentUser.email} (rol Docente/Coordinador)...` });
+    
+        try {
+          const q = query(
+            collection(db, 'tickets'),
+            where('requesterId', '==', currentUser.uid),
+            limit(1) // We only need to test if the query itself works, not get all data
+          );
+          
+          await getDocs(q);
+          
+          const successMsg = `¡Éxito! La consulta de tickets para tu usuario se ha ejecutado correctamente. Los permisos y los índices de Firestore para este rol son correctos.`;
+          setExecutionResult({ status: 'Éxito', message: successMsg });
+    
+        } catch (error: any) {
+          console.error('Error en la prueba de acceso de solicitante:', error);
+          const errorMsg = `No se pudo consultar la lista de tickets. Código de error: ${error.code}. Detalles: ${error.message}`;
+          setExecutionResult({ status: 'Error', message: errorMsg });
+          runAiDiagnosis({ flow: 'requester_access', errorCode: error.code, errorMessage: error.message });
+          toast({
+            variant: 'destructive',
+            title: 'Error en Prueba de Acceso',
+            description: error.message,
+            duration: 9000,
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
 
   const form = useForm<DiagnosisFormValues>({
     resolver: zodResolver(diagnosisSchema),
@@ -431,6 +476,25 @@ export default function DiagnosisPage() {
             
         </CardContent>
       </Card>
+
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+            <CardTitle className="font-headline text-2xl">Prueba de Acceso para Solicitantes</CardTitle>
+            <CardDescription>
+                Esta prueba verifica si un usuario con rol de Docente, Coordinador o Administrativo puede leer sus propias solicitudes, lo cual requiere un índice de Firestore específico.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button onClick={handleRequesterAccessTest} disabled={isLoading || isAuthLoading} className="w-full">
+                {(isLoading || isAuthLoading) ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                    <Fingerprint className="mr-2 h-4 w-4" />
+                )}
+                Probar Acceso a "Mis Solicitudes"
+            </Button>
+        </CardContent>
+       </Card>
       
        <Card className="w-full max-w-2xl">
         <CardHeader>
