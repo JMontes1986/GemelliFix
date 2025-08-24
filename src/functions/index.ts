@@ -8,7 +8,9 @@
 
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getMessaging } from 'firebase-admin/messaging';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { onRequest } from 'firebase-functions/v2/https';
 
 // Initialize the Firebase Admin SDK.
 // En el entorno de Cloud Functions, esto funciona automáticamente sin pasar credenciales.
@@ -72,5 +74,34 @@ export const onUserUpdated = onDocumentUpdated('users/{userId}', async (event) =
         const uid = event.params.userId;
         const newRole = dataAfter.role;
         await setRoleClaim(uid, newRole);
+    }
+});
+
+
+/**
+ * An HTTP-triggered function to send a test notification using FCM.
+ * This function can be called via its URL to send a message to the 'test' topic.
+ */
+export const sendTestNotification = onRequest(async (req, res) => {
+    const message = {
+        notification: {
+            title: '¡Notificación de Prueba!',
+            body: 'Si recibes esto, ¡el servidor de notificaciones funciona!',
+        },
+        data: {
+            score: '850',
+            time: '2:45',
+        },
+        topic: 'test', // Send to a specific topic
+    };
+
+    try {
+        // Send a message to the devices subscribed to the provided topic.
+        const response = await getMessaging().send(message);
+        console.log('Successfully sent message:', response);
+        res.status(200).send({ success: true, message: `Successfully sent message: ${response}` });
+    } catch (error) {
+        console.error('Error sending message:', error);
+        res.status(500).send({ success: false, error: 'Error sending message' });
     }
 });
