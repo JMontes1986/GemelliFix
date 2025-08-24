@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -495,6 +494,25 @@ export default function DiagnosisPage() {
             </Button>
         </CardContent>
        </Card>
+
+       <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle className="font-headline text-2xl">Verificar Conectividad con Firebase</CardTitle>
+          <CardDescription>
+            Esta prueba fundamental verifica si la aplicación puede autenticarse y realizar una operación de escritura básica en la base de datos. Es el primer paso para diagnosticar cualquier problema.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleSimpleConnectionTest} disabled={isLoading || isAuthLoading} className="w-full">
+            {(isLoading || isAuthLoading) ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Zap className="mr-2 h-4 w-4" />
+            )}
+            Ejecutar Prueba de Conexión
+          </Button>
+        </CardContent>
+      </Card>
       
        <Card className="w-full max-w-2xl">
         <CardHeader>
@@ -674,3 +692,5 @@ export default function DiagnosisPage() {
     </div>
   );
 }
+
+    
