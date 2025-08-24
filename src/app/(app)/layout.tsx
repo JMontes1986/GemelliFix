@@ -95,13 +95,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         setIsLoadingUser(true);
         if (firebaseUser) {
             try {
-              // Force refresh of the token to get the latest custom claims.
               await firebaseUser.getIdToken(true);
               const userDocRef = doc(db, 'users', firebaseUser.uid);
               const userDocSnap = await getDoc(userDocRef);
 
               if (userDocSnap.exists()) {
-                  setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
+                  let userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+                  // Si el usuario no tiene rol, se le asigna el de Docentes por defecto.
+                  if (!userData.role) {
+                      console.warn(`User ${userData.email} has no role. Defaulting to 'Docentes'. An admin should assign a permanent role.`);
+                      userData.role = 'Docentes';
+                  }
+                  setCurrentUser(userData);
               } else {
                   console.warn("User data not found in Firestore for authenticated user, logging out.");
                   await auth.signOut();
@@ -109,18 +114,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               }
             } catch (tokenError) {
               console.warn("Could not refresh token or get user data:", tokenError);
-              // Fallback to cached data if token refresh fails, to prevent logout loops
               const userDocRef = doc(db, 'users', firebaseUser.uid);
               const userDocSnap = await getDoc(userDocRef);
               if (userDocSnap.exists()) {
-                  setCurrentUser({ id: userDocSnap.id, ...userDocSnap.data() } as User);
+                  let userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+                   if (!userData.role) {
+                      console.warn(`User ${userData.email} has no role (cached). Defaulting to 'Docentes'.`);
+                      userData.role = 'Docentes';
+                  }
+                  setCurrentUser(userData);
               } else {
                   await auth.signOut();
                   router.push('/login');
               }
             }
         } else {
-            // No user is signed in, redirect to login.
             router.push('/login');
         }
         setIsLoadingUser(false);

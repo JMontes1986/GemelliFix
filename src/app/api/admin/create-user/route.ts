@@ -1,11 +1,12 @@
 
+
 // app/api/admin/create-user/route.ts
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import { adminApp } from '@/lib/firebaseAdmin'; // Importar la instancia única
+import { adminApp } from '@/lib/firebaseAdmin';
 
 export async function POST(req: Request) {
   try {
@@ -16,13 +17,11 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
     }
     
-    // Usamos el `adminApp` ya inicializado
     const auth = getAuth(adminApp);
     const db = getFirestore(adminApp);
 
     const decodedToken = await auth.verifyIdToken(idToken);
     
-    // Se verifica el rol usando el custom claim del token, que es más seguro.
     if (decodedToken.role !== 'Administrador') {
         return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
     }
@@ -34,8 +33,9 @@ export async function POST(req: Request) {
       photoURL: avatar || undefined,
     });
 
-    // La Cloud Function `onUserCreated` se encargará de poner el custom claim.
-    // Aquí solo guardamos el documento en Firestore.
+    // Set role as a custom claim for security and efficiency
+    await auth.setCustomUserClaims(userRec.uid, { role: role });
+    
     await db.collection('users').doc(userRec.uid).set({
       id: userRec.uid,
       uid: userRec.uid,
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         message = 'The email address is already in use by another account.';
     } else if (err.code === 'auth/invalid-password') {
         message = 'The password must be a string with at least 6 characters.';
-    } else if (err.message.includes('Must be a valid')) { // Captura errores de credenciales
+    } else if (err.message.includes('Must be a valid')) {
         message = 'Firebase Admin SDK credentials error. ' + err.message;
     }
     

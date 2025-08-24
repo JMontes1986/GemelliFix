@@ -1,4 +1,5 @@
 
+
 'use strict';
 /**
  * @fileOverview Cloud Functions for Firebase.
@@ -28,11 +29,10 @@ const setRoleClaim = async (uid: string, role: string | undefined) => {
         return;
     }
     const claims: {[key: string]: any} = {
-        role: role, // Set the role directly
+        role: role,
     };
 
     try {
-        // Set the custom claims on the user's auth token.
         await getAuth().setCustomUserClaims(uid, claims);
         console.log(`Successfully set custom claims for user ${uid}:`, claims);
     } catch (error) {
@@ -68,7 +68,6 @@ export const onUserUpdated = onDocumentUpdated('users/{userId}', async (event) =
         return;
     }
 
-    // Update claims only if the role has actually changed.
     if (dataAfter.role !== dataBefore.role) {
         console.log(`Role changed for user ${event.params.userId} from ${dataBefore.role} to ${dataAfter.role}. Updating claims.`);
         const uid = event.params.userId;
