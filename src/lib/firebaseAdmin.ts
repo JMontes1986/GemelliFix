@@ -20,7 +20,7 @@ function createAdminApp(): App {
   } catch (error: any) {
       console.error("Firebase Admin SDK initialization error:", error);
       // Re-throw with a more descriptive message.
-      if (error.code === 'app/invalid-credential' || error.message.includes('PEM')) {
+      if (error.code === 'app/invalid-credential' || (error.message && error.message.includes('PEM'))) {
         throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted in your environment variables.');
       }
       throw error;
@@ -35,7 +35,10 @@ function createAdminApp(): App {
 export function getAdminApp(): App {
   // Avoid re-initialization in hot-reload environments.
   if (getApps().length > 0) {
-    return getApp();
+    const existingApp = getApp();
+    if (existingApp) {
+      return existingApp;
+    }
   }
   return createAdminApp();
 }
