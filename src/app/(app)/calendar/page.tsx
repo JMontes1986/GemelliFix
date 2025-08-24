@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot, updateDoc, Timestamp, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot, updateDoc, Timestamp, writeBatch, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
   ChevronLeft,
@@ -15,6 +15,8 @@ import {
   Briefcase,
   Clock,
   User as UserIcon,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,6 +26,17 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import {
   Dialog,
   DialogContent,
@@ -84,7 +97,7 @@ const generateColorFromString = (str: string, name?: string): string => {
 };
 
 
-const EventCard = ({ event, color, onClick }: { event: ScheduleEvent, color: string, onClick: () => void }) => {
+const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: ScheduleEvent, color: string, onClick: () => void, onEdit: () => void, onDelete: () => void }) => {
   const eventStartDate = event.start;
   const eventEndDate = event.end;
   
@@ -105,10 +118,9 @@ const EventCard = ({ event, color, onClick }: { event: ScheduleEvent, color: str
 
 
   return (
-    <button
-      onClick={onClick}
+    <div
       className={cn(
-        'absolute w-full p-2 rounded-lg border text-xs shadow-sm cursor-pointer hover:shadow-md transition-all z-10 text-left'
+        'absolute w-full p-2 rounded-lg border text-xs shadow-sm transition-all z-10 text-left group'
       )}
       style={{
         top: `${top}px`,
@@ -122,9 +134,35 @@ const EventCard = ({ event, color, onClick }: { event: ScheduleEvent, color: str
         color: textColor,
       }}
     >
-      <p className="font-bold truncate">{event.title}</p>
-      <p className="opacity-80 truncate">{event.description}</p>
-    </button>
+      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
+          <Pencil className="h-3 w-3" />
+        </button>
+         <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <button onClick={(e) => e.stopPropagation()} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
+                    <Trash2 className="h-3 w-3" />
+                </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Esta acción no se puede deshacer. Esto eliminará permanentemente el evento del calendario.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={(e) => {e.stopPropagation(); onDelete();}}>Continuar</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+      </div>
+      <button onClick={onClick} className="h-full w-full text-left">
+        <p className="font-bold truncate pr-8">{event.title}</p>
+        <p className="opacity-80 truncate">{event.description}</p>
+      </button>
+    </div>
   );
 };
 
@@ -317,9 +355,10 @@ export default function CalendarPage() {
     const [techniciansToDisplay, setTechniciansToDisplay] = useState<User[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
 
-    // State for manual event creation dialog
+    // State for manual event creation/editing dialog
     const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
     const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+    const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
     const [newEventTitle, setNewEventTitle] = useState('');
     const [newEventDescription, setNewEventDescription] = useState('');
     const [newEventTechnicianId, setNewEventTechnicianId] = useState('');
@@ -531,115 +570,166 @@ export default function CalendarPage() {
         }
     };
 
-    const handleCreateEvent = async () => {
+    const resetForm = () => {
+        setEditingEvent(null);
+        setNewEventTitle('');
+        setNewEventDescription('');
+        setNewEventTechnicianId('');
+        setNewEventType('task');
+        setNewEventDate('');
+        setNewEventStartTime('');
+        setNewEventEndTime('');
+        setIsRecurring(false);
+        setRecurrenceFrequency('weekly');
+        setRecurrenceDays([]);
+        setRecurrenceEndDate('');
+    };
+
+    const handleCreateOrUpdateEvent = async () => {
         if (!newEventTitle || !newEventTechnicianId || !newEventDate || !newEventStartTime || !newEventEndTime) {
             toast({ variant: 'destructive', title: 'Campos requeridos', description: 'Por favor, completa todos los campos para crear el evento.' });
             return;
         }
 
-        if (isRecurring && !recurrenceEndDate) {
+        if (isRecurring && !recurrenceEndDate && !editingEvent) {
             toast({ variant: 'destructive', title: 'Campo requerido', description: 'Por favor, define una fecha de fin para la recurrencia.' });
             return;
         }
 
         setIsCreatingEvent(true);
         try {
-            const batch = writeBatch(db);
-            let eventCount = 0;
+            if (editingEvent) {
+                // Update logic
+                const eventRef = doc(db, 'scheduleEvents', editingEvent.id);
+                const start = new Date(`${newEventDate}T${newEventStartTime}`);
+                const end = new Date(`${newEventDate}T${newEventEndTime}`);
 
-            const tech = techniciansToDisplay.find(t => t.id === newEventTechnicianId);
-
-            const createEventInstance = (start: Date, end: Date) => {
-                const newEvent: Omit<ScheduleEvent, 'id'> = {
+                await updateDoc(eventRef, {
                     title: newEventTitle,
                     description: newEventDescription,
-                    start: start,
-                    end: end,
-                    type: newEventType,
                     technicianId: newEventTechnicianId,
-                };
-                
-                const eventRef = doc(collection(db, 'scheduleEvents'));
-                batch.set(eventRef, { ...newEvent });
-                
-                if (tech) {
-                    createCalendarNotification(tech.name, newEvent);
-                }
-                
-                createCalendarEvent({
-                    summary: newEvent.title,
-                    description: newEvent.description || 'Sin descripción.',
-                    start: { dateTime: newEvent.start.toISOString(), timeZone: 'America/Bogota' },
-                    end: { dateTime: newEvent.end.toISOString(), timeZone: 'America/Bogota' },
+                    type: newEventType,
+                    start,
+                    end,
                 });
 
-                eventCount++;
-            };
-            
-            const initialStartDateTime = new Date(`${newEventDate}T${newEventStartTime}`);
-            const initialEndDateTime = new Date(`${newEventDate}T${newEventEndTime}`);
-
-            if (isRecurring) {
-                let currentStartDate = new Date(initialStartDateTime);
-                const endDate = new Date(recurrenceEndDate);
-                endDate.setHours(23, 59, 59, 999); // Include the whole day
-
-                while (currentStartDate <= endDate) {
-                    const duration = initialEndDateTime.getTime() - initialStartDateTime.getTime();
-                    let currentEndDate = new Date(currentStartDate.getTime() + duration);
-
-                    if (recurrenceFrequency === 'daily') {
-                        createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
-                    } else if (recurrenceFrequency === 'weekly') {
-                        if (recurrenceDays.includes(currentStartDate.getDay())) {
-                            createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
-                        }
-                    } else if (recurrenceFrequency === 'monthly') {
-                        if (currentStartDate.getDate() === initialStartDateTime.getDate()) {
-                           createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
-                        }
-                    }
-
-                    if (recurrenceFrequency === 'monthly') {
-                       currentStartDate = addMonths(currentStartDate, 1);
-                    } else {
-                       currentStartDate = addDays(currentStartDate, 1);
-                    }
-                }
+                toast({ title: '¡Evento Actualizado!', description: `El evento ha sido modificado.` });
             } else {
-                createEventInstance(initialStartDateTime, initialEndDateTime);
-            }
-            
-            await batch.commit();
+                // Creation logic
+                const batch = writeBatch(db);
+                let eventCount = 0;
+                const tech = techniciansToDisplay.find(t => t.id === newEventTechnicianId);
 
-            toast({ title: '¡Evento(s) Creado(s)!', description: `Se ha(n) añadido ${eventCount} evento(s) al calendario.` });
-            
-            toast({
-                title: 'Sincronizado con Google Calendar',
-                description: 'Los eventos también han sido creados en el calendario de Google.'
-            });
+                const createEventInstance = (start: Date, end: Date) => {
+                    const newEvent: Omit<ScheduleEvent, 'id'> = {
+                        title: newEventTitle,
+                        description: newEventDescription,
+                        start: start,
+                        end: end,
+                        type: newEventType,
+                        technicianId: newEventTechnicianId,
+                    };
+                    
+                    const eventRef = doc(collection(db, 'scheduleEvents'));
+                    batch.set(eventRef, { ...newEvent });
+                    
+                    if (tech) {
+                        createCalendarNotification(tech.name, newEvent);
+                    }
+                    
+                    createCalendarEvent({
+                        summary: newEvent.title,
+                        description: newEvent.description || 'Sin descripción.',
+                        start: { dateTime: newEvent.start.toISOString(), timeZone: 'America/Bogota' },
+                        end: { dateTime: newEvent.end.toISOString(), timeZone: 'America/Bogota' },
+                    });
+
+                    eventCount++;
+                };
+                
+                const initialStartDateTime = new Date(`${newEventDate}T${newEventStartTime}`);
+                const initialEndDateTime = new Date(`${newEventDate}T${newEventEndTime}`);
+
+                if (isRecurring) {
+                    let currentStartDate = new Date(initialStartDateTime);
+                    const endDate = new Date(recurrenceEndDate);
+                    endDate.setHours(23, 59, 59, 999); // Include the whole day
+
+                    while (currentStartDate <= endDate) {
+                        const duration = initialEndDateTime.getTime() - initialStartDateTime.getTime();
+                        let currentEndDate = new Date(currentStartDate.getTime() + duration);
+
+                        if (recurrenceFrequency === 'daily') {
+                            createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
+                        } else if (recurrenceFrequency === 'weekly') {
+                            if (recurrenceDays.includes(currentStartDate.getDay())) {
+                                createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
+                            }
+                        } else if (recurrenceFrequency === 'monthly') {
+                            if (currentStartDate.getDate() === initialStartDateTime.getDate()) {
+                            createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
+                            }
+                        }
+
+                        if (recurrenceFrequency === 'monthly') {
+                        currentStartDate = addMonths(currentStartDate, 1);
+                        } else {
+                        currentStartDate = addDays(currentStartDate, 1);
+                        }
+                    }
+                } else {
+                    createEventInstance(initialStartDateTime, initialEndDateTime);
+                }
+                
+                await batch.commit();
+
+                toast({ title: '¡Evento(s) Creado(s)!', description: `Se ha(n) añadido ${eventCount} evento(s) al calendario.` });
+                
+                toast({
+                    title: 'Sincronizado con Google Calendar',
+                    description: 'Los eventos también han sido creados en el calendario de Google.'
+                });
+            }
 
             // Reset form
             setIsManualDialogOpen(false);
-            setNewEventTitle('');
-            setNewEventDescription('');
-            setNewEventTechnicianId('');
-            setNewEventType('task');
-            setNewEventDate('');
-            setNewEventStartTime('');
-            setNewEventEndTime('');
-            setIsRecurring(false);
-            setRecurrenceFrequency('weekly');
-            setRecurrenceDays([]);
-            setRecurrenceEndDate('');
+            resetForm();
 
         } catch (error) {
-            console.error("Error creating manual event:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el evento. Revisa la conexión con Google Calendar.' });
+            console.error("Error creating/updating event:", error);
+            const action = editingEvent ? 'actualizar' : 'guardar';
+            toast({ variant: 'destructive', title: 'Error', description: `No se pudo ${action} el evento. Revisa la conexión con Google Calendar.` });
         } finally {
             setIsCreatingEvent(false);
         }
     };
+    
+    const handleEditEvent = (event: ScheduleEvent) => {
+        setEditingEvent(event);
+        setNewEventTitle(event.title);
+        setNewEventDescription(event.description || '');
+        setNewEventTechnicianId(event.technicianId || '');
+        setNewEventType(event.type);
+        setNewEventDate(event.start.toISOString().split('T')[0]);
+        setNewEventStartTime(event.start.toTimeString().substring(0,5));
+        setNewEventEndTime(event.end.toTimeString().substring(0,5));
+        setIsRecurring(false); // Disable recurrence editing for simplicity for now
+        setIsManualDialogOpen(true);
+    };
+
+    const handleDeleteEvent = async (eventId: string) => {
+        try {
+            await deleteDoc(doc(db, "scheduleEvents", eventId));
+            toast({
+                title: 'Evento Eliminado',
+                description: 'El evento ha sido eliminado del calendario.',
+            });
+        } catch (error) {
+            console.error("Error deleting event:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar el evento.' });
+        }
+    };
+
 
     const handleSuggestWithAi = async () => {
         if (!newEventTitle) {
@@ -746,7 +836,7 @@ export default function CalendarPage() {
           <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => new Date(d.setDate(d.getDate() + 7)))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Dialog open={isManualDialogOpen} onOpenChange={setIsManualDialogOpen}>
+          <Dialog open={isManualDialogOpen} onOpenChange={(open) => { setIsManualDialogOpen(open); if(!open) resetForm(); }}>
             <DialogTrigger asChild>
                 <Button>
                     <Plus className="mr-2 h-4 w-4" />
@@ -755,9 +845,9 @@ export default function CalendarPage() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Programar Evento</DialogTitle>
+                    <DialogTitle>{editingEvent ? "Editar Evento" : "Programar Evento"}</DialogTitle>
                     <DialogDescription>
-                        Crea un nuevo turno, tarea o asigna un ticket.
+                         {editingEvent ? "Modifica los detalles del evento." : "Crea un nuevo turno, tarea o asigna un ticket."}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4 max-h-[90vh] overflow-y-auto pr-6">
@@ -770,12 +860,14 @@ export default function CalendarPage() {
                         <Textarea id="description" placeholder="Ej: Limpieza de filtros y revisión de gas" value={newEventDescription} onChange={(e) => setNewEventDescription(e.target.value)} />
                     </div>
 
-                    <div className="pt-2 flex justify-end">
-                        <Button variant="outline" size="sm" onClick={handleSuggestWithAi} disabled={!newEventTitle || isLoadingAi}>
-                             {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                            Sugerir con IA
-                        </Button>
-                    </div>
+                    {!editingEvent && (
+                        <div className="pt-2 flex justify-end">
+                            <Button variant="outline" size="sm" onClick={handleSuggestWithAi} disabled={!newEventTitle || isLoadingAi}>
+                                {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                Sugerir con IA
+                            </Button>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -820,58 +912,60 @@ export default function CalendarPage() {
                         </div>
                     </div>
                     
-                    <div className="space-y-4 pt-4 border-t">
-                        <div className="flex items-center space-x-2">
-                            <Switch id="recurring-switch" checked={isRecurring} onCheckedChange={setIsRecurring} />
-                            <Label htmlFor="recurring-switch">Repetir Evento</Label>
-                        </div>
-                        {isRecurring && (
-                            <div className="space-y-4 p-4 border rounded-md bg-muted/30">
-                                <div className="grid grid-cols-2 gap-4">
-                                     <div className="space-y-2">
-                                        <Label htmlFor="recurrence-frequency">Frecuencia</Label>
-                                        <Select value={recurrenceFrequency} onValueChange={(v) => setRecurrenceFrequency(v as any)}>
-                                            <SelectTrigger><SelectValue/></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="daily">Diariamente</SelectItem>
-                                                <SelectItem value="weekly">Semanalmente</SelectItem>
-                                                <SelectItem value="monthly">Mensualmente</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="recurrence-end-date">Finaliza en</Label>
-                                        <Input id="recurrence-end-date" type="date" value={recurrenceEndDate} onChange={(e) => setRecurrenceEndDate(e.target.value)} />
-                                    </div>
-                                </div>
-
-                                {recurrenceFrequency === 'weekly' && (
-                                    <div>
-                                        <Label>Repetir los días</Label>
-                                        <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
-                                            {[{id: 1, label: 'Lu'}, {id: 2, label: 'Ma'}, {id: 3, label: 'Mi'}, {id: 4, label: 'Ju'}, {id: 5, label: 'Vi'}].map(day => (
-                                                <div key={day.id} className="flex items-center space-x-2">
-                                                    <Checkbox
-                                                        id={`day-${day.id}`}
-                                                        checked={recurrenceDays.includes(day.id)}
-                                                        onCheckedChange={(checked) => {
-                                                            setRecurrenceDays(prev => checked ? [...prev, day.id] : prev.filter(d => d !== day.id));
-                                                        }}
-                                                    />
-                                                    <Label htmlFor={`day-${day.id}`} className="font-normal">{day.label}</Label>
-                                                </div>
-                                            ))}
+                    {!editingEvent && (
+                        <div className="space-y-4 pt-4 border-t">
+                            <div className="flex items-center space-x-2">
+                                <Switch id="recurring-switch" checked={isRecurring} onCheckedChange={setIsRecurring} />
+                                <Label htmlFor="recurring-switch">Repetir Evento</Label>
+                            </div>
+                            {isRecurring && (
+                                <div className="space-y-4 p-4 border rounded-md bg-muted/30">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="recurrence-frequency">Frecuencia</Label>
+                                            <Select value={recurrenceFrequency} onValueChange={(v) => setRecurrenceFrequency(v as any)}>
+                                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="daily">Diariamente</SelectItem>
+                                                    <SelectItem value="weekly">Semanalmente</SelectItem>
+                                                    <SelectItem value="monthly">Mensualmente</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="recurrence-end-date">Finaliza en</Label>
+                                            <Input id="recurrence-end-date" type="date" value={recurrenceEndDate} onChange={(e) => setRecurrenceEndDate(e.target.value)} />
                                         </div>
                                     </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
+
+                                    {recurrenceFrequency === 'weekly' && (
+                                        <div>
+                                            <Label>Repetir los días</Label>
+                                            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
+                                                {[{id: 1, label: 'Lu'}, {id: 2, label: 'Ma'}, {id: 3, label: 'Mi'}, {id: 4, label: 'Ju'}, {id: 5, label: 'Vi'}].map(day => (
+                                                    <div key={day.id} className="flex items-center space-x-2">
+                                                        <Checkbox
+                                                            id={`day-${day.id}`}
+                                                            checked={recurrenceDays.includes(day.id)}
+                                                            onCheckedChange={(checked) => {
+                                                                setRecurrenceDays(prev => checked ? [...prev, day.id] : prev.filter(d => d !== day.id));
+                                                            }}
+                                                        />
+                                                        <Label htmlFor={`day-${day.id}`} className="font-normal">{day.label}</Label>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <DialogFooter>
-                    <Button onClick={handleCreateEvent} disabled={isCreatingEvent}>
+                    <Button onClick={handleCreateOrUpdateEvent} disabled={isCreatingEvent}>
                         {isCreatingEvent && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Guardar Programación
+                        {editingEvent ? 'Guardar Cambios' : 'Guardar Programación'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -964,7 +1058,14 @@ export default function CalendarPage() {
                       >
                         {/* Events for this technician on this day */}
                         {eventsByTechnicianAndDay(tech.id, date).map(event => (
-                            <EventCard key={event.id} event={event} color={generateColorFromString(tech.id, tech.name)} onClick={() => handleEventClick(event)} />
+                            <EventCard 
+                                key={event.id} 
+                                event={event} 
+                                color={generateColorFromString(tech.id, tech.name)} 
+                                onClick={() => handleEventClick(event)}
+                                onEdit={() => handleEditEvent(event)}
+                                onDelete={() => handleDeleteEvent(event.id)}
+                             />
                         ))}
                       </div>
                     ))}
