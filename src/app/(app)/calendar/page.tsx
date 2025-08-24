@@ -99,7 +99,7 @@ const generateColorFromString = (str: string, name?: string): string => {
 };
 
 
-const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: ScheduleEvent, color: string, onClick: () => void, onEdit: () => void, onDelete: () => void }) => {
+const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: ScheduleEvent, color: string, onClick: () => void, onEdit: () => void, onDelete: (mode: 'single' | 'future') => void }) => {
   const eventStartDate = event.start;
   const eventEndDate = event.end;
   
@@ -118,6 +118,7 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
   const hsl = color.match(/\d+/g)?.map(Number);
   const textColor = (hsl && hsl[1] > 50 && hsl[2] > 50) ? 'black' : 'white';
 
+  const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
 
   return (
     <div
@@ -140,22 +141,23 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
         <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
           <Pencil className="h-3 w-3" />
         </button>
-         <AlertDialog>
+         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
             <AlertDialogTrigger asChild>
-                <button onClick={(e) => e.stopPropagation()} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
+                <button onClick={(e) => {e.stopPropagation(); if (!event.recurrenceId) {onDelete('single'); return;} setIsDeleteOpen(true);}} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
                     <Trash2 className="h-3 w-3" />
                 </button>
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                    <AlertDialogTitle>Eliminar evento recurrente</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Esto eliminará permanentemente el evento del calendario.
+                        Este es un evento recurrente. ¿Cómo te gustaría eliminarlo?
                     </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter>
+                <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={(e) => {e.stopPropagation(); onDelete();}}>Continuar</AlertDialogAction>
+                    <AlertDialogAction onClick={(e) => {e.stopPropagation(); onDelete('single');}}>Eliminar este evento</AlertDialogAction>
+                    <AlertDialogAction onClick={(e) => {e.stopPropagation(); onDelete('future');}}>Eliminar este y futuros</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -375,6 +377,8 @@ export default function CalendarPage() {
     const [recurrenceFrequency, setRecurrenceFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
     const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
     const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+
+    const [isEditRecurrenceDialogOpen, setIsEditRecurrenceDialogOpen] = useState(false);
 
 
     useEffect(() => {
@@ -622,6 +626,7 @@ export default function CalendarPage() {
                 const batch = writeBatch(db);
                 let eventCount = 0;
                 const tech = techniciansToDisplay.find(t => t.id === newEventTechnicianId);
+                const recurrenceId = isRecurring ? `rec-${Date.now()}` : undefined;
 
                 const createEventInstance = (start: Date, end: Date) => {
                     const newEvent: Omit<ScheduleEvent, 'id'> = {
@@ -631,6 +636,7 @@ export default function CalendarPage() {
                         end: end,
                         type: newEventType,
                         technicianId: newEventTechnicianId,
+                        recurrenceId,
                     };
                     
                     const eventRef = doc(collection(db, 'scheduleEvents'));
@@ -665,19 +671,19 @@ export default function CalendarPage() {
                         if (recurrenceFrequency === 'daily') {
                             createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
                         } else if (recurrenceFrequency === 'weekly') {
-                            if (recurrenceDays.includes(currentStartDate.getDay())) {
+                            if (recurrenceDays.includes(currentStartDate.getDay() === 0 ? 6 : currentStartDate.getDay() - 1)) { // Adjust for Mon-Sun
                                 createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
                             }
                         } else if (recurrenceFrequency === 'monthly') {
                             if (currentStartDate.getDate() === initialStartDateTime.getDate()) {
-                            createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
+                            createEventInstance(new- Date(currentStartDate), new Date(currentEndDate));
                             }
                         }
 
                         if (recurrenceFrequency === 'monthly') {
-                        currentStartDate = addMonths(currentStartDate, 1);
+                          currentStartDate.setMonth(currentStartDate.getMonth() + 1);
                         } else {
-                        currentStartDate = addDays(currentStartDate, 1);
+                          currentStartDate.setDate(currentStartDate.getDate() + 1);
                         }
                     }
                 } else {
@@ -708,6 +714,15 @@ export default function CalendarPage() {
     };
     
     const handleEditEvent = (event: ScheduleEvent) => {
+        if (event.recurrenceId) {
+            setEditingEvent(event);
+            setIsEditRecurrenceDialogOpen(true);
+        } else {
+            openEditDialog(event);
+        }
+    };
+    
+    const openEditDialog = (event: ScheduleEvent) => {
         setEditingEvent(event);
         setNewEventTitle(event.title);
         setNewEventDescription(event.description || '');
@@ -716,20 +731,37 @@ export default function CalendarPage() {
         setNewEventDate(event.start.toISOString().split('T')[0]);
         setNewEventStartTime(event.start.toTimeString().substring(0,5));
         setNewEventEndTime(event.end.toTimeString().substring(0,5));
-        setIsRecurring(false); // Disable recurrence editing for simplicity for now
+        setIsRecurring(false); // Disable recurrence editing for simplicity
         setIsManualDialogOpen(true);
     };
 
-    const handleDeleteEvent = async (eventId: string) => {
+    const handleDeleteEvent = async (event: ScheduleEvent, mode: 'single' | 'future') => {
+        setIsCreatingEvent(true);
         try {
-            await deleteDoc(doc(db, "scheduleEvents", eventId));
-            toast({
-                title: 'Evento Eliminado',
-                description: 'El evento ha sido eliminado del calendario.',
-            });
+            if (mode === 'single' || !event.recurrenceId) {
+                await deleteDoc(doc(db, "scheduleEvents", event.id));
+                 toast({ title: 'Evento Eliminado', description: 'El evento ha sido eliminado del calendario.' });
+            } else {
+                const batch = writeBatch(db);
+                const q = query(
+                    collection(db, 'scheduleEvents'), 
+                    where('recurrenceId', '==', event.recurrenceId),
+                    where('start', '>=', event.start)
+                );
+                const querySnapshot = await getDocs(q);
+                
+                querySnapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                
+                await batch.commit();
+                toast({ title: 'Eventos Eliminados', description: `Se han eliminado ${querySnapshot.size} eventos recurrentes.` });
+            }
         } catch (error) {
-            console.error("Error deleting event:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar el evento.' });
+            console.error("Error deleting event(s):", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar el/los evento(s).' });
+        } finally {
+            setIsCreatingEvent(false);
         }
     };
 
@@ -842,6 +874,20 @@ export default function CalendarPage() {
         event={selectedEvent}
         technician={techniciansToDisplay.find(t => t.id === selectedEvent?.technicianId)}
       />
+       <AlertDialog open={isEditRecurrenceDialogOpen} onOpenChange={setIsEditRecurrenceDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Editar evento recurrente</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Este es un evento recurrente. La edición de series completas estará disponible pronto. Por ahora, puedes editar solo esta instancia.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => { if(editingEvent) openEditDialog(editingEvent) }}>Editar solo este evento</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
       <div className="flex items-center justify-between pb-4">
         <div>
           <h1 className="text-2xl font-headline font-bold">
@@ -970,7 +1016,7 @@ export default function CalendarPage() {
                                         <div>
                                             <Label>Repetir los días</Label>
                                             <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
-                                                {[{id: 1, label: 'Lu'}, {id: 2, label: 'Ma'}, {id: 3, label: 'Mi'}, {id: 4, label: 'Ju'}, {id: 5, label: 'Vi'}].map(day => (
+                                                {[{id: 1, label: 'Lu'}, {id: 2, label: 'Ma'}, {id: 3, label: 'Mi'}, {id: 4, label: 'Ju'}, {id: 5, label: 'Vi'}, {id: 6, label: 'Sa'}, {id: 0, label: 'Do'}].map(day => (
                                                     <div key={day.id} className="flex items-center space-x-2">
                                                         <Checkbox
                                                             id={`day-${day.id}`}
@@ -1092,7 +1138,7 @@ export default function CalendarPage() {
                                 color={generateColorFromString(tech.id, tech.name)} 
                                 onClick={() => handleEventClick(event)}
                                 onEdit={() => handleEditEvent(event)}
-                                onDelete={() => handleDeleteEvent(event.id)}
+                                onDelete={(mode) => handleDeleteEvent(event, mode)}
                              />
                         ))}
                       </div>

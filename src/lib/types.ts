@@ -80,6 +80,7 @@ export type ScheduleEvent = {
   type: 'shift' | 'ticket' | 'task';
   technicianId?: string;
   ticketId?: string;
+  recurrenceId?: string;
 };
 
 export type Log = {
