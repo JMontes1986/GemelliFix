@@ -9,6 +9,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
 // Helper function to get the initialized Firebase Admin app
+// This is defined locally to ensure it's robust and self-contained.
 function getAdminApp(): App {
     if (getApps().length > 0) {
         return getApps()[0];
@@ -16,6 +17,7 @@ function getAdminApp(): App {
 
     const projectId = process.env.FB_PROJECT_ID;
     const clientEmail = process.env.FB_CLIENT_EMAIL;
+    // CRUCIAL: Replace escaped newlines with actual newlines
     const privateKey = process.env.FB_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
     if (!projectId || !clientEmail || !privateKey) {
@@ -29,6 +31,7 @@ function getAdminApp(): App {
             credential: cert({ projectId, clientEmail, privateKey }),
         });
     } catch (error: any) {
+        // Provide a more specific error message for easier debugging.
         if (error.code === 'app/invalid-credential' || (error.message && (error.message.includes('PEM') || error.message.includes('parse')))) {
             throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted in your environment variables.');
         }
@@ -46,7 +49,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
     }
 
-    // Initialize Admin SDK inside the request function
+    // Initialize Admin SDK reliably inside the request function
     const adminApp = getAdminApp();
     const auth = getAuth(adminApp);
     const db = getFirestore(adminApp);
@@ -82,7 +85,8 @@ export async function POST(req: Request) {
     console.error('create-user error:', err);
     let message = 'An unknown error occurred on the server.';
     
-    if (err.message && (err.message.includes('PEM') || err.message.includes('parse') || err.message.includes('private key'))) {
+    // Capture the specific error messages for better client-side feedback.
+    if (err.message && err.message.includes('Failed to parse Firebase private key')) {
         message = 'Server-side Firebase Admin credentials are not configured correctly. The private key format is invalid.';
     } else if (err.code === 'auth/email-already-exists') {
         message = 'The email address is already in use by another account.';
