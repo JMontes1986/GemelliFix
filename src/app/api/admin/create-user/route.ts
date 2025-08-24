@@ -1,11 +1,12 @@
 
 // app/api/admin/create-user/route.ts
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import { adminApp } from '@/lib/firebaseAdmin';
+import { getAdminApp } from '@/lib/firebaseAdmin';
 
 export async function POST(req: Request) {
   try {
@@ -16,6 +17,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
     }
     
+    // Usar la función centralizada para obtener la app de admin
+    const adminApp = getAdminApp();
     const auth = getAuth(adminApp);
     const db = getFirestore(adminApp);
 
@@ -48,14 +51,18 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, uid: userRec.uid });
   } catch (err: any) {
-    console.error('create-user error:', err.message);
-    let message = 'An unknown error occurred.';
-    if (err.code === 'auth/email-already-exists') {
+    console.error('create-user error:', err);
+    let message = 'An unknown error occurred on the server.';
+    
+    // Captura el error específico de parseo de credenciales si ocurre aquí
+    if (err.message.includes('Firebase Admin environment variables are not set')) {
+        message = 'Server-side Firebase Admin credentials are not configured correctly.';
+    } else if (err.code === 'auth/email-already-exists') {
         message = 'The email address is already in use by another account.';
     } else if (err.code === 'auth/invalid-password') {
         message = 'The password must be a string with at least 6 characters.';
-    } else if (err.message.includes('Must be a valid')) {
-        message = 'Firebase Admin SDK credentials error. ' + err.message;
+    } else if (err.message) {
+        message = err.message;
     }
     
     return NextResponse.json(

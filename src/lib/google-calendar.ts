@@ -1,24 +1,21 @@
 import { google } from 'googleapis';
-import { serviceAccount } from './firebase-admin-config';
+import { getAdminApp } from './firebaseAdmin';
 
-// This function safely retrieves the service account credentials directly from the config file.
+// Esta función ahora depende de las variables de entorno directamente,
+// al igual que la inicialización del Admin SDK.
 const getServiceAccountCredentials = () => {
     try {
+        const clientEmail = process.env.FB_CLIENT_EMAIL;
+        const privateKey = process.env.FB_PRIVATE_KEY?.replace(/\\n/g, '\n');
         const calendarId = process.env.GOOGLE_CALENDAR_ID;
         
-        // Validate that the necessary fields exist for Google Calendar API.
-        if (!serviceAccount.client_email || !serviceAccount.private_key || !calendarId) {
-            throw new Error("The service account object in firebase-admin-config.ts is missing required fields (client_email, private_key) or GOOGLE_CALENDAR_ID is not set in .env.");
+        if (!clientEmail || !privateKey || !calendarId) {
+            throw new Error("Missing required environment variables for Google Calendar: FB_CLIENT_EMAIL, FB_PRIVATE_KEY, GOOGLE_CALENDAR_ID.");
         }
         
-        return {
-            clientEmail: serviceAccount.client_email,
-            privateKey: serviceAccount.private_key,
-            calendarId: calendarId
-        };
+        return { clientEmail, privateKey, calendarId };
     } catch(error: any) {
-        console.error("Failed to parse Google service account credentials from config file:", error.message);
-        // Throw a more specific error to make debugging easier.
+        console.error("Failed to get Google service account credentials from environment variables:", error.message);
         throw new Error(`Failed to initialize Google Calendar client. ${error.message}`);
     }
 };
@@ -26,11 +23,10 @@ const getServiceAccountCredentials = () => {
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
 
-// Initialize the JWT client
+// Inicializa el cliente JWT para la API de Google Calendar
 const getJwtClient = () => {
     try {
         const { clientEmail, privateKey } = getServiceAccountCredentials();
-        // The private key from the direct import does not need escaping fixes.
         return new google.auth.JWT(
             clientEmail,
             undefined,
@@ -38,7 +34,6 @@ const getJwtClient = () => {
             SCOPES
         );
     } catch(error) {
-        // The error from getServiceAccountCredentials will be more descriptive.
         console.error("Could not create Google JWT client:", error);
         return null;
     }
