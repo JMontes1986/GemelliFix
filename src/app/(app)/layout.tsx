@@ -95,30 +95,47 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         setIsLoadingUser(true);
         if (firebaseUser) {
             try {
-              // Force token refresh to get the latest custom claims.
+              // The most reliable way to get the role is from the ID token claims.
+              // Force refresh to get the latest claims, especially after a role change.
               const idTokenResult = await firebaseUser.getIdTokenResult(true);
-              const userRole = idTokenResult.claims.role;
+              let userRole = idTokenResult.claims.role as User['role'] | undefined;
 
-              if (!userRole) {
-                  console.warn(`User ${firebaseUser.email} has no role claim in token. Logging out for security.`);
+              const userDocRef = doc(db, 'users', firebaseUser.uid);
+              const userDocSnap = await getDoc(userDocRef);
+
+              if (!userDocSnap.exists()) {
+                  console.error(`User document not found in Firestore for UID: ${firebaseUser.uid}. Logging out.`);
                   await auth.signOut();
                   router.push('/login');
                   return;
               }
 
-              const userDocRef = doc(db, 'users', firebaseUser.uid);
-              const userDocSnap = await getDoc(userDocRef);
+              const firestoreData = userDocSnap.data() as User;
 
-              if (userDocSnap.exists()) {
-                  let userData = { id: userDocSnap.id, ...userDocSnap.data(), role: userRole } as User;
-                  setCurrentUser(userData);
-              } else {
-                  console.error("User data not found in Firestore for authenticated user, logging out.");
+              // If role claim is missing (e.g., for older users), use the role from Firestore as a fallback.
+              if (!userRole) {
+                  console.warn(`No role claim found for user ${firebaseUser.email}. Falling back to Firestore role.`);
+                  userRole = firestoreData.role;
+              }
+              
+              // If role is still missing, something is wrong. Log out.
+              if (!userRole) {
+                  console.error(`No role could be determined for user ${firebaseUser.email}. Logging out for security.`);
                   await auth.signOut();
                   router.push('/login');
+                  return;
               }
+
+              const userData: User = { 
+                  id: userDocSnap.id, 
+                  ...firestoreData, 
+                  role: userRole 
+              };
+
+              setCurrentUser(userData);
+
             } catch (error) {
-              console.error("Error verifying user session or getting data:", error);
+              console.error("Error verifying user session or getting data. Logging out.", error);
               await auth.signOut();
               router.push('/login');
             }
