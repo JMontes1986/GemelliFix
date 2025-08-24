@@ -1,6 +1,6 @@
 # GemelliFix: Sistema Inteligente de Gestión de Mantenimiento
 
-![GemelliFix Logo](httpshttps://firebasestorage.googleapis.com/v0/b/gemellifix.firebasestorage.app/o/Logo.png?alt=media&token=3c91d664-c1d3-43b0-b81f-2b21a7cf2c05)
+![GemelliFix Logo](https://firebasestorage.googleapis.com/v0/b/gemellifix.firebasestorage.app/o/Logo.png?alt=media&token=3c91d664-c1d3-43b0-b81f-2b21a7cf2c05)
 
 Bienvenido a GemelliFix, la solución integral para la gestión de solicitudes y operaciones de mantenimiento del Colegio Franciscano Agustín Gemelli. Esta aplicación está diseñada para optimizar, agilizar y transparentar todo el ciclo de vida de un ticket de mantenimiento, desde su creación hasta su resolución, potenciada por una capa de inteligencia artificial que asiste a los usuarios en cada paso.
 
@@ -17,6 +17,107 @@ Para ejecutar la aplicación en tu entorno de desarrollo local, sigue estos paso
     npm run dev
     ```
 3.  Abre tu navegador y visita [http://localhost:9002](http://localhost:9002).
+
+## 📊 Arquitectura y Diagramas del Sistema
+
+Para una comprensión más clara de la aplicación, a continuación se presentan diagramas que ilustran sus componentes clave.
+
+### 1. Arquitectura de Roles de Usuario
+
+Este diagrama muestra los permisos y capacidades de cada rol dentro de GemelliFix.
+
+```mermaid
+graph TD
+    subgraph "Roles de Usuario"
+        A(Administrador)
+        B(Servicios Generales)
+        C(SST - Auditor)
+        D(Solicitantes)
+    end
+
+    subgraph "Acciones"
+        Accion1[Ver Todos los Tickets y Dashboard]
+        Accion2[Crear/Editar/Asignar/Eliminar Tickets]
+        Accion3[Gestionar Configuración (Usuarios, Zonas, etc.)]
+        Accion4[Ver Solo Tickets Asignados]
+        Accion5[Actualizar Progreso y Subir Evidencia]
+        Accion6[Crear Nuevos Tickets]
+        Accion7[Ver Solo Tickets Propios]
+    end
+
+    A --> Accion1
+    A --> Accion2
+    A --> Accion3
+
+    B --> Accion4
+    B --> Accion5
+
+    C --> Accion1
+
+    D --> Accion6
+    D --> Accion7
+```
+
+### 2. Ciclo de Vida de un Ticket
+
+Este diagrama de estado ilustra el flujo de trabajo de un ticket de mantenimiento desde su creación hasta su resolución final.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Abierto: Solicitante crea ticket
+    
+    Abierto --> Asignado: Admin asigna técnico
+    Asignado --> EnProgreso: Técnico inicia trabajo
+    EnProgreso --> RequiereAprobacion: Técnico sube evidencia
+
+    RequiereAprobacion --> Cerrado: Admin aprueba trabajo
+    RequiereAprobacion --> Asignado: Admin rechaza (requiere corrección)
+
+    Abierto --> Cancelado: Admin cancela ticket
+    Asignado --> Cancelado: Admin cancela ticket
+    
+    Cerrado --> [*]
+    Cancelado --> [*]
+```
+
+### 3. Ecosistema de Inteligencia Artificial "Molly IA"
+
+Molly IA es una capa de inteligencia distribuida en toda la aplicación para asistir en diferentes tareas.
+
+```mermaid
+mindmap
+  root((GemelliFix))
+    (Molly IA)
+      (Asistente de Ayuda General 🤖)
+        ::icon(fa fa-question-circle)
+        - Responde preguntas sobre el uso de la app
+        - Ubicado en la barra de navegación
+      (Sugerencias de Ticket)
+        ::icon(fa fa-lightbulb)
+        - Sugiere Categoría y Prioridad
+        - Se activa en el formulario de creación
+      (Asignación Inteligente de Personal)
+        ::icon(fa fa-users)
+        - Recomienda al mejor técnico
+        - Disponible en los detalles del ticket
+      (Asistente de Estado)
+        ::icon(fa fa-magic)
+        - Analiza si un ticket está vencido
+        - Sugiere el próximo estado lógico
+      (Programación Asistida)
+        ::icon(fa fa-calendar-check)
+        - Valida asignaciones en el calendario
+        - Optimiza horarios y carga de trabajo
+      (Análisis de Dashboard)
+        ::icon(fa fa-chart-line)
+        - Genera resúmenes ejecutivos de KPIs
+        - Convierte datos en insights
+      (Sistema de Autodiagnóstico)
+        ::icon(fa fa-heartbeat)
+        - Prueba puntos críticos del sistema
+        - Diagnostica errores y sugiere soluciones
+```
 
 ## 👤 Roles de Usuario
 
