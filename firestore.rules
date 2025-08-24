@@ -1,85 +1,90 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Función para obtener el rol del usuario que hace la petición.
+
+    // Helper functions
+    function isUserAuthenticated() {
+      return request.auth != null;
+    }
+
     function getUserRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
-    // Reglas para la colección de Usuarios
-    match /users/{userId} {
-      // Un usuario puede leer su propio perfil.
-      allow read: if request.auth.uid == userId;
-      // Solo un Administrador puede crear o actualizar usuarios.
-      allow create, update: if getUserRole() == 'Administrador';
-    }
-    
-    // Reglas para la colección de Tickets
-    match /tickets/{ticketId} {
-      // REGLA DE LECTURA (GET): Quién puede leer un ticket INDIVIDUAL.
-      allow get: if request.auth != null && 
-                    (resource.data.requesterId == request.auth.uid ||
-                     getUserRole() in ['Administrador', 'SST'] ||
-                     (getUserRole() == 'Servicios Generales' && resource.data.assignedToIds.hasAny([request.auth.uid])));
-      
-      // REGLA DE LISTADO (LIST): Quién puede REALIZAR CONSULTAS sobre la colección.
-      // Firestore aplicará las reglas de 'get' a los resultados de la consulta,
-      // por lo que un usuario solo recibirá los tickets que tiene permiso para leer.
-      allow list: if request.auth != null;
-      
-      // REGLA DE CREACIÓN (CREATE): Cualquier usuario autenticado puede crear un ticket.
-      allow create: if request.auth != null;
-      
-      // REGLA DE ACTUALIZACIÓN (UPDATE): Solo Administradores y Servicios Generales.
-      allow update: if request.auth != null && getUserRole() in ['Administrador', 'Servicios Generales'];
-      
-      // REGLA DE BORRADO (DELETE): Solo Administradores.
-      allow delete: if request.auth != null && getUserRole() == 'Administrador';
-    }
-    
-    // Reglas para Logs de Auditoría
-    match /logs/{logId} {
-      // Solo los administradores pueden ver los logs.
-      allow read: if request.auth != null && getUserRole() == 'Administrador';
-      // La creación de logs se maneja desde el backend (createLog),
-      // pero se permite la creación a cualquier usuario autenticado como medida de seguridad.
-      allow create: if request.auth != null;
-      // Nadie puede modificar o borrar los logs.
-      allow update, delete: if false;
-    }
-    
-    // Reglas para Notificaciones
-    match /notifications/{notificationId} {
-        // Un usuario puede leer/actualizar sus propias notificaciones.
-        allow read, update: if request.auth != null && resource.data.userId == request.auth.uid;
-        // La creación se gestiona desde el backend.
-        allow create: if request.auth != null;
-    }
-    
-    // Reglas para Eventos del Calendario
-    match /scheduleEvents/{eventId} {
-        // Administradores y Servicios Generales pueden leer/escribir en el calendario.
-        allow read, write: if request.auth != null && getUserRole() in ['Administrador', 'Servicios Generales'];
+    function isOneOfRoles(roles) {
+      return isUserAuthenticated() && getUserRole() in roles;
     }
 
-    // Reglas para Datos Maestros (Zonas, Sitios, Categorías)
-    // Se asume que estos datos no son sensibles y pueden ser leídos por todos.
-    // La escritura se limita a los administradores.
+    function isOwner() {
+      // Check if the requesterId of the document being read matches the user's UID.
+      // This is used for 'get' operations on a single document.
+      return request.auth.uid == resource.data.requesterId;
+    }
+
+    match /tickets/{ticketId} {
+      // GET: Who can read a single, specific ticket document?
+      allow get: if isUserAuthenticated() && 
+                    (isOwner() || 
+                     isOneOfRoles(['Administrador', 'SST']) || 
+                     (request.auth.uid in resource.data.assignedToIds));
+
+      // LIST: Who can query the tickets collection?
+      // Admins/SST can list everything.
+      // Others can ONLY list if their query is filtered by 'requesterId' or 'assignedToIds'.
+      allow list: if isUserAuthenticated() && (
+                    isOneOfRoles(['Administrador', 'SST']) ||
+                    (request.query.where.path == "requesterId" && request.query.where.value == request.auth.uid) ||
+                    (request.query.where.path == "assignedToIds" && request.query.where.arrayContains == request.auth.uid)
+                  );
+
+      // WRITE operations
+      allow create: if isUserAuthenticated();
+      allow update: if isUserAuthenticated() && isOneOfRoles(['Administrador', 'Servicios Generales']);
+      allow delete: if isOneOfRoles(['Administrador']);
+    }
+
+    match /users/{userId} {
+      allow read: if isUserAuthenticated();
+      allow create: if isOneOfRoles(['Administrador']);
+      allow update: if request.auth.uid == userId || isOneOfRoles(['Administrador']);
+      allow delete: if isOneOfRoles(['Administrador']);
+    }
+
     match /zones/{zoneId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && getUserRole() == 'Administrador';
+      allow read: if isUserAuthenticated();
+      allow write: if isOneOfRoles(['Administrador']);
     }
     
     match /sites/{siteId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && getUserRole() == 'Administrador';
+        allow read: if isUserAuthenticated();
+        allow write: if isOneOfRoles(['Administrador']);
+    }
+
+    match /categories/{categoryId} {
+        allow read: if isUserAuthenticated();
+        allow write: if isOneOfRoles(['Administrador']);
     }
     
-    match /categories/{categoryId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && getUserRole() == 'Administrador';
+    match /scheduleEvents/{eventId} {
+      allow read: if isUserAuthenticated();
+      allow create: if isUserAuthenticated() && isOneOfRoles(['Administrador', 'Servicios Generales']);
+      allow update, delete: if isOneOfRoles(['Administrador']);
+    }
+
+    match /logs/{logId} {
+      allow read: if isOneOfRoles(['Administrador']);
+      allow create: if isUserAuthenticated(); // Anyone can create a log entry
+    }
+
+    match /notifications/{notificationId} {
+      allow read, update: if isUserAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isUserAuthenticated();
+    }
+    
+    match /diagnosis_logs/{logId} {
+        allow create: if isUserAuthenticated();
     }
   }
 }
