@@ -1,13 +1,9 @@
 
 import { google } from 'googleapis';
-import { getAdminApp } from './firebaseAdmin'; // Using the central admin app to get credentials is not standard.
-                                           // This file should source credentials from env vars directly.
 
-// This function sources credentials directly from environment variables.
 const getServiceAccountCredentials = () => {
     try {
         const clientEmail = process.env.FB_CLIENT_EMAIL;
-        // Crucial: Format the private key correctly by replacing escaped newlines.
         const privateKey = process.env.FB_PRIVATE_KEY?.replace(/\\n/g, '\n');
         const calendarId = process.env.GOOGLE_CALENDAR_ID;
         
@@ -24,8 +20,6 @@ const getServiceAccountCredentials = () => {
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
-
-// Initializes the JWT client for the Google Calendar API
 const getJwtClient = () => {
     try {
         const { clientEmail, privateKey } = getServiceAccountCredentials();
@@ -42,11 +36,6 @@ const getJwtClient = () => {
 };
 
 
-/**
- * Creates an event in the configured Google Calendar.
- * @param event - The event object to create.
- * @returns The created event data from Google Calendar API.
- */
 export async function createGoogleCalendarEvent(event: {
   summary: string;
   description: string;
@@ -70,7 +59,6 @@ export async function createGoogleCalendarEvent(event: {
       calendarId: calendarId,
       requestBody: {
         ...event,
-        // You can add default properties here, e.g., default reminders
         reminders: {
           useDefault: false,
           overrides: [
@@ -88,12 +76,6 @@ export async function createGoogleCalendarEvent(event: {
   }
 }
 
-/**
- * Lists events from the configured Google Calendar within a date range.
- * @param timeMin - The start date for the query (ISO string).
- * @param timeMax - The end date for the query (ISO string).
- * @returns A list of events from Google Calendar.
- */
 export async function listGoogleCalendarEvents(timeMin: string, timeMax: string) {
     const jwtClient = getJwtClient();
     if (!jwtClient) {
