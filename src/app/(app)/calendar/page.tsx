@@ -67,10 +67,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { addDays, addMonths, addWeeks } from 'date-fns';
+import { addDays, addMonths, addWeeks, format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
-const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 
 const generateColorFromString = (str: string, name?: string): string => {
@@ -343,6 +345,7 @@ async function createCalendarNotification(technicianName: string, event: Omit<Sc
 
 export default function CalendarPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
     const [events, setEvents] = useState<ScheduleEvent[]>([]);
     const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>([]);
     const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
@@ -785,6 +788,8 @@ export default function CalendarPage() {
         return date;
     });
 
+    const datesToDisplay = viewMode === 'week' ? weekDates : [currentDate];
+
     const eventsByTechnicianAndDay = (technicianId: string, day: Date) => {
         return events.filter(e => {
             if (!e.technicianId) return false;
@@ -795,6 +800,23 @@ export default function CalendarPage() {
     
     const handleEventClick = (event: ScheduleEvent) => {
         setSelectedEvent(event);
+    };
+
+    const handleDateChange = (direction: 'prev' | 'next') => {
+        const increment = direction === 'next' ? 1 : -1;
+        if (viewMode === 'week') {
+            setCurrentDate(d => addWeeks(d, increment));
+        } else {
+            setCurrentDate(d => addDays(d, increment));
+        }
+    };
+
+    const getHeaderDescription = () => {
+        if (viewMode === 'week') {
+            const endOfWeek = new Date(weekDates[4]);
+            return `Semana del ${format(weekDates[0], 'd LLL', { locale: es })} al ${format(endOfWeek, 'd LLL, yyyy', { locale: es })}`;
+        }
+        return format(currentDate, 'cccc, d MMMM, yyyy', { locale: es });
     };
 
   if (isLoadingData || !currentUser) {
@@ -826,14 +848,20 @@ export default function CalendarPage() {
             Calendario Operativo
           </h1>
           <p className="text-muted-foreground">
-            Semana del {startOfWeek.getDate()} de {startOfWeek.toLocaleString('es-CO', { month: 'long' })} al {weekDates[4].getDate()} de {weekDates[4].toLocaleString('es-CO', { month: 'long' })}, {startOfWeek.getFullYear()}
+            {getHeaderDescription()}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => new Date(d.setDate(d.getDate() - 7)))}>
+            <Tabs defaultValue="week" value={viewMode} onValueChange={(value) => setViewMode(value as any)}>
+                <TabsList>
+                    <TabsTrigger value="week">Semana</TabsTrigger>
+                    <TabsTrigger value="day">Día</TabsTrigger>
+                </TabsList>
+            </Tabs>
+          <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => new Date(d.setDate(d.getDate() + 7)))}>
+          <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}>
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Dialog open={isManualDialogOpen} onOpenChange={(open) => { setIsManualDialogOpen(open); if(!open) resetForm(); }}>
@@ -1026,12 +1054,12 @@ export default function CalendarPage() {
             </div>
             
             {/* Days and Technicians Grid */}
-            <div className="grid" style={{ gridTemplateColumns: `repeat(${weekDates.length}, 1fr)` }}>
-              {weekDates.map((date, dayIndex) => (
-                <div key={date.toISOString()} className={cn("relative", dayIndex < weekDates.length - 1 && 'border-r')}>
+            <div className="grid" style={{ gridTemplateColumns: `repeat(${datesToDisplay.length}, 1fr)` }}>
+              {datesToDisplay.map((date, dayIndex) => (
+                <div key={date.toISOString()} className={cn("relative", dayIndex < datesToDisplay.length - 1 && 'border-r')}>
                   {/* Day Header */}
                    <div className="h-8 border-b text-center text-sm font-medium sticky top-0 bg-background z-20">
-                     {weekDays[date.getDay() - 1]} {date.getDate()}
+                     {weekDays[(date.getDay() + 6) % 7]} {date.getDate()}
                    </div>
                   
                   {/* Background Hour Lines */}
