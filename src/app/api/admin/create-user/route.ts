@@ -8,16 +8,18 @@ import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
-// Helper function to get the initialized Firebase Admin app
-// This is defined locally to ensure it's robust and self-contained.
+// Helper function to get the initialized Firebase Admin app.
+// This is self-contained to ensure robustness and prevent bundling issues.
 function getAdminApp(): App {
+    // If the app is already initialized, return it to avoid re-initialization.
     if (getApps().length > 0) {
         return getApps()[0];
     }
 
     const projectId = process.env.FB_PROJECT_ID;
     const clientEmail = process.env.FB_CLIENT_EMAIL;
-    // CRUCIAL: Replace escaped newlines with actual newlines
+    // CRUCIAL: The private key from environment variables often has escaped newlines.
+    // They must be replaced with actual newline characters for the PEM format to be valid.
     const privateKey = process.env.FB_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
     if (!projectId || !clientEmail || !privateKey) {
@@ -27,14 +29,16 @@ function getAdminApp(): App {
     }
 
     try {
+        // Initialize the app with the correctly formatted credentials.
         return initializeApp({
             credential: cert({ projectId, clientEmail, privateKey }),
         });
     } catch (error: any) {
-        // Provide a more specific error message for easier debugging.
+        // Provide a more specific and helpful error message for easier debugging.
         if (error.code === 'app/invalid-credential' || (error.message && (error.message.includes('PEM') || error.message.includes('parse')))) {
             throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted in your environment variables.');
         }
+        // Re-throw any other initialization errors.
         throw error;
     }
 }
@@ -54,13 +58,14 @@ export async function POST(req: Request) {
     const auth = getAuth(adminApp);
     const db = getFirestore(adminApp);
 
+    // Verify the token of the user making the request to ensure they are an admin
     const decodedToken = await auth.verifyIdToken(idToken);
-    
     const callerClaims = (await auth.getUser(decodedToken.uid)).customClaims;
     if (callerClaims?.role !== 'Administrador') {
         return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
     }
 
+    // Create the new user in Firebase Authentication
     const userRec = await auth.createUser({
       email,
       password,
@@ -68,8 +73,10 @@ export async function POST(req: Request) {
       photoURL: avatar || undefined,
     });
 
+    // Set the user's role as a custom claim on their authentication token
     await auth.setCustomUserClaims(userRec.uid, { role: role });
     
+    // Create the corresponding user document in the Firestore 'users' collection
     await db.collection('users').doc(userRec.uid).set({
       id: userRec.uid,
       uid: userRec.uid,
@@ -85,7 +92,6 @@ export async function POST(req: Request) {
     console.error('create-user error:', err);
     let message = 'An unknown error occurred on the server.';
     
-    // Capture the specific error messages for better client-side feedback.
     if (err.message && err.message.includes('Failed to parse Firebase private key')) {
         message = 'Server-side Firebase Admin credentials are not configured correctly. The private key format is invalid.';
     } else if (err.code === 'auth/email-already-exists') {
