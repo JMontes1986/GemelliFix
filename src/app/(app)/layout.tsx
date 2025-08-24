@@ -95,38 +95,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         setIsLoadingUser(true);
         if (firebaseUser) {
             try {
-              await firebaseUser.getIdToken(true);
+              // Force token refresh to get the latest custom claims.
+              const idTokenResult = await firebaseUser.getIdTokenResult(true);
+              const userRole = idTokenResult.claims.role;
+
+              if (!userRole) {
+                  console.warn(`User ${firebaseUser.email} has no role claim in token. Logging out for security.`);
+                  await auth.signOut();
+                  router.push('/login');
+                  return;
+              }
+
               const userDocRef = doc(db, 'users', firebaseUser.uid);
               const userDocSnap = await getDoc(userDocRef);
 
               if (userDocSnap.exists()) {
-                  let userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-                  // Si el usuario no tiene rol, se le asigna el de Docentes por defecto.
-                  if (!userData.role) {
-                      console.warn(`User ${userData.email} has no role. Defaulting to 'Docentes'. An admin should assign a permanent role.`);
-                      userData.role = 'Docentes';
-                  }
+                  let userData = { id: userDocSnap.id, ...userDocSnap.data(), role: userRole } as User;
                   setCurrentUser(userData);
               } else {
-                  console.warn("User data not found in Firestore for authenticated user, logging out.");
+                  console.error("User data not found in Firestore for authenticated user, logging out.");
                   await auth.signOut();
                   router.push('/login');
               }
-            } catch (tokenError) {
-              console.warn("Could not refresh token or get user data:", tokenError);
-              const userDocRef = doc(db, 'users', firebaseUser.uid);
-              const userDocSnap = await getDoc(userDocRef);
-              if (userDocSnap.exists()) {
-                  let userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-                   if (!userData.role) {
-                      console.warn(`User ${userData.email} has no role (cached). Defaulting to 'Docentes'.`);
-                      userData.role = 'Docentes';
-                  }
-                  setCurrentUser(userData);
-              } else {
-                  await auth.signOut();
-                  router.push('/login');
-              }
+            } catch (error) {
+              console.error("Error verifying user session or getting data:", error);
+              await auth.signOut();
+              router.push('/login');
             }
         } else {
             router.push('/login');

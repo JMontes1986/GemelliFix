@@ -1,5 +1,4 @@
 
-
 // app/api/admin/create-user/route.ts
 export const runtime = 'nodejs';
 
@@ -22,7 +21,8 @@ export async function POST(req: Request) {
 
     const decodedToken = await auth.verifyIdToken(idToken);
     
-    if (decodedToken.role !== 'Administrador') {
+    const callerClaims = (await auth.getUser(decodedToken.uid)).customClaims;
+    if (callerClaims?.role !== 'Administrador') {
         return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
     }
 
