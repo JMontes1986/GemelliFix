@@ -24,7 +24,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { GemelliFixLogo } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -95,41 +95,48 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         setIsLoadingUser(true);
         if (firebaseUser) {
             try {
-              // The most reliable way to get the role is from the ID token claims.
-              // Force refresh to get the latest claims, especially after a role change.
-              const idTokenResult = await firebaseUser.getIdTokenResult(true);
-              let userRole = idTokenResult.claims.role as User['role'] | undefined;
-
               const userDocRef = doc(db, 'users', firebaseUser.uid);
-              const userDocSnap = await getDoc(userDocRef);
+              let userDocSnap = await getDoc(userDocRef);
 
+              // **Auto-repair mechanism:** If user exists in Auth but not Firestore, create them.
               if (!userDocSnap.exists()) {
-                  console.error(`User document not found in Firestore for UID: ${firebaseUser.uid}. Logging out.`);
-                  await auth.signOut();
-                  router.push('/login');
-                  return;
+                  console.warn(`User document not found for UID: ${firebaseUser.uid}. Creating a new profile.`);
+                  const newUser: User = {
+                      id: firebaseUser.uid,
+                      uid: firebaseUser.uid,
+                      name: firebaseUser.displayName || firebaseUser.email || 'Nuevo Usuario',
+                      email: firebaseUser.email || '',
+                      avatar: firebaseUser.photoURL || `https://placehold.co/100x100.png`,
+                      role: 'Docentes', // Assign a default, safe role
+                  };
+                  await setDoc(userDocRef, { ...newUser, createdAt: serverTimestamp() });
+                  
+                  // Re-fetch the document to ensure we have the fresh data
+                  userDocSnap = await getDoc(userDocRef);
+                  if (!userDocSnap.exists()) {
+                    // If it still doesn't exist after creation, something is seriously wrong.
+                    throw new Error("Failed to create and fetch user document.");
+                  }
               }
 
+              // Proceed with role and data validation
               const firestoreData = userDocSnap.data() as User;
-
-              // If role claim is missing (e.g., for older users), use the role from Firestore as a fallback.
-              if (!userRole) {
-                  console.warn(`No role claim found for user ${firebaseUser.email}. Falling back to Firestore role.`);
-                  userRole = firestoreData.role;
-              }
+              let userRole = firestoreData.role;
               
-              // If role is still missing, something is wrong. Log out.
+              // Fallback for older users who might not have a role in Firestore
               if (!userRole) {
-                  console.error(`No role could be determined for user ${firebaseUser.email}. Logging out for security.`);
-                  await auth.signOut();
-                  router.push('/login');
-                  return;
+                  console.warn(`User ${firestoreData.email} has no role in Firestore. Assigning default 'Docentes' role.`);
+                  userRole = 'Docentes'; // Assign default role
+                  await setDoc(userDocRef, { role: userRole }, { merge: true });
               }
 
+              const idTokenResult = await firebaseUser.getIdTokenResult(true);
+              const tokenRole = idTokenResult.claims.role as User['role'] | undefined;
+              
               const userData: User = { 
                   id: userDocSnap.id, 
                   ...firestoreData, 
-                  role: userRole 
+                  role: tokenRole || userRole // Prefer token role, but fallback to Firestore role
               };
 
               setCurrentUser(userData);
