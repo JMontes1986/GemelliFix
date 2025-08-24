@@ -152,20 +152,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarContent>
           <SidebarMenu>
             {(isAdmin || isSST) && (
-                <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive('/dashboard')}
-                        tooltip="Dashboard"
-                      >
-                        <Link href="/dashboard">
-                          <LayoutDashboard />
-                          <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/dashboard')}
+                    tooltip="Dashboard"
+                  >
+                    <Link href="/dashboard">
+                      <LayoutDashboard />
+                      <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
             )}
             {isAdmin && (
                  <SidebarMenuItem>

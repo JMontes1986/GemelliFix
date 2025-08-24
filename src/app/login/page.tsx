@@ -55,9 +55,16 @@ export default function LoginPage() {
       const userDocRef = doc(db, 'users', userCredential.user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
+      let redirectPath = '/tickets'; // Default redirect for most users
+
       if (userDocSnap.exists()) {
           const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
           await createLog(userData, 'login');
+          
+          // Redirect admins and SST to dashboard, others to tickets
+          if (userData.role === 'Administrador' || userData.role === 'SST') {
+            redirectPath = '/dashboard';
+          }
       }
 
       toast({
@@ -65,12 +72,7 @@ export default function LoginPage() {
         description: 'Has iniciado sesión correctamente.',
       });
       
-      // Redirect based on user email
-      if (userCredential.user.email === 'sistemas@colgemelli.edu.co') {
-        router.push('/dashboard');
-      } else {
-        router.push('/tickets');
-      }
+      router.push(redirectPath);
 
     } catch (error: any) {
       console.error("Error de inicio de sesión:", error);
