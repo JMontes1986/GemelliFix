@@ -20,7 +20,7 @@ function createAdminApp(): App {
   } catch (error: any) {
       console.error("Firebase Admin SDK initialization error:", error);
       // Re-throw with a more descriptive message.
-      if (error.message.includes('Invalid PEM formatted message')) {
+      if (error.code === 'app/invalid-credential' || error.message.includes('PEM')) {
         throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted in your environment variables.');
       }
       throw error;
