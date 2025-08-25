@@ -178,15 +178,20 @@ export default function DashboardPage() {
   ).map(([name, total]) => ({ name, total }));
   
   const calculateSlaByPriority = (priority: Ticket['priority']): number => {
-    const priorityTickets = closedTickets.filter(t => t.priority === priority);
-    if (priorityTickets.length === 0) return 100;
+    const priorityTickets = tickets.filter(t => t.priority === priority);
+    const closedPriorityTickets = priorityTickets.filter(t => t.status === 'Cerrado' || t.status === 'Resuelto');
     
-    const compliantTickets = priorityTickets.filter(t => 
-      t.resolvedAt && new Date(t.resolvedAt) <= new Date(t.dueDate)
+    if (closedPriorityTickets.length === 0) {
+        // If no tickets of this priority are closed yet, SLA is 100% by definition.
+        return 100;
+    }
+    
+    const compliantTickets = closedPriorityTickets.filter(t => 
+        t.resolvedAt && new Date(t.resolvedAt) <= new Date(t.dueDate)
     );
     
-    return Math.round((compliantTickets.length / priorityTickets.length) * 100);
-  };
+    return Math.round((compliantTickets.length / closedPriorityTickets.length) * 100);
+};
 
   const slaByPriority = {
       Urgente: calculateSlaByPriority('Urgente'),
