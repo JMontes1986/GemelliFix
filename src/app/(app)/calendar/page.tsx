@@ -20,6 +20,7 @@ import {
   Trash2,
   CalendarDays,
   AlertTriangle,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -57,6 +58,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+  } from '@/components/ui/dropdown-menu';
 import type { ScheduleEvent, Ticket, User } from '@/lib/types';
 import { cn, createLog } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -334,7 +343,7 @@ export default function CalendarPage() {
     const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
     const [newEventTitle, setNewEventTitle] = useState('');
     const [newEventDescription, setNewEventDescription] = useState('');
-    const [newEventTechnicianId, setNewEventTechnicianId] = useState('');
+    const [newEventTechnicianIds, setNewEventTechnicianIds] = useState<string[]>([]);
     const [newEventDate, setNewEventDate] = useState('');
     const [newEventStartTime, setNewEventStartTime] = useState('');
     const [newEventEndTime, setNewEventEndTime] = useState('');
@@ -427,7 +436,7 @@ export default function CalendarPage() {
         setEditingEvent(null);
         setNewEventTitle('');
         setNewEventDescription('');
-        setNewEventTechnicianId('');
+        setNewEventTechnicianIds([]);
         setNewEventDate('');
         setNewEventStartTime('');
         setNewEventEndTime('');
@@ -438,8 +447,8 @@ export default function CalendarPage() {
     };
 
     const handleCreateOrUpdateEvent = async () => {
-        if (!newEventTitle || !newEventTechnicianId || !newEventDate || !newEventStartTime || !newEventEndTime) {
-            toast({ variant: 'destructive', title: 'Campos requeridos', description: 'Por favor, completa todos los campos para crear el evento.' });
+        if (!newEventTitle || newEventTechnicianIds.length === 0 || !newEventDate || !newEventStartTime || !newEventEndTime) {
+            toast({ variant: 'destructive', title: 'Campos requeridos', description: 'Por favor, completa el título, personal, fecha y horas para crear el evento.' });
             return;
         }
 
@@ -451,7 +460,7 @@ export default function CalendarPage() {
         setIsCreatingEvent(true);
         try {
             if (editingEvent) {
-                // Update logic
+                // Update logic (only for single event, single technician)
                 const eventRef = doc(db, 'scheduleEvents', editingEvent.id);
                 const start = new Date(`${newEventDate}T${newEventStartTime}`);
                 const end = new Date(`${newEventDate}T${newEventEndTime}`);
@@ -459,7 +468,7 @@ export default function CalendarPage() {
                 await updateDoc(eventRef, {
                     title: newEventTitle,
                     description: newEventDescription,
-                    technicianId: newEventTechnicianId,
+                    technicianId: newEventTechnicianIds[0], // Assuming single update
                     type: 'task',
                     start,
                     end,
@@ -470,16 +479,18 @@ export default function CalendarPage() {
                 // Creation logic
                 const batch = writeBatch(db);
                 let eventCount = 0;
-                const tech = techniciansToDisplay.find(t => t.id === newEventTechnicianId);
+                
+                const createEventInstance = (start: Date, end: Date, technicianId: string) => {
+                    const tech = techniciansToDisplay.find(t => t.id === technicianId);
+                    if (!tech) return;
 
-                const createEventInstance = (start: Date, end: Date) => {
                     const baseEvent: Omit<ScheduleEvent, 'id' | 'recurrenceId'> = {
                         title: newEventTitle,
                         description: newEventDescription,
                         start: start,
                         end: end,
                         type: 'task',
-                        technicianId: newEventTechnicianId,
+                        technicianId: technicianId,
                     };
                     
                     const newEvent: Omit<ScheduleEvent, 'id'> = isRecurring 
@@ -489,9 +500,7 @@ export default function CalendarPage() {
                     const eventRef = doc(collection(db, 'scheduleEvents'));
                     batch.set(eventRef, newEvent);
                     
-                    if (tech) {
-                        createCalendarNotification(tech.name, newEvent);
-                    }
+                    createCalendarNotification(tech.name, newEvent);
                     
                     createCalendarEvent({
                         summary: newEvent.title,
@@ -506,35 +515,37 @@ export default function CalendarPage() {
                 const initialStartDateTime = new Date(`${newEventDate}T${newEventStartTime}`);
                 const initialEndDateTime = new Date(`${newEventDate}T${newEventEndTime}`);
 
-                if (isRecurring) {
-                    let currentStartDate = new Date(initialStartDateTime);
-                    const endDate = new Date(recurrenceEndDate);
-                    endDate.setHours(23, 59, 59, 999); // Include the whole day
+                for (const techId of newEventTechnicianIds) {
+                    if (isRecurring) {
+                        let currentStartDate = new Date(initialStartDateTime);
+                        const endDate = new Date(recurrenceEndDate);
+                        endDate.setHours(23, 59, 59, 999); // Include the whole day
 
-                    while (currentStartDate <= endDate) {
-                        const duration = initialEndDateTime.getTime() - initialStartDateTime.getTime();
-                        let currentEndDate = new Date(currentStartDate.getTime() + duration);
+                        while (currentStartDate <= endDate) {
+                            const duration = initialEndDateTime.getTime() - initialStartDateTime.getTime();
+                            let currentEndDate = new Date(currentStartDate.getTime() + duration);
 
-                        if (recurrenceFrequency === 'daily') {
-                            createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
-                        } else if (recurrenceFrequency === 'weekly') {
-                            if (recurrenceDays.includes(currentStartDate.getDay() === 0 ? 6 : currentStartDate.getDay() - 1)) { // Adjust for Mon-Sun
-                                createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
+                            if (recurrenceFrequency === 'daily') {
+                                createEventInstance(new Date(currentStartDate), new Date(currentEndDate), techId);
+                            } else if (recurrenceFrequency === 'weekly') {
+                                if (recurrenceDays.includes(currentStartDate.getDay() === 0 ? 6 : currentStartDate.getDay() - 1)) { // Adjust for Mon-Sun
+                                    createEventInstance(new Date(currentStartDate), new Date(currentEndDate), techId);
+                                }
+                            } else if (recurrenceFrequency === 'monthly') {
+                                if (currentStartDate.getDate() === initialStartDateTime.getDate()) {
+                                createEventInstance(new Date(currentStartDate), new Date(currentEndDate), techId);
+                                }
                             }
-                        } else if (recurrenceFrequency === 'monthly') {
-                            if (currentStartDate.getDate() === initialStartDateTime.getDate()) {
-                            createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
+
+                            if (recurrenceFrequency === 'monthly') {
+                              currentStartDate.setMonth(currentStartDate.getMonth() + 1);
+                            } else {
+                              currentStartDate.setDate(currentStartDate.getDate() + 1);
                             }
                         }
-
-                        if (recurrenceFrequency === 'monthly') {
-                          currentStartDate.setMonth(currentStartDate.getMonth() + 1);
-                        } else {
-                          currentStartDate.setDate(currentStartDate.getDate() + 1);
-                        }
+                    } else {
+                        createEventInstance(initialStartDateTime, initialEndDateTime, techId);
                     }
-                } else {
-                    createEventInstance(initialStartDateTime, initialEndDateTime);
                 }
                 
                 await batch.commit();
@@ -574,7 +585,7 @@ export default function CalendarPage() {
         setEditingEvent(event);
         setNewEventTitle(event.title);
         setNewEventDescription(event.description || '');
-        setNewEventTechnicianId(event.technicianId || '');
+        setNewEventTechnicianIds(event.technicianId ? [event.technicianId] : []);
         setNewEventDate(event.start.toISOString().split('T')[0]);
         setNewEventStartTime(event.start.toTimeString().substring(0,5));
         setNewEventEndTime(event.end.toTimeString().substring(0,5));
@@ -646,7 +657,7 @@ export default function CalendarPage() {
             const result = await suggestCalendarAssignment(input);
             const suggestedDate = new Date(result.suggestedTime);
             
-            setNewEventTechnicianId(result.technician.id);
+            setNewEventTechnicianIds([result.technician.id]);
             setNewEventDate(suggestedDate.toISOString().split('T')[0]);
             setNewEventStartTime(suggestedDate.toTimeString().substring(0,5));
             // Set end time 2 hours later
@@ -811,12 +822,12 @@ export default function CalendarPage() {
                 <DialogHeader>
                     <DialogTitle>{editingEvent ? "Editar Evento" : "Programar Evento"}</DialogTitle>
                     <DialogDescription>
-                         {editingEvent ? "Modifica los detalles del evento." : "Crea una nueva tarea."}
+                         {editingEvent ? "Modifica los detalles del evento." : "Crea una nueva tarea para uno o varios miembros del personal."}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4 max-h-[90vh] overflow-y-auto pr-6">
                     <div className="space-y-2">
-                        <Label htmlFor="title">Título</Label>
+                        <Label htmlFor="title">Tarea</Label>
                         <Select onValueChange={setNewEventTitle} value={newEventTitle}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Seleccionar tarea" />
@@ -827,7 +838,7 @@ export default function CalendarPage() {
                         </Select>
                     </div>
                      <div className="space-y-2">
-                        <Label htmlFor="description">Descripción</Label>
+                        <Label htmlFor="description">Descripción (Opcional)</Label>
                         <Textarea id="description" placeholder="Ej: Limpieza de filtros y revisión de gas" value={newEventDescription} onChange={(e) => setNewEventDescription(e.target.value)} />
                     </div>
 
@@ -843,14 +854,34 @@ export default function CalendarPage() {
                     <div className="grid grid-cols-1 gap-4">
                       <div className="space-y-2">
                           <Label htmlFor="technician">Personal</Label>
-                          <Select onValueChange={setNewEventTechnicianId} value={newEventTechnicianId}>
-                              <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar personal" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                  {techniciansToDisplay.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                              </SelectContent>
-                          </Select>
+                           <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-start">
+                                        <Users className="mr-2 h-4 w-4" />
+                                        {newEventTechnicianIds.length === 0 && "Seleccionar personal"}
+                                        {newEventTechnicianIds.length === 1 && techniciansToDisplay.find(t => t.id === newEventTechnicianIds[0])?.name}
+                                        {newEventTechnicianIds.length > 1 && `${newEventTechnicianIds.length} personas seleccionadas`}
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-full">
+                                    {techniciansToDisplay.map(tech => (
+                                        <DropdownMenuItem key={tech.id} onSelect={(e) => e.preventDefault()}>
+                                            <div className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`tech-check-${tech.id}`}
+                                                    checked={newEventTechnicianIds.includes(tech.id)}
+                                                    onCheckedChange={(checked) => {
+                                                        setNewEventTechnicianIds(prev => 
+                                                            checked ? [...prev, tech.id] : prev.filter(id => id !== tech.id)
+                                                        )
+                                                    }}
+                                                />
+                                                <Label htmlFor={`tech-check-${tech.id}`}>{tech.name}</Label>
+                                            </div>
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1045,5 +1076,6 @@ export default function CalendarPage() {
     </div>
   );
 }
+
 
 
