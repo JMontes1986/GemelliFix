@@ -37,11 +37,12 @@ import { db, storage, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, getDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UploadCloud, File as FileIcon, X, Sparkles } from 'lucide-react';
+import { Loader2, UploadCloud, File as FileIcon, X, Sparkles, History } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createLog } from '@/lib/utils';
 import type { User, Ticket, Zone, Site, Category } from '@/lib/types';
 import { suggestTicketDetails } from '@/ai/flows/suggest-ticket-details';
+import type { User as FirebaseUser } from 'firebase/auth';
 
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -55,7 +56,11 @@ const ticketSchema = z.object({
   siteId: z.string().min(1, 'El sitio es requerido.'),
   priority: z.enum(['Baja', 'Media', 'Alta', 'Urgente']),
   category: z.string().min(1, 'La categoría es requerida.'),
-  attachments: z.any().optional()
+  attachments: z.any().optional(),
+  // Admin-only historical fields
+  historicalCreatedAt: z.string().optional(),
+  historicalClosedAt: z.string().optional(),
+  closingObservation: z.string().optional(),
 });
 
 type TicketFormValues = z.infer<typeof ticketSchema>;
@@ -70,10 +75,14 @@ export default function CreateTicketPage() {
   const [zones, setZones] = React.useState<Zone[]>([]);
   const [sites, setSites] = React.useState<Site[]>([]);
   const [categories, setCategories] = React.useState<Category[]>([]);
+  const [currentUser, setCurrentUser] = React.useState<FirebaseUser | null>(null);
+
+  const isAdmin = currentUser?.email === 'sistemas@colgemelli.edu.co';
   
   React.useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(user => {
       if (user) {
+        setCurrentUser(user);
         setIsAuthLoading(false);
       } else {
         router.push('/login');
@@ -113,6 +122,9 @@ export default function CreateTicketPage() {
       priority: 'Media',
       category: '',
       attachments: [],
+      historicalCreatedAt: '',
+      historicalClosedAt: '',
+      closingObservation: '',
     },
   });
 
@@ -155,7 +167,6 @@ export default function CreateTicketPage() {
   };
 
   const onSubmit = async (data: TicketFormValues) => {
-    const currentUser = auth.currentUser;
     if (!currentUser) {
         toast({
             variant: 'destructive',
@@ -197,23 +208,19 @@ export default function CreateTicketPage() {
       const siteCode = siteName ? siteName.substring(0,4).toUpperCase().replace(/\s/g, '') : 'SITE';
       const ticketCode = `GEMMAN-${zoneCode}-${siteCode}-${Math.floor(1000 + Math.random() * 9000)}`;
       
-      const now = new Date();
-      let dueDate = new Date(now);
+      const isHistorical = isAdmin && data.historicalCreatedAt;
+      const createdAt = isHistorical ? new Date(data.historicalCreatedAt!) : new Date();
+      let dueDate = new Date(createdAt);
 
       switch(data.priority) {
-          case 'Urgente':
-              dueDate.setHours(dueDate.getHours() + 12);
-              break;
-          case 'Alta':
-              dueDate.setHours(dueDate.getHours() + 24);
-              break;
-          case 'Media':
-              dueDate.setHours(dueDate.getHours() + 36);
-              break;
-          case 'Baja':
-              dueDate.setHours(dueDate.getHours() + 48);
-              break;
+          case 'Urgente': dueDate.setHours(dueDate.getHours() + 12); break;
+          case 'Alta': dueDate.setHours(dueDate.getHours() + 24); break;
+          case 'Media': dueDate.setHours(dueDate.getHours() + 36); break;
+          case 'Baja': dueDate.setHours(dueDate.getHours() + 48); break;
       }
+      
+      const status = (isAdmin && data.historicalClosedAt) ? 'Cerrado' : 'Abierto';
+      const resolvedAt = (isAdmin && data.historicalClosedAt) ? new Date(data.historicalClosedAt) : undefined;
 
 
       const newTicketData: Omit<Ticket, 'id'> = {
@@ -224,24 +231,30 @@ export default function CreateTicketPage() {
         site: siteName || 'Desconocido',
         priority: data.priority,
         category: data.category,
-        status: 'Abierto',
+        status: status,
         requester: requesterName,
         requesterId: currentUser.uid,
         assignedTo: [],
         assignedToIds: [],
-        createdAt: now.toISOString(),
+        createdAt: createdAt.toISOString(),
         dueDate: dueDate.toISOString(),
+        resolvedAt: resolvedAt?.toISOString(),
         attachments: attachmentUrls,
       };
 
       const docRef = await addDoc(collection(db, 'tickets'), {
           ...newTicketData,
-          createdAt: serverTimestamp(),
-          dueDate,
+          createdAt: createdAt, // Use specific date for historical
+          dueDate: dueDate,
+          resolvedAt: resolvedAt
       });
 
       const newTicketForLog = { id: docRef.id, ...newTicketData };
       await createLog(userObject, 'create_ticket', { ticket: newTicketForLog });
+      
+      if (status === 'Cerrado' && data.closingObservation) {
+        await createLog(userObject, 'add_comment', { ticket: newTicketForLog, comment: `Observación de Cierre: ${data.closingObservation}` });
+      }
 
       toast({
         title: '¡Ticket Creado!',
@@ -494,6 +507,57 @@ export default function CreateTicketPage() {
                 )}
               />
 
+             {isAdmin && (
+                <div className="space-y-4 pt-4 border-t-2 border-dashed border-yellow-500">
+                    <h3 className="font-headline text-lg flex items-center gap-2 text-primary"><History /> Registro Histórico (Solo Admin)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormField
+                            control={form.control}
+                            name="historicalCreatedAt"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Fecha de Creación</FormLabel>
+                                    <FormControl>
+                                        <Input type="date" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="historicalClosedAt"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Fecha de Cierre</FormLabel>
+                                    <FormControl>
+                                        <Input type="date" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                     <FormField
+                        control={form.control}
+                        name="closingObservation"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Observación de Cierre</FormLabel>
+                            <FormControl>
+                            <Textarea
+                                placeholder="Añade una observación sobre la resolución del ticket histórico."
+                                {...field}
+                            />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                </div>
+             )}
+
+
               <Alert variant="default">
                 <span className="text-2xl absolute -top-1.5 left-2">📌</span>
                 <AlertTitle className="font-headline text-primary pl-6">SLA – Tiempos de atención de solicitudes</AlertTitle>
@@ -539,3 +603,4 @@ export default function CreateTicketPage() {
     </div>
   );
 }
+
