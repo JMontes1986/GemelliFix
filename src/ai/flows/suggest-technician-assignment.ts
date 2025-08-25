@@ -11,9 +11,8 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { collection, getDocs, query, where } from 'firebase-admin/firestore';
-import { getAdminApp } from '@/lib/firebaseAdmin';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getAdminApp } from '@/lib/firebaseAdmin';
 import type { User } from '@/lib/types';
 
 const SuggestTechnicianAssignmentInputSchema = z.object({
@@ -48,8 +47,8 @@ const techniciansTool = ai.defineTool(
         const adminApp = getAdminApp();
         const adminDb = getFirestore(adminApp);
 
-        const q = query(collection(adminDb, 'users'), where('role', '==', 'Servicios Generales'));
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await adminDb.collection('users').where('role', '==', 'Servicios Generales').get();
+        
         const technicians = querySnapshot.docs.map(doc => {
             const data = doc.data() as User;
             return {
@@ -107,3 +106,4 @@ const suggestTechnicianAssignmentFlow = ai.defineFlow(
   }
 );
     
+
