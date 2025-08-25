@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -118,7 +119,7 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
   return (
     <div
       className={cn(
-        'absolute w-full p-2 rounded-lg border text-xs shadow-sm transition-all z-10 text-left group'
+        'absolute w-full rounded-lg border text-xs shadow-sm transition-all z-10 text-left group flex flex-col'
       )}
       style={{
         top: `${top}px`,
@@ -132,7 +133,7 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
         color: textColor,
       }}
     >
-      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
         <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
           <Pencil className="h-3 w-3" />
         </button>
@@ -167,7 +168,7 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
             </AlertDialogContent>
         </AlertDialog>
       </div>
-      <button onClick={onClick} className="h-full w-full text-left">
+       <button onClick={onClick} className="h-full w-full text-left p-2">
         <p className="font-bold truncate pr-8">{event.title}</p>
         <p className="opacity-80 truncate">{event.description}</p>
       </button>
@@ -1158,5 +1159,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-
-    
