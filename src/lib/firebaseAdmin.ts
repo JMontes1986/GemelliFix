@@ -14,9 +14,10 @@ function createAdminApp(): App {
 
   try {
     const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+    // Inicializa la app por defecto, sin un nombre específico.
     return initializeApp({
       credential: cert({ projectId, clientEmail, privateKey: formattedPrivateKey }),
-    }, 'firebase-admin-app'); // Nombre único para la app
+    });
   } catch (error: any) {
     console.error("Firebase Admin SDK initialization error:", error.message);
     if (error.code === 'app/invalid-credential' || error.message?.includes('PEM') || error.message?.includes('parse')) {
@@ -27,9 +28,10 @@ function createAdminApp(): App {
 }
 
 export function getAdminApp(): App {
-  const adminApp = getApps().find(app => app.name === 'firebase-admin-app');
+  // Busca la app por defecto. Si no existe, la crea.
+  const adminApp = getApps().find(app => app.name === '[DEFAULT]');
   if (adminApp) {
     return adminApp;
   }
-  return createAdminApp();
+  return getApps().length > 0 ? getApp() : createAdminApp();
 }

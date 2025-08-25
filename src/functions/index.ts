@@ -7,15 +7,14 @@
  * such as creating or updating a user document, and performs actions like setting custom claims.
  */
 
-import { initializeApp } from 'firebase-admin/app';
+import { getAdminApp } from '@/lib/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import { getMessaging } from 'firebase-admin/messaging';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 
-// Initialize the Firebase Admin SDK.
-// En el entorno de Cloud Functions, esto funciona automáticamente sin pasar credenciales.
-initializeApp();
+// Inicializa la aplicación de administrador a través de la función centralizada.
+const adminApp = getAdminApp();
 
 /**
  * Sets custom claims for a user based on their role in Firestore.
@@ -33,7 +32,7 @@ const setRoleClaim = async (uid: string, role: string | undefined) => {
     };
 
     try {
-        await getAuth().setCustomUserClaims(uid, claims);
+        await getAuth(adminApp).setCustomUserClaims(uid, claims);
         console.log(`Successfully set custom claims for user ${uid}:`, claims);
     } catch (error) {
         console.error(`Error setting custom claims for user ${uid}:`, error);
@@ -96,7 +95,7 @@ export const sendTestNotification = onRequest(async (req, res) => {
 
     try {
         // Send a message to the devices subscribed to the provided topic.
-        const response = await getMessaging().send(message);
+        const response = await getMessaging(adminApp).send(message);
         console.log('Successfully sent message:', response);
         res.status(200).send({ success: true, message: `Successfully sent message: ${response}` });
     } catch (error) {

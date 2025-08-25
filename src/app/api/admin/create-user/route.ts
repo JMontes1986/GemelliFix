@@ -1,16 +1,22 @@
+
 // app/api/admin/create-user/route.ts
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs'; // Evita el runtime de Edge
+export const dynamic = 'force-dynamic'; // Evita el pre-renderizado en el build
 
 import { NextResponse } from 'next/server';
-import { getAdminApp } from '@/lib/firebaseAdmin'; 
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
 
 export async function POST(req: Request) {
   try {
+    // Importaciones perezosas para que no se evalúen durante el build:
+    const [{ getAdminApp }, { getAuth }, { getFirestore }] = await Promise.all([
+      import('@/lib/firebaseAdmin'),
+      import('firebase-admin/auth'),
+      import('firebase-admin/firestore'),
+    ]);
+
     const { name, email, password, role, avatar } = await req.json();
 
+    // Validar token del que llama
     const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
     if (!idToken) {
         return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
@@ -21,8 +27,10 @@ export async function POST(req: Request) {
     const db = getFirestore(adminApp);
 
     const decodedToken = await auth.verifyIdToken(idToken);
-    const callerClaims = (await auth.getUser(decodedToken.uid)).customClaims;
-    if (callerClaims?.role !== 'Administrador') {
+    
+    // Se verifica el rol usando el custom claim del token, que es más seguro.
+    const userClaims = (await auth.getUser(decodedToken.uid)).customClaims;
+    if (userClaims?.role !== 'Administrador') {
         return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
     }
 
@@ -32,7 +40,9 @@ export async function POST(req: Request) {
       displayName: name,
       photoURL: avatar || undefined,
     });
-    
+
+    // La Cloud Function `onUserCreated` se encargará de poner el custom claim del rol.
+    // Aquí solo guardamos el documento en Firestore.
     await db.collection('users').doc(userRec.uid).set({
       id: userRec.uid,
       uid: userRec.uid,
@@ -45,8 +55,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, uid: userRec.uid });
   } catch (err: any) {
-    console.error('create-user error:', err.message);
-    let message = 'An unknown error occurred on the server.';
+    console.error('create-user error:', err);
+    let message = 'An unknown error occurred.';
     
     if (err.message?.includes('Firebase Admin environment variables are not set')) {
         message = 'Server-side Firebase Admin credentials are not configured. Check your .env file.';
