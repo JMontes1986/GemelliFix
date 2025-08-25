@@ -11,6 +11,7 @@ import {
   CalendarPlus,
   Sparkles,
   MapPin,
+  Users,
 } from 'lucide-react';
 import {
   Bar,
@@ -177,6 +178,17 @@ export default function DashboardPage() {
     }, {} as Record<string, number>)
   ).map(([name, total]) => ({ name, total }));
   
+  const topRequestersData = Object.entries(
+    tickets.reduce((acc, ticket) => {
+        const requesterName = ticket.requester || "Desconocido";
+        acc[requesterName] = (acc[requesterName] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>)
+  ).map(([name, total]) => ({ name, total }))
+   .sort((a,b) => b.total - a.total)
+   .slice(0, 5);
+
+
   const calculateSlaByPriority = (priority: Ticket['priority']): number => {
     const priorityTickets = tickets.filter(t => t.priority === priority);
     const closedPriorityTickets = priorityTickets.filter(t => t.status === 'Cerrado' || t.status === 'Resuelto');
@@ -240,9 +252,6 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-4">
       <AiAnalysisDialog open={isAnalysisOpen} onOpenChange={setAnalysisOpen} analysis={analysisResult} isLoading={isLoadingAnalysis} />
-      <div className="flex justify-center mb-4">
-        <GemelliFixLogo className="w-48" />
-      </div>
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-headline font-bold tracking-tight">
           Dashboard de Líder
@@ -253,9 +262,9 @@ export default function DashboardPage() {
               Analizar con IA
             </Button>
           <Link href="/calendar">
-            <Button variant="secondary">
+            <Button>
               <CalendarPlus className="mr-2 h-4 w-4" />
-              Programar Turno
+              Programar
             </Button>
           </Link>
         </div>
@@ -304,7 +313,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Tickets por Zona</CardTitle>
@@ -344,8 +353,45 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
+            <CardTitle className="font-headline">Top Solicitantes</CardTitle>
+            <CardDescription>Usuarios que más solicitudes han creado.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-[200px] w-full" /> : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={topRequestersData} layout="vertical" margin={{ left: 20 }}>
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    width={100}
+                    />
+                  <Tooltip 
+                    cursor={{fill: 'hsl(var(--muted))'}}
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      borderColor: 'hsl(var(--border))',
+                      borderRadius: 'var(--radius)'
+                    }}
+                  />
+                  <Bar dataKey="total" radius={[0, 4, 4, 0]}>
+                    {topRequestersData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} /> // Offset colors
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
             <CardTitle className="font-headline">Cumplimiento de SLA por Prioridad</CardTitle>
-            <CardDescription>Rendimiento del equipo según la urgencia del ticket.</CardDescription>
+            <CardDescription>Rendimiento del equipo según la urgencia.</CardDescription>
           </CardHeader>
           <CardContent>
              {isLoading ? <Skeleton className="h-[200px] w-full" /> : (
