@@ -15,7 +15,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Ticket } from '@/lib/types';
 
@@ -82,14 +82,17 @@ const techniciansTool = ai.defineTool(
                 collection(db, 'scheduleEvents'),
                 where('technicianId', '==', tech.id),
                 where('start', '>=', new Date(startDate)),
-                where('end', '<=', new Date(endDate))
+                where('start', '<=', new Date(endDate))
             );
             const eventsSnapshot = await getDocs(eventsQuery);
             const events = eventsSnapshot.docs.map(doc => {
                 const data = doc.data();
+                 // Handle both Firebase Timestamp and regular Date objects
+                const start = data.start?.toDate ? data.start.toDate() : new Date(data.start);
+                const end = data.end?.toDate ? data.end.toDate() : new Date(data.end);
                 return {
-                    start: (data.start.toDate() as Date).toISOString(),
-                    end: (data.end.toDate() as Date).toISOString(),
+                    start: start.toISOString(),
+                    end: end.toISOString(),
                 };
             });
 
@@ -197,5 +200,3 @@ const suggestCalendarAssignmentFlow = ai.defineFlow(
     return finalSuggestion;
   }
 );
-
-    
