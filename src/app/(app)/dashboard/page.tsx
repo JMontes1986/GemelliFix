@@ -143,8 +143,8 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, [toast]);
 
-  const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto').length;
-  const overdueTickets = tickets.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Cerrado' && t.status !== 'Resuelto').length;
+  const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto' && t.status !== 'Cancelado').length;
+  const overdueTickets = tickets.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Cerrado' && t.status !== 'Resuelto' && t.status !== 'Cancelado').length;
   
   const closedTickets = tickets.filter(t => t.status === 'Cerrado' || t.status === 'Resuelto');
   
@@ -178,25 +178,19 @@ export default function DashboardPage() {
   ).map(([name, total]) => ({ name, total }));
   
   const calculateSlaByPriority = (priority: Ticket['priority']): number => {
-    // 1. Get all tickets of the specified priority.
     const priorityTickets = tickets.filter(t => t.priority === priority);
-    
-    // 2. From those, get only the ones that are closed.
     const closedPriorityTickets = priorityTickets.filter(t => t.status === 'Cerrado' || t.status === 'Resuelto');
-    
-    // 3. If no tickets of this priority have been closed yet, compliance is 100%.
+
     if (closedPriorityTickets.length === 0) {
         return 100;
     }
-    
-    // 4. Count how many of the closed tickets were resolved on time.
+
     const compliantTickets = closedPriorityTickets.filter(t => 
         t.resolvedAt && new Date(t.resolvedAt) <= new Date(t.dueDate)
     );
-    
-    // 5. Calculate and return the percentage.
+
     return Math.round((compliantTickets.length / closedPriorityTickets.length) * 100);
-};
+  };
 
   const slaByPriority = {
       Urgente: calculateSlaByPriority('Urgente'),
