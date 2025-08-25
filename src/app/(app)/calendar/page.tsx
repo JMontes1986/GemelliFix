@@ -95,7 +95,7 @@ const generateColorFromString = (id: string, name?: string): string => {
 };
 
 
-const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: ScheduleEvent, color: string, onClick: () => void, onEdit: () => void, onDelete: (mode: 'single' | 'future') => void }) => {
+const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: ScheduleEvent, color: string, onClick: () => void, onEdit: () => void, onDelete: () => void }) => {
   const eventStartDate = event.start;
   const eventEndDate = event.end;
   
@@ -114,7 +114,6 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
   const hsl = color.match(/\d+/g)?.map(Number);
   const textColor = (hsl && hsl[1] > 50 && hsl[2] > 50) ? 'black' : 'white';
 
-  const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
 
   return (
     <div
@@ -133,43 +132,18 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
         color: textColor,
       }}
     >
-        <div 
+       <div 
             className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20"
-            onClick={(e) => e.stopPropagation()}
         >
             <button onClick={onEdit} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
                 <Pencil className="h-3 w-3" />
             </button>
-            <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-                <AlertDialogTrigger asChild>
-                    <button 
-                        onClick={(e) => { 
-                            e.stopPropagation(); 
-                            if (!event.recurrenceId) {
-                                onDelete('single');
-                                return;
-                            }
-                            setIsDeleteOpen(true);
-                        }} 
-                        className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white')}
-                    >
-                        <Trash2 className="h-3 w-3" />
-                    </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Eliminar evento recurrente</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Este es un evento recurrente. ¿Cómo te gustaría eliminarlo?
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => onDelete('single')}>Eliminar este evento</AlertDialogAction>
-                        <AlertDialogAction onClick={() => onDelete('future')}>Eliminar este y futuros</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <button 
+                onClick={onDelete} 
+                className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white')}
+            >
+                <Trash2 className="h-3 w-3" />
+            </button>
         </div>
        <button onClick={onClick} className="h-full w-full text-left p-2">
             <p className="font-bold truncate pr-8">{event.title}</p>
@@ -354,6 +328,12 @@ async function createCalendarNotification(technicianName: string, event: Omit<Sc
     }
 }
 
+// Define state for deletion dialog
+type DeleteDialogState = {
+    isOpen: boolean;
+    eventToDelete: ScheduleEvent | null;
+}
+
 export default function CalendarPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
@@ -388,6 +368,11 @@ export default function CalendarPage() {
     const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
 
     const [isEditRecurrenceDialogOpen, setIsEditRecurrenceDialogOpen] = useState(false);
+    
+    const [deleteDialogState, setDeleteDialogState] = useState<DeleteDialogState>({
+        isOpen: false,
+        eventToDelete: null,
+    });
 
 
     useEffect(() => {
@@ -744,18 +729,30 @@ export default function CalendarPage() {
         setIsManualDialogOpen(true);
     };
 
-    const handleDeleteEvent = async (event: ScheduleEvent, mode: 'single' | 'future') => {
+    const handleDeleteClick = (event: ScheduleEvent) => {
+        if (event.recurrenceId) {
+            setDeleteDialogState({ isOpen: true, eventToDelete: event });
+        } else {
+            // For single events, delete directly
+            handleConfirmDelete('single');
+        }
+    };
+    
+    const handleConfirmDelete = async (mode: 'single' | 'future') => {
+        const eventToDelete = deleteDialogState.eventToDelete;
+        if (!eventToDelete) return;
+    
         setIsCreatingEvent(true);
         try {
-            if (mode === 'single' || !event.recurrenceId) {
-                await deleteDoc(doc(db, "scheduleEvents", event.id));
-                 toast({ title: 'Evento Eliminado', description: 'El evento ha sido eliminado del calendario.' });
-            } else {
+            if (mode === 'single' || !eventToDelete.recurrenceId) {
+                await deleteDoc(doc(db, "scheduleEvents", eventToDelete.id));
+                toast({ title: 'Evento Eliminado', description: 'El evento ha sido eliminado del calendario.' });
+            } else { // mode === 'future'
                 const batch = writeBatch(db);
                 const q = query(
                     collection(db, 'scheduleEvents'), 
-                    where('recurrenceId', '==', event.recurrenceId),
-                    where('start', '>=', event.start)
+                    where('recurrenceId', '==', eventToDelete.recurrenceId),
+                    where('start', '>=', eventToDelete.start)
                 );
                 const querySnapshot = await getDocs(q);
                 
@@ -771,6 +768,8 @@ export default function CalendarPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar el/los evento(s).' });
         } finally {
             setIsCreatingEvent(false);
+            // Close and reset dialog state
+            setDeleteDialogState({ isOpen: false, eventToDelete: null });
         }
     };
 
@@ -894,6 +893,21 @@ export default function CalendarPage() {
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction onClick={() => { if(editingEvent) openEditDialog(editingEvent) }}>Editar solo este evento</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+      <AlertDialog open={deleteDialogState.isOpen} onOpenChange={(open) => setDeleteDialogState({ isOpen: open, eventToDelete: open ? deleteDialogState.eventToDelete : null })}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Eliminar evento recurrente</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Este es un evento recurrente. ¿Cómo te gustaría eliminarlo?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleConfirmDelete('single')}>Eliminar este evento</AlertDialogAction>
+                    <AlertDialogAction onClick={() => handleConfirmDelete('future')}>Eliminar este y futuros</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -1147,7 +1161,7 @@ export default function CalendarPage() {
                                 color={generateColorFromString(tech.id, tech.name)} 
                                 onClick={() => handleEventClick(event)}
                                 onEdit={() => handleEditEvent(event)}
-                                onDelete={(mode) => handleDeleteEvent(event, mode)}
+                                onDelete={() => handleDeleteClick(event)}
                              />
                         ))}
                       </div>
@@ -1162,3 +1176,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
