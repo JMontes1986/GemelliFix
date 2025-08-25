@@ -46,7 +46,6 @@ import {
 } from 'lucide-react';
 import type { Ticket, User as CurrentUser, Attachment, Log, Category } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import AiSuggestion from './components/ai-suggestion';
 import AiStateSuggestion from './components/ai-state-suggestion';
 import Image from 'next/image';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
@@ -56,10 +55,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged } from 'firebase/auth';
 import { createLog } from '@/lib/utils';
 import Link from 'next/link';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger
+} from '@/components/ui/dialog';
 import PdfViewer from '@/components/ui/pdf-viewer';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
@@ -203,6 +211,9 @@ export default function TicketDetailPage() {
   const [comment, setComment] = useState("");
   const [logs, setLogs] = useState<Log[]>([]);
 
+  // State for manual assignment dialog
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -283,6 +294,7 @@ export default function TicketDetailPage() {
                 evidence: data.evidence || [],
             };
             setTicket(ticketData);
+            setSelectedPersonnelIds(ticketData.assignedToIds || []);
         } else {
             setError("No se pudo encontrar el ticket especificado.");
         }
@@ -503,17 +515,17 @@ export default function TicketDetailPage() {
     }
   };
   
-   const handleAssignPersonnel = async (personnel: CurrentUser[]) => {
+   const handleAssignPersonnel = async () => {
     if(!ticket || !currentUser) return;
     if (isSST) {
       toast({ variant: 'destructive', title: 'Acción no permitida', description: 'El rol SST no puede modificar tickets.'});
       return;
     }
 
+    const selectedPersonnel = technicians.filter(t => selectedPersonnelIds.includes(t.id));
     const oldValue = ticket.assignedTo || [];
-
-    const personnelIds = personnel.map(p => p.id);
-    const personnelNames = personnel.map(p => p.name);
+    const personnelIds = selectedPersonnel.map(p => p.id);
+    const personnelNames = selectedPersonnel.map(p => p.name);
     
     setIsUpdating(true);
     const docRef = doc(db, "tickets", ticket.id);
@@ -524,10 +536,14 @@ export default function TicketDetailPage() {
         status: newStatus,
     });
     setIsUpdating(false);
+    setIsAssignDialogOpen(false); // Close dialog on success
 
     await createLog(currentUser, 'update_assignment', { ticket, oldValue, newValue: personnelNames });
     
-    await createNotification(ticket, personnelIds);
+    if (personnelIds.length > 0) {
+        await createNotification(ticket, personnelIds);
+    }
+
     toast({
         title: "Personal Asignado",
         description: `El ticket ha sido actualizado y se ha notificado al personal.`,
@@ -790,12 +806,52 @@ export default function TicketDetailPage() {
           </CardContent>
           {canEdit && (
             <CardFooter>
-                 <AiSuggestion 
-                    ticket={ticket} 
-                    technicians={technicians}
-                    onAssign={handleAssignPersonnel}
-                    isAssigned={assignedPersonnelDetails.length > 0}
-                />
+                 <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="default" className="w-full">
+                            <Users className="mr-2 h-4 w-4" />
+                            {assignedPersonnelDetails.length > 0 ? "Cambiar Asignación" : "Asignar Personal"}
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Asignar Personal</DialogTitle>
+                            <DialogDescription>
+                                Selecciona el personal de Servicios Generales para este ticket.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div className="grid gap-2 max-h-60 overflow-y-auto pr-2">
+                                {technicians.map(tech => (
+                                    <div key={tech.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
+                                        <Checkbox 
+                                            id={`tech-assign-${tech.id}`}
+                                            checked={selectedPersonnelIds.includes(tech.id)}
+                                            onCheckedChange={(checked) => {
+                                                setSelectedPersonnelIds(prev => 
+                                                    checked 
+                                                        ? [...prev, tech.id]
+                                                        : prev.filter(id => id !== tech.id)
+                                                );
+                                            }}
+                                        />
+                                        <Label htmlFor={`tech-assign-${tech.id}`} className="flex items-center gap-2 font-normal w-full cursor-pointer">
+                                            <Avatar className="h-9 w-9">
+                                                <AvatarImage src={tech.avatar} />
+                                                <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            {tech.name}
+                                        </Label>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <Button className="w-full mt-4" onClick={handleAssignPersonnel} disabled={isUpdating}>
+                            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Aplicar Asignación ({selectedPersonnelIds.length})
+                        </Button>
+                    </DialogContent>
+                 </Dialog>
             </CardFooter>
           )}
         </Card>
