@@ -13,8 +13,9 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 
-// Inicializa la aplicación de administrador a través de la función centralizada.
+// Initialize the admin app through the centralized function.
 const adminApp = getAdminApp();
+const auth = getAuth(adminApp);
 
 /**
  * Sets custom claims for a user based on their role in Firestore.
@@ -32,7 +33,7 @@ const setRoleClaim = async (uid: string, role: string | undefined) => {
     };
 
     try {
-        await getAuth(adminApp).setCustomUserClaims(uid, claims);
+        await auth.setCustomUserClaims(uid, claims);
         console.log(`Successfully set custom claims for user ${uid}:`, claims);
     } catch (error) {
         console.error(`Error setting custom claims for user ${uid}:`, error);
