@@ -2,7 +2,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
-import type { User, Ticket } from './types';
+import type { User, Ticket, Log } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -10,13 +10,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export async function createLog(
   user: User,
-  action:
-    | 'login'
-    | 'update_status'
-    | 'update_priority'
-    | 'update_assignment'
-    | 'create_ticket'
-    | 'add_comment',
+  action: Log['action'],
   details: {
     ticket?: Ticket;
     oldValue?: any;
@@ -27,52 +21,33 @@ export async function createLog(
   if (!user) return;
 
   try {
-    let logDetails: any = {
-      description: `<strong>${user.name}</strong> realizó la acción: ${action}`,
-      comment: details.comment || null,
+    const logDetails: Log['details'] = {
+        // description is no longer pre-formatted here. It will be constructed on the client.
     };
-
-    if (action === 'login') {
-      logDetails.description = `<strong>${user.name}</strong> inició sesión.`;
-    }
-
-    if (action === 'create_ticket' && details.ticket) {
-      logDetails.description = `<strong>${user.name}</strong> creó el ticket.`;
-    }
-
-    if (action === 'add_comment' && details.comment) {
-      logDetails.description = `<strong>${user.name}</strong> añadió un comentario.`;
-    }
 
     if (details.ticket) {
       logDetails.ticketId = details.ticket.id;
       logDetails.ticketCode = details.ticket.code;
     }
+    if (details.comment) {
+        logDetails.comment = details.comment;
+    }
     if (details.oldValue !== undefined) {
       logDetails.oldValue = Array.isArray(details.oldValue)
         ? details.oldValue.join(', ')
-        : details.oldValue;
+        : String(details.oldValue);
     }
     if (details.newValue !== undefined) {
       logDetails.newValue = Array.isArray(details.newValue)
         ? details.newValue.join(', ')
-        : details.newValue;
+        : String(details.newValue);
+    }
+    
+    // For updates, capture the field being changed
+    if (action.startsWith('update_')) {
+        logDetails.field = action.replace('update_', '') as Log['details']['field'];
     }
 
-    if (action.startsWith('update')) {
-      const fieldMap: Record<string, string> = {
-        status: 'estado',
-        priority: 'prioridad',
-        assignment: 'asignación',
-      };
-      const field = action.split('_')[1];
-      const friendlyField = fieldMap[field] || field;
-
-      logDetails.field = field;
-      logDetails.description = `<strong>${user.name}</strong> actualizó la <strong>${friendlyField}</strong> de '${
-        logDetails.oldValue || 'ninguno'
-      }' a '<strong>${logDetails.newValue || 'ninguno'}</strong>'.`;
-    }
 
     await addDoc(collection(db, 'logs'), {
       userId: user.id,

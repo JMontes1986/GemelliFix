@@ -117,6 +117,29 @@ const LogIcon = ({ action }: { action: Log['action'] }) => {
     }
 };
 
+// New function to render log descriptions
+const renderLogDescription = (log: Log) => {
+    const userName = <strong className="font-semibold">{log.userName}</strong>;
+    const { action, details } = log;
+    
+    switch(action) {
+        case 'create_ticket':
+            return <>{userName} creó el ticket.</>;
+        case 'update_status':
+            return <>{userName} actualizó el estado de '{details.oldValue}' a <strong>'{details.newValue}'</strong>.</>;
+        case 'update_priority':
+            return <>{userName} actualizó la prioridad de '{details.oldValue}' a <strong>'{details.newValue}'</strong>.</>;
+        case 'update_assignment':
+            return <>{userName} cambió la asignación de '{details.oldValue || 'nadie'}' a <strong>'{details.newValue || 'nadie'}'</strong>.</>;
+        case 'add_comment':
+            return <>{userName} añadió un comentario.</>;
+        case 'login':
+             return <>{userName} inició sesión.</>;
+        default:
+            return <>Acción desconocida.</>;
+    }
+};
+
 async function createNotification(ticket: Ticket, assignedPersonnelIds: string[]) {
     try {
         const usersRef = collection(db, "users");
@@ -392,7 +415,7 @@ export default function TicketDetailPage() {
       }
       
       // If there was a comment during a status change, log it separately.
-      if ( (commentText || comment).trim() && field !== 'status') {
+      if ( (commentText || comment).trim() && field === 'status') {
          await createLog(currentUser, 'add_comment', { ticket, comment: commentText || comment });
       }
 
@@ -848,7 +871,7 @@ export default function TicketDetailPage() {
                                    <LogIcon action={log.action} />
                                 </div>
                                 <div className="flex-1">
-                                    <p dangerouslySetInnerHTML={{ __html: log.details.description }} />
+                                    <p>{renderLogDescription(log)}</p>
                                     {log.details.comment && (
                                         <blockquote className="mt-1 pl-3 border-l-2 border-border italic text-muted-foreground">
                                             "{log.details.comment}"
