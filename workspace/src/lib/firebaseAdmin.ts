@@ -2,28 +2,36 @@
 import { cert, getApps, initializeApp, getApp, App } from 'firebase-admin/app';
 
 function createAdminApp(): App {
-  // Asegúrate de que las variables de entorno están definidas.
   const projectId = process.env.FB_PROJECT_ID;
   const clientEmail = process.env.FB_CLIENT_EMAIL;
-  const rawKey = process.env.FB_PRIVATE_KEY;
+  const privateKey = process.env.FB_PRIVATE_KEY;
 
-  if (!projectId || !clientEmail || !rawKey) {
-    throw new Error("Firebase Admin environment variables are not set.");
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      'Firebase Admin environment variables are not set. Ensure FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY are correctly configured.'
+    );
   }
-  
-  // Reemplaza los caracteres de nueva línea escapados con saltos de línea reales.
-  const privateKey = rawKey.replace(/\\n/g, '\n');
 
-  return initializeApp({
-    credential: cert({ projectId, clientEmail, privateKey }),
-  });
+  try {
+    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+    // Inicializa la app por defecto, sin un nombre específico.
+    return initializeApp({
+      credential: cert({ projectId, clientEmail, privateKey: formattedPrivateKey }),
+    });
+  } catch (error: any) {
+    console.error("Firebase Admin SDK initialization error:", error.message);
+    if (error.code === 'app/invalid-credential' || error.message?.includes('PEM') || error.message?.includes('parse')) {
+      throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted in your environment variables.');
+    }
+    throw error;
+  }
 }
 
-/**
- * Obtiene la instancia de la aplicación de administrador de Firebase,
- * inicializándola solo si no existe ya una.
- * @returns {App} La instancia de la aplicación de administrador.
- */
 export function getAdminApp(): App {
+  // Busca la app por defecto. Si no existe, la crea.
+  const adminApp = getApps().find(app => app.name === '[DEFAULT]');
+  if (adminApp) {
+    return adminApp;
+  }
   return getApps().length > 0 ? getApp() : createAdminApp();
 }
