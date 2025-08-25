@@ -61,7 +61,7 @@ import PdfViewer from '@/components/ui/pdf-viewer';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
 
 
@@ -314,7 +314,7 @@ export default function TicketDetailPage() {
 
         for (const file of newFiles) {
             if (file.size > MAX_FILE_SIZE) {
-                toast({ variant: 'destructive', title: 'Archivo demasiado grande', description: `El archivo ${file.name} supera los 5MB.` });
+                toast({ variant: 'destructive', title: 'Archivo demasiado grande', description: `El archivo ${file.name} supera los 10MB.` });
                 continue;
             }
             if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
@@ -801,7 +801,7 @@ export default function TicketDetailPage() {
                                         </label>
                                         <p className="pl-1">o arrastra y suelta</p>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">Imágenes o PDF, hasta 5MB</p>
+                                    <p className="text-xs text-muted-foreground">Imágenes o PDF, hasta 10MB</p>
                                 </div>
                             </div>
                             {filesToUpload.length > 0 && (
