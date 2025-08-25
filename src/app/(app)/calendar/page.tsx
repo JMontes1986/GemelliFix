@@ -500,15 +500,18 @@ export default function CalendarPage() {
                     const tech = allTechnicians.find(t => t.id === technicianId);
                     if (!tech) return;
     
-                    const baseEvent: Omit<ScheduleEvent, 'id'> = {
+                    const baseEvent: Omit<ScheduleEvent, 'id' | 'recurrenceId'> & { recurrenceId?: string } = {
                         title: newEventTitle,
                         description: newEventDescription,
                         start: start,
                         end: end,
                         type: 'task',
                         technicianId: technicianId,
-                        ...(recurrenceId && { recurrenceId }),
                     };
+                    
+                    if (isRecurring && recurrenceId) {
+                      baseEvent.recurrenceId = recurrenceId;
+                    }
                     
                     const eventRef = doc(collection(db, 'scheduleEvents'));
                     batch.set(eventRef, baseEvent);
