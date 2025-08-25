@@ -493,20 +493,21 @@ export default function CalendarPage() {
                         technicianId: technicianId,
                     };
                     
-                    const newEvent: Omit<ScheduleEvent, 'id'> = isRecurring 
-                        ? { ...baseEvent, recurrenceId: `rec-${Date.now()}` }
-                        : baseEvent;
+                    const eventData: any = { ...baseEvent };
+                    if (isRecurring) {
+                        eventData.recurrenceId = `rec-${Date.now()}`;
+                    }
 
                     const eventRef = doc(collection(db, 'scheduleEvents'));
-                    batch.set(eventRef, newEvent);
+                    batch.set(eventRef, eventData);
                     
-                    createCalendarNotification(tech.name, newEvent);
+                    createCalendarNotification(tech.name, eventData);
                     
                     createCalendarEvent({
-                        summary: newEvent.title,
-                        description: newEvent.description || 'Sin descripción.',
-                        start: { dateTime: newEvent.start.toISOString(), timeZone: 'America/Bogota' },
-                        end: { dateTime: newEvent.end.toISOString(), timeZone: 'America/Bogota' },
+                        summary: eventData.title,
+                        description: eventData.description || 'Sin descripción.',
+                        start: { dateTime: eventData.start.toISOString(), timeZone: 'America/Bogota' },
+                        end: { dateTime: eventData.end.toISOString(), timeZone: 'America/Bogota' },
                     });
 
                     eventCount++;
@@ -1076,6 +1077,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-
-
-
