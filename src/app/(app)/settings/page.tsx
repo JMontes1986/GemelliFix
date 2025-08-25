@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -344,7 +345,7 @@ export default function SettingsPage() {
                 newAvatarUrl = await getDownloadURL(uploadResult.ref);
             }
             
-            const idToken = await auth.currentUser?.getIdToken();
+            const idToken = await auth.currentUser?.getIdToken(true); // Force token refresh
 
             const res = await fetch('/api/admin/create-user', {
                 method: 'POST',
