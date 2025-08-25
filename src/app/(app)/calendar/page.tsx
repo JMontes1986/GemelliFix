@@ -75,23 +75,18 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const hours = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`); // 8am to 8pm
 
-const generateColorFromString = (str: string, name?: string): string => {
-    if (name === 'Alfredo') {
-      return '#F7EF81';
+const generateColorFromString = (id: string, name?: string): string => {
+    if (name) {
+      if (name === 'Alfredo') return '#F7EF81';
+      if (name === 'Guillermo Corrales') return '#CFE795';
+      if (name === 'Robinson') return '#0075F2';
+      if (name === 'Gloria') return '#FFEAEE';
     }
-    if (name === 'Guillermo Corrales') {
-      return '#CFE795';
-    }
-    if (name === 'Robinson') {
-      return '#0075F2';
-    }
-    if (name === 'Gloria') {
-      return '#FFEAEE';
-    }
+    
     let hash = 0;
-    if (!str) return `hsl(0, 60%, 70%)`;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 7) - hash);
+    if (!id) return `hsl(0, 60%, 70%)`;
+    for (let i = 0; i < id.length; i++) {
+        hash = id.charCodeAt(i) + ((hash << 7) - hash);
         hash = hash & hash;
     }
     const h = (hash ^ (hash >> 10)) % 360;
@@ -676,7 +671,7 @@ export default function CalendarPage() {
                             }
                         } else if (recurrenceFrequency === 'monthly') {
                             if (currentStartDate.getDate() === initialStartDateTime.getDate()) {
-                            createEventInstance(new- Date(currentStartDate), new Date(currentEndDate));
+                            createEventInstance(new Date(currentStartDate), new Date(currentEndDate));
                             }
                         }
 
