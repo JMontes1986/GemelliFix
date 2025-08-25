@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -81,6 +80,27 @@ export default function CreateTicketPage() {
 
   const isAdmin = currentUser?.email === 'sistemas@colgemelli.edu.co';
   
+  const form = useForm<TicketFormValues>({
+    resolver: zodResolver(ticketSchema),
+    defaultValues: {
+      title: '',
+      description: '',
+      zoneId: '',
+      siteId: '',
+      priority: 'Media',
+      category: '',
+      attachments: [],
+      historicalCreatedAt: '',
+      historicalClosedAt: '',
+      closingObservation: '',
+    },
+  });
+  
+  const attachedFiles = form.watch('attachments') || [];
+  const selectedZoneId = form.watch('zoneId');
+  const ticketTitle = form.watch('title');
+  const ticketDescription = form.watch('description');
+
   React.useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(user => {
       if (user) {
@@ -114,26 +134,37 @@ export default function CreateTicketPage() {
     };
   }, [router]);
 
-  const form = useForm<TicketFormValues>({
-    resolver: zodResolver(ticketSchema),
-    defaultValues: {
-      title: '',
-      description: '',
-      zoneId: '',
-      siteId: '',
-      priority: 'Media',
-      category: '',
-      attachments: [],
-      historicalCreatedAt: '',
-      historicalClosedAt: '',
-      closingObservation: '',
-    },
-  });
+  const handleGenerateTitle = React.useCallback(async () => {
+    const description = form.getValues('description');
+    if (!description || description.length < 20) { // Min length to avoid too many calls
+        return;
+    }
+    setIsTitleLoading(true);
+    try {
+        const result = await suggestTicketTitle({ description });
+        form.setValue('title', result.title);
+    } catch (error) {
+        console.error('Error generating AI title:', error);
+        // Do not show toast here to avoid bothering the user on auto-triggers
+    } finally {
+        setIsTitleLoading(false);
+    }
+  }, [form]);
 
-  const attachedFiles = form.watch('attachments') || [];
-  const selectedZoneId = form.watch('zoneId');
-  const ticketTitle = form.watch('title');
-  const ticketDescription = form.watch('description');
+
+  React.useEffect(() => {
+      const description = form.watch('description');
+      // Debounce logic
+      const handler = setTimeout(() => {
+          if (description) {
+            handleGenerateTitle();
+          }
+      }, 1000); // 1 second delay
+
+      return () => {
+          clearTimeout(handler);
+      };
+  }, [form.watch('description'), handleGenerateTitle]);
   
   const handleAiSuggestions = async () => {
     if (!ticketTitle || !ticketDescription) {
@@ -168,34 +199,6 @@ export default function CreateTicketPage() {
     }
   };
 
-  const handleGenerateTitle = async () => {
-    if (!ticketDescription) {
-        toast({
-            variant: 'destructive',
-            title: 'Descripción requerida',
-            description: 'Por favor, escribe una descripción del problema antes de generar un título.',
-        });
-        return;
-    }
-    setIsTitleLoading(true);
-    try {
-        const result = await suggestTicketTitle({ description: ticketDescription });
-        form.setValue('title', result.title);
-        toast({
-            title: 'Título Sugerido por IA',
-            description: 'El título ha sido generado a partir de la descripción.',
-        });
-    } catch (error) {
-        console.error('Error generating AI title:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Error de IA',
-            description: 'No se pudo generar el título.',
-        });
-    } finally {
-        setIsTitleLoading(false);
-    }
-  };
 
   const onSubmit = async (data: TicketFormValues) => {
     if (!currentUser) {
@@ -361,7 +364,7 @@ export default function CreateTicketPage() {
                       />
                     </FormControl>
                     <FormDescription>
-                      Describe el problema para que la IA pueda generar un título por ti.
+                      Una vez que termines de escribir, la IA generará un título estandarizado para ti.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -373,15 +376,12 @@ export default function CreateTicketPage() {
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Título de la Solicitud</FormLabel>
-                     <div className="flex items-center gap-2">
+                    <FormLabel>Título de la Solicitud (Generado por IA)</FormLabel>
+                     <div className="relative">
                         <FormControl>
-                          <Input placeholder="Ej: Fuga de agua en baño del segundo piso" {...field} />
+                          <Input placeholder="El título aparecerá aquí..." {...field} readOnly className="bg-muted/50" />
                         </FormControl>
-                         <Button type="button" variant="outline" size="sm" onClick={handleGenerateTitle} disabled={isTitleLoading}>
-                            {isTitleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                             <span className="hidden sm:inline ml-2">Generar con IA</span>
-                        </Button>
+                        {isTitleLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />}
                       </div>
                     <FormMessage />
                   </FormItem>
