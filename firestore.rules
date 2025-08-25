@@ -2,93 +2,81 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check user role
-    function getUserRole(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.role;
-    }
-    
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
+  
+    // Helper function to check user roles
+    function isSignedIn() {
       return request.auth != null;
     }
-
-    // Helper function to check if the user is an admin
-    function isAdmin() {
-      return isAuthenticated() && getUserRole(request.auth.uid) == 'Administrador';
+    
+    function getUserRole() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
-    // Helper function to check if the user is a technician
-    function isTechnician() {
-        return isAuthenticated() && getUserRole(request.auth.uid) == 'Servicios Generales';
+    function isInRole(roles) {
+      return isSignedIn() && getUserRole() in roles;
     }
 
-    // Helper function to check if the user is an auditor
-    function isSST() {
-        return isAuthenticated() && getUserRole(request.auth.uid) == 'SST';
-    }
-
-    // Users can read their own data. Admins can read/write any user data.
-    // Admins and Technicians can list other technicians.
+    // Rules for Users
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin() || isSST());
-      allow list: if isAuthenticated() && (isAdmin() || isTechnician());
-      allow create: if isAdmin();
-      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow read: if isSignedIn() && (request.auth.uid == userId || isInRole(['Administrador', 'Servicios Generales']));
+      allow list: if isSignedIn() && isInRole(['Administrador', 'Servicios Generales']);
+      allow create: if isSignedIn(); // Allows new user registration
+      allow update: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Tickets can be created by any authenticated user.
-    // They can be read by their creator, the admin, SST, or assigned personnel.
-    // They can only be updated/deleted by Admin or assigned personnel.
+    // Rules for Tickets
     match /tickets/{ticketId} {
-      allow create: if isAuthenticated();
-      allow read: if isAuthenticated() && 
-                    (resource.data.requesterId == request.auth.uid ||
-                     isAdmin() || 
-                     isSST() || 
-                     (isTechnician() && request.auth.uid in resource.data.assignedToIds));
-      allow update: if isAuthenticated() && (isAdmin() || (isTechnician() && request.auth.uid in resource.data.assignedToIds));
-      allow delete: if isAdmin();
-    }
-
-    // Only Admins can manage master data like zones, sites, and categories.
-    // Any authenticated user can read them.
-    match /zones/{zoneId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    match /sites/{siteId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    match /categories/{categoryId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      // Create: Any authenticated user can create a ticket.
+      allow create: if isSignedIn();
+      
+      // Read: 
+      // - Admins and SST can read all tickets.
+      // - Technicians can read tickets assigned to them.
+      // - Requesters can read their own tickets.
+      allow read: if isSignedIn() && 
+                    (isInRole(['Administrador', 'SST']) || 
+                     (resource.data.assignedToIds != null && request.auth.uid in resource.data.assignedToIds) ||
+                     request.auth.uid == resource.data.requesterId);
+      
+      // Update:
+      // - Admins can update any ticket.
+      // - Technicians can update tickets assigned to them.
+      // - Requesters can only edit if the status is 'Abierto' or 'Asignado'.
+      allow update: if isSignedIn() &&
+                      (isInRole(['Administrador']) || 
+                       (isInRole(['Servicios Generales']) && request.auth.uid in resource.data.assignedToIds) ||
+                       (request.auth.uid == resource.data.requesterId && resource.data.status in ['Abierto', 'Asignado']));
     }
     
-    // Schedule events can be created and read by Admins and Technicians.
+    // Rules for Data Masters (Zones, Sites, Categories) - Readonly for most
+    match /{collectionName}/{docId} where collectionName in ['zones', 'sites', 'categories'] {
+      allow read: if isSignedIn();
+      allow write: if isInRole(['Administrador']); // Only admins can create/update/delete
+    }
+
+    // Rules for Calendar Events
     match /scheduleEvents/{eventId} {
-      allow read: if isAuthenticated() && (isAdmin() || isTechnician());
-      allow write: if isAuthenticated() && (isAdmin() || isTechnician());
+       allow read: if isSignedIn() && (isInRole(['Administrador', 'SST']) || request.auth.uid == resource.data.technicianId);
+       allow list: if isSignedIn() && isInRole(['Administrador', 'Servicios Generales']);
+       allow create: if isSignedIn() && (isInRole(['Administrador', 'Servicios Generales']));
+       allow update, delete: if isSignedIn() && (isInRole(['Administrador']) || request.auth.uid == resource.data.technicianId);
     }
-
-    // Users can read their own notifications.
+    
+    // Rules for Notifications - Users can only see their own
     match /notifications/{notificationId} {
-      allow read, update: if isAuthenticated() && request.auth.uid == resource.data.userId;
-      allow create: if isAuthenticated(); // Server-side logic creates notifications
+      allow read, update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow create: if isSignedIn(); // System can create notifications
     }
     
-    // Logs are created by the server and can only be read by Admins or SST.
+    // Rules for Logs - Readonly for Admins/SST
     match /logs/{logId} {
-        allow read: if isAdmin() || isSST();
-        allow write: if isAuthenticated(); // Log creation is handled via secure function/server logic
+      allow read: if isInRole(['Administrador', 'SST']);
+      allow write: if isSignedIn(); // System/Functions can write logs
     }
     
-    // Diagnosis logs are only for testing purposes. Any authenticated user can write to it.
+    // Rules for diagnosis logs - for testing
     match /diagnosis_logs/{logId} {
-        allow write: if isAuthenticated();
+        allow write: if isSignedIn();
     }
   }
 }
