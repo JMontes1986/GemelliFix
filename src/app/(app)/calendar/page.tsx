@@ -133,19 +133,14 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete, isSelected }: { ev
         color: textColor,
       }}
     >
-        <div 
-            className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20"
-        >
-            <button onClick={onEdit} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
-                <Pencil className="h-3 w-3" />
-            </button>
-            <button 
-                onClick={onDelete} 
-                className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white')}
-            >
-                <Trash2 className="h-3 w-3" />
-            </button>
-        </div>
+       <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <button onClick={onEdit} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
+              <Pencil className="h-3 w-3" />
+          </button>
+          <button onClick={onDelete} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white')}>
+              <Trash2 className="h-3 w-3" />
+          </button>
+      </div>
        <button onClick={onClick} className="h-full w-full text-left p-2">
             <p className="font-bold truncate pr-8">{event.title}</p>
             <p className="opacity-80 truncate">{event.description}</p>
@@ -934,7 +929,7 @@ export default function CalendarPage() {
                 <DialogHeader>
                     <DialogTitle>{editingEvent ? "Editar Evento" : "Programar Evento"}</DialogTitle>
                     <DialogDescription>
-                         {editingEvent ? "Modifica los detalles del evento." : "Crea un nuevo turno, tarea o asigna un ticket."}
+                         {editingEvent ? "Modifica los detalles del evento." : "Crea una nueva tarea."}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4 max-h-[90vh] overflow-y-auto pr-6">
@@ -956,7 +951,7 @@ export default function CalendarPage() {
                         </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div className="space-y-2">
                           <Label htmlFor="technician">Personal</Label>
                           <Select onValueChange={setNewEventTechnicianId} value={newEventTechnicianId}>
@@ -965,19 +960,6 @@ export default function CalendarPage() {
                               </SelectTrigger>
                               <SelectContent>
                                   {techniciansToDisplay.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                              </SelectContent>
-                          </Select>
-                      </div>
-                       <div className="space-y-2">
-                          <Label htmlFor="type">Tipo</Label>
-                          <Select onValueChange={(v) => setNewEventType(v as ScheduleEvent['type'])} value={newEventType}>
-                              <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar tipo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                  <SelectItem value="shift">Turno</SelectItem>
-                                  <SelectItem value="task">Tarea</SelectItem>
-                                  <SelectItem value="ticket">Ticket</SelectItem>
                               </SelectContent>
                           </Select>
                       </div>
@@ -1183,4 +1165,3 @@ export default function CalendarPage() {
   );
 }
 
-    
