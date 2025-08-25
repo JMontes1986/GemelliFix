@@ -295,6 +295,7 @@ export default function TicketsPage() {
     if (!currentUser) {
         return; // Don't fetch technicians if there's no user
     }
+    // Only admins need the list of technicians on this page
     if (currentUser.role === 'Administrador') {
         const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
         const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
