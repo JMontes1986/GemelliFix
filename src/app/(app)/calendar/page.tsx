@@ -71,6 +71,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { addDays, addMonths, addWeeks, format, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { categories as predefinedTaskTitles } from '@/lib/data';
 
 
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -333,7 +334,6 @@ export default function CalendarPage() {
     const [newEventTitle, setNewEventTitle] = useState('');
     const [newEventDescription, setNewEventDescription] = useState('');
     const [newEventTechnicianId, setNewEventTechnicianId] = useState('');
-    const [newEventType, setNewEventType] = useState<ScheduleEvent['type']>('task');
     const [newEventDate, setNewEventDate] = useState('');
     const [newEventStartTime, setNewEventStartTime] = useState('');
     const [newEventEndTime, setNewEventEndTime] = useState('');
@@ -422,124 +422,11 @@ export default function CalendarPage() {
         };
     }, [toast, currentUser]);
 
-    const handleDrop = async (e: React.DragEvent<HTMLDivElement>, technicianId: string, day: Date, hour: number) => {
-        e.preventDefault();
-        const ticketId = e.dataTransfer.getData("ticketId");
-        const ticketTitle = e.dataTransfer.getData("ticketTitle");
-        const ticketDescription = e.dataTransfer.getData("ticketDescription");
-        const ticketCategory = e.dataTransfer.getData("ticketCategory");
-        const ticketPriority = e.dataTransfer.getData("ticketPriority") as Ticket['priority'];
-        const ticketCreatedAt = e.dataTransfer.getData("ticketCreatedAt");
-        
-        if (!ticketId) return;
-
-        const targetDate = new Date(day);
-        targetDate.setHours(hour, 0, 0, 0); 
-        
-        setIsAiDialogOpen(true);
-        setIsLoadingAi(true);
-        setAiSuggestion(null);
-
-        const input: SuggestCalendarAssignmentInput = {
-            ticket: { 
-                id: ticketId, 
-                title: ticketTitle, 
-                description: ticketDescription, 
-                category: ticketCategory,
-                priority: ticketPriority,
-                createdAt: ticketCreatedAt
-            },
-            targetDate: targetDate.toISOString(),
-            targetTechnicianId: technicianId,
-        };
-
-        try {
-            const result = await suggestCalendarAssignment(input);
-            setAiSuggestion(result);
-        } catch (error) {
-            console.error("Error getting AI suggestion:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Error de IA',
-                description: 'No se pudo obtener la sugerencia del asistente de IA.',
-            });
-            setIsAiDialogOpen(false);
-        } finally {
-            setIsLoadingAi(false);
-        }
-    };
-
-    const handleConfirmAssignment = async (suggestion: SuggestCalendarAssignmentOutput) => {
-        const { ticket, technician, suggestedTime } = suggestion;
-        
-        const newEventStart = new Date(suggestedTime);
-        const newEventEnd = new Date(newEventStart.getTime() + 2 * 60 * 60 * 1000); // Assume 2 hour duration
-
-        const newEvent: Omit<ScheduleEvent, 'id'> = {
-            title: `Ticket: ${ticket.title}`,
-            description: ticket.description,
-            start: newEventStart,
-            end: newEventEnd,
-            type: 'ticket',
-            technicianId: technician.id,
-            ticketId: ticket.id
-        };
-        
-        try {
-            await addDoc(collection(db, "scheduleEvents"), {
-                ...newEvent,
-                start: newEvent.start,
-                end: newEvent.end
-            });
-            
-            const ticketRef = doc(db, "tickets", ticket.id);
-            await updateDoc(ticketRef, {
-                status: 'Asignado',
-                assignedTo: [technician.name],
-                assignedToIds: [technician.id]
-            });
-
-            if (currentUser) {
-              await createLog(currentUser, 'update_assignment', { ticket: { ...ticket, assignedTo: [technician.name] } as Ticket, oldValue: 'Sin Asignar', newValue: technician.name });
-            }
-
-            const tech = techniciansToDisplay.find(t => t.id === technician.id);
-            if (tech) {
-              await createCalendarNotification(tech.name, newEvent);
-            }
-
-            toast({
-                title: '¡Evento Programado!',
-                description: `Se ha asignado el ticket a ${technician.name} y se le ha notificado.`
-            });
-            
-            // Sync with Google Calendar
-            await createCalendarEvent({
-                summary: newEvent.title,
-                description: newEvent.description || 'Sin descripción.',
-                start: { dateTime: newEvent.start.toISOString(), timeZone: 'America/Bogota' },
-                end: { dateTime: newEvent.end.toISOString(), timeZone: 'America/Bogota' },
-            });
-
-            toast({
-                title: 'Sincronizado con Google Calendar',
-                description: 'El evento también ha sido creado en el calendario de Google.'
-            });
-
-        } catch (error) {
-            console.error("Error saving event:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el evento. Revisa la conexión con Google Calendar.' });
-        } finally {
-            setIsAiDialogOpen(false);
-        }
-    };
-
     const resetForm = () => {
         setEditingEvent(null);
         setNewEventTitle('');
         setNewEventDescription('');
         setNewEventTechnicianId('');
-        setNewEventType('task');
         setNewEventDate('');
         setNewEventStartTime('');
         setNewEventEndTime('');
@@ -572,7 +459,7 @@ export default function CalendarPage() {
                     title: newEventTitle,
                     description: newEventDescription,
                     technicianId: newEventTechnicianId,
-                    type: newEventType,
+                    type: 'task',
                     start,
                     end,
                 });
@@ -591,7 +478,7 @@ export default function CalendarPage() {
                         description: newEventDescription,
                         start: start,
                         end: end,
-                        type: newEventType,
+                        type: 'task',
                         technicianId: newEventTechnicianId,
                         recurrenceId,
                     };
@@ -685,7 +572,6 @@ export default function CalendarPage() {
         setNewEventTitle(event.title);
         setNewEventDescription(event.description || '');
         setNewEventTechnicianId(event.technicianId || '');
-        setNewEventType(event.type);
         setNewEventDate(event.start.toISOString().split('T')[0]);
         setNewEventStartTime(event.start.toTimeString().substring(0,5));
         setNewEventEndTime(event.end.toTimeString().substring(0,5));
@@ -839,13 +725,6 @@ export default function CalendarPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-80px)]">
-      <AiAssignmentDialog 
-        isOpen={isAiDialogOpen}
-        onOpenChange={setIsAiDialogOpen}
-        isLoading={isLoadingAi}
-        suggestion={aiSuggestion}
-        onConfirm={handleConfirmAssignment}
-      />
       <EventDetailsDialog 
         isOpen={!!selectedEvent}
         onOpenChange={(open) => !open && setSelectedEvent(null)}
@@ -935,7 +814,14 @@ export default function CalendarPage() {
                 <div className="space-y-4 py-4 max-h-[90vh] overflow-y-auto pr-6">
                     <div className="space-y-2">
                         <Label htmlFor="title">Título</Label>
-                        <Input id="title" placeholder="Ej: Mantenimiento Aires" value={newEventTitle} onChange={(e) => setNewEventTitle(e.target.value)} />
+                        <Select onValueChange={setNewEventTitle} value={newEventTitle}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar tarea" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {predefinedTaskTitles.map(task => <SelectItem key={task.id} value={task.name}>{task.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="description">Descripción</Label>
@@ -1131,14 +1017,6 @@ export default function CalendarPage() {
                       <div
                         key={tech.id}
                         className={cn("relative h-full", techIndex < techniciansToDisplay.length - 1 && 'border-r')}
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const y = e.clientY - rect.top;
-                            const hourSlot = Math.floor(y / 64);
-                            const hour = hourSlot + 8;
-                            handleDrop(e, tech.id, date, hour);
-                        }}
                       >
                         {/* Events for this technician on this day */}
                         {eventsByTechnicianAndDay(tech.id, date).map(event => (
