@@ -82,6 +82,12 @@ import { es } from 'date-fns/locale';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { categories as predefinedTaskTitles } from '@/lib/data';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+  } from "@/components/ui/accordion"
 
 
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -734,6 +740,11 @@ export default function CalendarPage() {
         }
         return format(currentDate, 'cccc, d MMMM, yyyy', { locale: es });
     };
+    
+    const groupedVisibleEvents = visibleEvents.reduce((acc, event) => {
+        (acc[event.title] = acc[event.title] || []).push(event);
+        return acc;
+      }, {} as Record<string, ScheduleEvent[]>);
 
   if (isLoadingData || !currentUser) {
     return (
@@ -979,23 +990,34 @@ export default function CalendarPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0 flex-1 overflow-y-auto">
-                    <ScrollArea className="h-full p-2">
-                        {visibleEvents.length > 0 ? (
-                            visibleEvents.map((event) => (
-                               <button 
-                                 key={event.id} 
-                                 onClick={() => handleAgendaItemClick(event)}
-                                 className={cn(
-                                    "w-full text-left p-2 rounded-md hover:bg-background/80 transition-colors",
-                                    selectedEvent?.id === event.id && "bg-background shadow-sm"
-                                 )}
-                                >
-                                    <p className="font-semibold text-sm truncate">{event.title}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {format(event.start, 'd MMM, h:mm a', { locale: es })}
-                                    </p>
-                               </button>
-                            ))
+                     <ScrollArea className="h-full p-1">
+                        {Object.keys(groupedVisibleEvents).length > 0 ? (
+                           <Accordion type="single" collapsible className="w-full">
+                             {Object.entries(groupedVisibleEvents).map(([title, events]) => (
+                                 <AccordionItem value={title} key={title}>
+                                     <AccordionTrigger className="text-sm font-semibold px-2 py-2 hover:no-underline hover:bg-background/80 rounded-md">
+                                        <span className="truncate">{title}</span>
+                                        <Badge variant="secondary" className="ml-2">{events.length}</Badge>
+                                     </AccordionTrigger>
+                                     <AccordionContent className="pl-4 pr-1 space-y-1">
+                                         {events.map(event => (
+                                             <button 
+                                                 key={event.id} 
+                                                 onClick={() => handleAgendaItemClick(event)}
+                                                 className={cn(
+                                                     "w-full text-left p-2 rounded-md hover:bg-background transition-colors text-xs",
+                                                     selectedEvent?.id === event.id && "bg-primary/10 text-primary font-medium"
+                                                 )}
+                                             >
+                                                 <p className="text-muted-foreground">
+                                                     {format(event.start, 'h:mm a', { locale: es })} - {techniciansToDisplay.find(t => t.id === event.technicianId)?.name.split(' ')[0] || 'N/A'}
+                                                 </p>
+                                             </button>
+                                         ))}
+                                     </AccordionContent>
+                                 </AccordionItem>
+                             ))}
+                            </Accordion>
                         ) : (
                             <p className="text-sm text-muted-foreground p-4 text-center">¡No hay eventos programados!</p>
                         )}
@@ -1084,5 +1106,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-
-    
