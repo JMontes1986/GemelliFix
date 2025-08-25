@@ -133,45 +133,48 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
         color: textColor,
       }}
     >
-      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-        <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
-          <Pencil className="h-3 w-3" />
-        </button>
-         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-            <AlertDialogTrigger asChild>
-                <button 
-                    onClick={(e) => { 
-                        e.stopPropagation(); 
-                        if (!event.recurrenceId) {
-                            onDelete('single'); 
-                            return;
-                        }
-                        setIsDeleteOpen(true);
-                    }} 
-                    className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white')}
-                >
-                    <Trash2 className="h-3 w-3" />
-                </button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Eliminar evento recurrente</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Este es un evento recurrente. ¿Cómo te gustaría eliminarlo?
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={(e) => {e.stopPropagation(); onDelete('single');}}>Eliminar este evento</AlertDialogAction>
-                    <AlertDialogAction onClick={(e) => {e.stopPropagation(); onDelete('future');}}>Eliminar este y futuros</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-      </div>
+        <div 
+            className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+            onClick={(e) => e.stopPropagation()}
+        >
+            <button onClick={onEdit} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
+                <Pencil className="h-3 w-3" />
+            </button>
+            <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+                <AlertDialogTrigger asChild>
+                    <button 
+                        onClick={(e) => { 
+                            e.stopPropagation(); 
+                            if (!event.recurrenceId) {
+                                onDelete('single');
+                                return;
+                            }
+                            setIsDeleteOpen(true);
+                        }} 
+                        className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white')}
+                    >
+                        <Trash2 className="h-3 w-3" />
+                    </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Eliminar evento recurrente</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Este es un evento recurrente. ¿Cómo te gustaría eliminarlo?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onDelete('single')}>Eliminar este evento</AlertDialogAction>
+                        <AlertDialogAction onClick={() => onDelete('future')}>Eliminar este y futuros</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
        <button onClick={onClick} className="h-full w-full text-left p-2">
-        <p className="font-bold truncate pr-8">{event.title}</p>
-        <p className="opacity-80 truncate">{event.description}</p>
-      </button>
+            <p className="font-bold truncate pr-8">{event.title}</p>
+            <p className="opacity-80 truncate">{event.description}</p>
+       </button>
     </div>
   );
 };
