@@ -1,90 +1,93 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
-    function isUserAuthenticated() {
+  
+    // Helper function to get user role
+    function getUserRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+    
+    function isSignedIn() {
       return request.auth != null;
     }
-
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    
+    function isUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isOneOfRoles(roles) {
-      return isUserAuthenticated() && getUserRole() in roles;
+    function isAdmin() {
+      return isSignedIn() && getUserRole(request.auth.uid) == 'Administrador';
     }
 
-    function isOwner() {
-      // Check if the requesterId of the document being read matches the user's UID.
-      // This is used for 'get' operations on a single document.
-      return request.auth.uid == resource.data.requesterId;
+    function isSST() {
+      return isSignedIn() && getUserRole(request.auth.uid) == 'SST';
     }
 
-    match /tickets/{ticketId} {
-      // GET: Who can read a single, specific ticket document?
-      allow get: if isUserAuthenticated() && 
-                    (isOwner() || 
-                     isOneOfRoles(['Administrador', 'SST']) || 
-                     (request.auth.uid in resource.data.assignedToIds));
-
-      // LIST: Who can query the tickets collection?
-      // Admins/SST can list everything.
-      // Others can ONLY list if their query is filtered by 'requesterId' or 'assignedToIds'.
-      allow list: if isUserAuthenticated() && (
-                    isOneOfRoles(['Administrador', 'SST']) ||
-                    (request.query.where.path == "requesterId" && request.query.where.value == request.auth.uid) ||
-                    (request.query.where.path == "assignedToIds" && request.query.where.arrayContains == request.auth.uid)
-                  );
-
-      // WRITE operations
-      allow create: if isUserAuthenticated();
-      allow update: if isUserAuthenticated() && isOneOfRoles(['Administrador', 'Servicios Generales']);
-      allow delete: if isOneOfRoles(['Administrador']);
+    function isTech() {
+      return isSignedIn() && getUserRole(request.auth.uid) == 'Servicios Generales';
     }
 
+    // Users can read their own profile, Admins can read/write all
     match /users/{userId} {
-      allow read: if isUserAuthenticated();
-      allow create: if isOneOfRoles(['Administrador']);
-      allow update: if request.auth.uid == userId || isOneOfRoles(['Administrador']);
-      allow delete: if isOneOfRoles(['Administrador']);
+      allow read: if isUser(userId) || isAdmin() || isSST();
+      allow write: if isUser(userId) || isAdmin();
     }
 
+    // Tickets: Complex rules based on role
+    match /tickets/{ticketId} {
+      // Create: Any authenticated user can create a ticket
+      allow create: if isSignedIn();
+      
+      // Read: Admins/SST can read all. Techs can read assigned. Requesters can read their own.
+      allow read: if isAdmin() || isSST() 
+                  || (isTech() && request.auth.uid in resource.data.assignedToIds)
+                  || (isUser(resource.data.requesterId));
+                  
+      // Update: Admins can update all. Techs/Requesters have limited update rights.
+      allow update: if isAdmin() 
+                    || (isTech() && request.auth.uid in resource.data.assignedToIds && !(request.resource.data.status == 'Cerrado' || request.resource.data.priority != resource.data.priority))
+                    || (isUser(resource.data.requesterId) && resource.data.status == 'Abierto');
+    }
+    
+    // Notifications: Users can only see their own notifications
+    match /notifications/{notificationId} {
+        allow read, update: if isUser(resource.data.userId);
+        allow create: if isSignedIn(); // Allow server-side creation
+    }
+
+    // Schedule: Admins and assigned Techs can manage events
+    match /scheduleEvents/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || isTech();
+      allow update, delete: if isAdmin() || (isTech() && isUser(resource.data.technicianId));
+    }
+
+    // Data Masters: Any signed-in user can read zones, sites, categories
     match /zones/{zoneId} {
-      allow read: if isUserAuthenticated();
-      allow write: if isOneOfRoles(['Administrador']);
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
     
     match /sites/{siteId} {
-        allow read: if isUserAuthenticated();
-        allow write: if isOneOfRoles(['Administrador']);
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     match /categories/{categoryId} {
-        allow read: if isUserAuthenticated();
-        allow write: if isOneOfRoles(['Administrador']);
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
     
-    match /scheduleEvents/{eventId} {
-      allow read: if isUserAuthenticated();
-      allow create: if isUserAuthenticated() && isOneOfRoles(['Administrador', 'Servicios Generales']);
-      allow update, delete: if isOneOfRoles(['Administrador']);
-    }
-
+    // Logs: Only Admins/SST can read. Only backend can write.
     match /logs/{logId} {
-      allow read: if isOneOfRoles(['Administrador']);
-      allow create: if isUserAuthenticated(); // Anyone can create a log entry
-    }
-
-    match /notifications/{notificationId} {
-      allow read, update: if isUserAuthenticated() && request.auth.uid == resource.data.userId;
-      allow create: if isUserAuthenticated();
+      allow read: if isAdmin() || isSST();
+      allow write: if false; // Should only be written from backend/functions
     }
     
+    // Diagnosis Logs: Allow authenticated users to write for testing purposes
     match /diagnosis_logs/{logId} {
-        allow create: if isUserAuthenticated();
+      allow read, write: if isSignedIn();
     }
   }
 }
