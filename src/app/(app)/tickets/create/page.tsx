@@ -42,6 +42,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createLog } from '@/lib/utils';
 import type { User, Ticket, Zone, Site, Category } from '@/lib/types';
 import { suggestTicketDetails } from '@/ai/flows/suggest-ticket-details';
+import { suggestTicketTitle } from '@/ai/flows/suggest-ticket-title';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 
@@ -71,6 +72,7 @@ export default function CreateTicketPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [isAuthLoading, setIsAuthLoading] = React.useState(true);
   const [isAiLoading, setIsAiLoading] = React.useState(false);
+  const [isTitleLoading, setIsTitleLoading] = React.useState(false);
 
   const [zones, setZones] = React.useState<Zone[]>([]);
   const [sites, setSites] = React.useState<Site[]>([]);
@@ -163,6 +165,35 @@ export default function CreateTicketPage() {
         });
     } finally {
         setIsAiLoading(false);
+    }
+  };
+
+  const handleGenerateTitle = async () => {
+    if (!ticketDescription) {
+        toast({
+            variant: 'destructive',
+            title: 'Descripción requerida',
+            description: 'Por favor, escribe una descripción del problema antes de generar un título.',
+        });
+        return;
+    }
+    setIsTitleLoading(true);
+    try {
+        const result = await suggestTicketTitle({ description: ticketDescription });
+        form.setValue('title', result.title);
+        toast({
+            title: 'Título Sugerido por IA',
+            description: 'El título ha sido generado a partir de la descripción.',
+        });
+    } catch (error) {
+        console.error('Error generating AI title:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Error de IA',
+            description: 'No se pudo generar el título.',
+        });
+    } finally {
+        setIsTitleLoading(false);
     }
   };
 
@@ -318,16 +349,40 @@ export default function CreateTicketPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descripción Detallada</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe el problema con el mayor detalle posible. Incluye qué has observado, cuándo comenzó, y cualquier otra información relevante."
+                        className="min-h-[120px]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Describe el problema para que la IA pueda generar un título por ti.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="title"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Título de la Solicitud</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ej: Fuga de agua en baño del segundo piso" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Sé breve y descriptivo.
-                    </FormDescription>
+                     <div className="flex items-center gap-2">
+                        <FormControl>
+                          <Input placeholder="Ej: Fuga de agua en baño del segundo piso" {...field} />
+                        </FormControl>
+                         <Button type="button" variant="outline" size="sm" onClick={handleGenerateTitle} disabled={isTitleLoading}>
+                            {isTitleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                             <span className="hidden sm:inline ml-2">Generar con IA</span>
+                        </Button>
+                      </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -386,32 +441,13 @@ export default function CreateTicketPage() {
                     )}
                 />
               </div>
-
-               <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descripción Detallada</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Describe el problema con el mayor detalle posible. Incluye qué has observado, cuándo comenzó, y cualquier otra información relevante."
-                        className="min-h-[120px]"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               
               <div className="flex justify-end">
                 <Button type="button" variant="outline" onClick={handleAiSuggestions} disabled={isAiLoading}>
                     {isAiLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                    Analizar con IA
+                    Sugerir Categoría y Prioridad
                 </Button>
               </div>
-
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
