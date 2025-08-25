@@ -20,6 +20,7 @@ import {
   CalendarDays,
   AlertTriangle,
   Users,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -294,7 +295,7 @@ function EventDetailsDialog({
     );
 }
 
-async function createCalendarNotification(technicianName: string, event: Omit<ScheduleEvent, 'id'>) {
+async function createCalendarNotification(technicianName: string, event: Omit<ScheduleEvent, 'id' | 'recurrenceId'>) {
     try {
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("name", "==", technicianName));
@@ -341,8 +342,10 @@ export default function CalendarPage() {
     const [isLoadingData, setIsLoadingData] = useState(true);
     const { toast } = useToast();
     const router = useRouter();
-    const [techniciansToDisplay, setTechniciansToDisplay] = useState<User[]>([]);
+    const [allTechnicians, setAllTechnicians] = useState<User[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
+    const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
+
 
     // State for manual event creation/editing dialog
     const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
@@ -368,6 +371,10 @@ export default function CalendarPage() {
         eventToDelete: null,
     });
 
+    const techniciansToDisplay = selectedTechnicianId
+      ? allTechnicians.filter((t) => t.id === selectedTechnicianId)
+      : allTechnicians;
+
 
     useEffect(() => {
         const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -390,9 +397,10 @@ export default function CalendarPage() {
                             const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
                             const querySnapshot = await getDocs(techQuery);
                             const techData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-                            setTechniciansToDisplay(techData);
+                            setAllTechnicians(techData);
                         } else if (userData.role === 'Servicios Generales') {
-                            setTechniciansToDisplay([userData]);
+                            setAllTechnicians([userData]);
+                            setSelectedTechnicianId(userData.id); // Auto-select the technician themselves
                         }
                     } else {
                         router.push('/login');
@@ -486,34 +494,25 @@ export default function CalendarPage() {
                 // Creation logic
                 const batch = writeBatch(db);
                 let eventCount = 0;
+                const recurrenceId = isRecurring ? `rec-${Date.now()}` : undefined;
                 
                 const createEventInstance = (start: Date, end: Date, technicianId: string) => {
-                    const tech = techniciansToDisplay.find(t => t.id === technicianId);
+                    const tech = allTechnicians.find(t => t.id === technicianId);
                     if (!tech) return;
     
-                    const baseEvent: Omit<ScheduleEvent, 'id' | 'recurrenceId'> = {
+                    const baseEvent: Omit<ScheduleEvent, 'id'> = {
                         title: newEventTitle,
                         description: newEventDescription,
                         start: start,
                         end: end,
                         type: 'task',
                         technicianId: technicianId,
+                        ...(recurrenceId && { recurrenceId }),
                     };
                     
                     const eventRef = doc(collection(db, 'scheduleEvents'));
-                    
-                    if (isRecurring) {
-                        const eventData: Omit<ScheduleEvent, 'id'> = {
-                            ...baseEvent,
-                            recurrenceId: `rec-${Date.now()}`
-                        };
-                        batch.set(eventRef, eventData);
-                        createCalendarNotification(tech.name, eventData);
-                    } else {
-                        const eventData: Omit<ScheduleEvent, 'id'> = baseEvent;
-                         batch.set(eventRef, eventData);
-                         createCalendarNotification(tech.name, eventData);
-                    }
+                    batch.set(eventRef, baseEvent);
+                    createCalendarNotification(tech.name, baseEvent);
                     
                     createCalendarEvent({
                         summary: baseEvent.title,
@@ -664,7 +663,7 @@ export default function CalendarPage() {
                     createdAt: new Date().toISOString(),
                 },
                 targetDate: new Date().toISOString(),
-                targetTechnicianId: techniciansToDisplay[0]?.id || '', // Default to first technician
+                targetTechnicianId: allTechnicians[0]?.id || '', // Default to first technician
             };
             
             const result = await suggestCalendarAssignment(input);
@@ -705,7 +704,9 @@ export default function CalendarPage() {
     
     const visibleEvents = events.filter(e => {
         const eventDate = startOfDay(e.start);
-        return datesToDisplay.some(d => startOfDay(d).getTime() === eventDate.getTime());
+        const matchesTechnician = selectedTechnicianId ? e.technicianId === selectedTechnicianId : true;
+        const matchesDate = datesToDisplay.some(d => startOfDay(d).getTime() === eventDate.getTime());
+        return matchesTechnician && matchesDate;
     }).sort((a, b) => a.start.getTime() - b.start.getTime());
 
     const eventsByTechnicianAndDay = (technicianId: string, day: Date) => {
@@ -761,7 +762,7 @@ export default function CalendarPage() {
         isOpen={!!selectedEvent}
         onOpenChange={(open) => !open && setSelectedEvent(null)}
         event={selectedEvent}
-        technician={techniciansToDisplay.find(t => t.id === selectedEvent?.technicianId)}
+        technician={allTechnicians.find(t => t.id === selectedEvent?.technicianId)}
       />
        <AlertDialog open={isEditRecurrenceDialogOpen} onOpenChange={setIsEditRecurrenceDialogOpen}>
             <AlertDialogContent>
@@ -877,12 +878,12 @@ export default function CalendarPage() {
                                     <Button variant="outline" className="w-full justify-start">
                                         <Users className="mr-2 h-4 w-4" />
                                         {newEventTechnicianIds.length === 0 && "Seleccionar personal"}
-                                        {newEventTechnicianIds.length === 1 && techniciansToDisplay.find(t => t.id === newEventTechnicianIds[0])?.name}
+                                        {newEventTechnicianIds.length === 1 && allTechnicians.find(t => t.id === newEventTechnicianIds[0])?.name}
                                         {newEventTechnicianIds.length > 1 && `${newEventTechnicianIds.length} personas seleccionadas`}
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent className="w-full">
-                                    {techniciansToDisplay.map(tech => (
+                                    {allTechnicians.map(tech => (
                                         <DropdownMenuItem key={tech.id} onSelect={(e) => e.preventDefault()}>
                                             <div className="flex items-center space-x-2">
                                                 <Checkbox
@@ -1011,7 +1012,7 @@ export default function CalendarPage() {
                                                  )}
                                              >
                                                  <p className="text-muted-foreground">
-                                                     {format(event.start, 'h:mm a', { locale: es })} - {techniciansToDisplay.find(t => t.id === event.technicianId)?.name.split(' ')[0] || 'N/A'}
+                                                     {format(event.start, 'h:mm a', { locale: es })} - {allTechnicians.find(t => t.id === event.technicianId)?.name.split(' ')[0] || 'N/A'}
                                                  </p>
                                              </button>
                                          ))}
@@ -1026,12 +1027,24 @@ export default function CalendarPage() {
                 </CardContent>
             </Card>
              <Card className="flex flex-col bg-muted/30 h-1/2">
-                <CardHeader className="py-3 px-4 border-b">
+                <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between">
                   <CardTitle className="font-headline text-base">Servicios Generales</CardTitle>
+                  {selectedTechnicianId && (
+                     <Button variant="ghost" size="sm" onClick={() => setSelectedTechnicianId(null)}>
+                        <Eye className="mr-2 h-4 w-4"/> Ver Todos
+                     </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="p-2 flex-1 overflow-y-auto">
-                  {techniciansToDisplay.length > 0 ? techniciansToDisplay.map(tech => (
-                    <div key={tech.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-background/80">
+                  {allTechnicians.length > 0 ? allTechnicians.map(tech => (
+                    <button 
+                        key={tech.id} 
+                        onClick={() => setSelectedTechnicianId(tech.id)}
+                        className={cn(
+                            "flex items-center gap-3 p-2 rounded-md hover:bg-background/80 w-full text-left",
+                            selectedTechnicianId === tech.id && "bg-primary/10"
+                        )}
+                    >
                          <Avatar className="h-10 w-10 border-2" style={{ borderColor: generateColorFromString(tech.id, tech.name) }}>
                             <AvatarImage src={tech.avatar} alt={tech.name} />
                             <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
@@ -1039,7 +1052,7 @@ export default function CalendarPage() {
                         <div>
                             <p className="font-semibold text-sm">{tech.name}</p>
                         </div>
-                    </div>
+                    </button>
                   )) : (
                      <p className="text-sm text-muted-foreground p-4 text-center">No hay personal registrado.</p>
                   )}
@@ -1107,5 +1120,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-
-    
