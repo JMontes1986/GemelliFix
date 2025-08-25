@@ -82,6 +82,7 @@ import { addDays, addMonths, addWeeks, format, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { categories as predefinedTaskTitles } from '@/lib/data';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -484,7 +485,7 @@ export default function CalendarPage() {
                     const tech = techniciansToDisplay.find(t => t.id === technicianId);
                     if (!tech) return;
 
-                    const baseEvent: Omit<ScheduleEvent, 'id' | 'recurrenceId'> = {
+                    const baseEvent: Omit<ScheduleEvent, 'id'> = {
                         title: newEventTitle,
                         description: newEventDescription,
                         start: start,
@@ -973,26 +974,28 @@ export default function CalendarPage() {
                         Agenda del Día
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-2 flex-1 overflow-y-auto">
-                    {visibleEvents.length > 0 ? (
-                        visibleEvents.map((event) => (
-                           <button 
-                             key={event.id} 
-                             onClick={() => handleAgendaItemClick(event)}
-                             className={cn(
-                                "w-full text-left p-2 rounded-md hover:bg-background/80 transition-colors",
-                                selectedEvent?.id === event.id && "bg-background shadow-sm"
-                             )}
-                            >
-                                <p className="font-semibold text-sm truncate">{event.title}</p>
-                                <p className="text-xs text-muted-foreground">
-                                    {format(event.start, 'd MMM, h:mm a', { locale: es })}
-                                </p>
-                           </button>
-                        ))
-                    ) : (
-                        <p className="text-sm text-muted-foreground p-4 text-center">¡No hay eventos programados!</p>
-                    )}
+                <CardContent className="p-0 flex-1">
+                    <ScrollArea className="h-full p-2">
+                        {visibleEvents.length > 0 ? (
+                            visibleEvents.map((event) => (
+                               <button 
+                                 key={event.id} 
+                                 onClick={() => handleAgendaItemClick(event)}
+                                 className={cn(
+                                    "w-full text-left p-2 rounded-md hover:bg-background/80 transition-colors",
+                                    selectedEvent?.id === event.id && "bg-background shadow-sm"
+                                 )}
+                                >
+                                    <p className="font-semibold text-sm truncate">{event.title}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {format(event.start, 'd MMM, h:mm a', { locale: es })}
+                                    </p>
+                               </button>
+                            ))
+                        ) : (
+                            <p className="text-sm text-muted-foreground p-4 text-center">¡No hay eventos programados!</p>
+                        )}
+                    </ScrollArea>
                 </CardContent>
             </Card>
              <Card className="flex flex-col bg-muted/30 h-1/2">
