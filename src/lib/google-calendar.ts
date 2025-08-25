@@ -1,4 +1,3 @@
-
 import { google } from 'googleapis';
 
 const getServiceAccountCredentials = () => {
@@ -6,11 +5,11 @@ const getServiceAccountCredentials = () => {
         const clientEmail = process.env.FB_CLIENT_EMAIL;
         const privateKey = process.env.FB_PRIVATE_KEY?.replace(/\\n/g, '\n');
         const calendarId = process.env.GOOGLE_CALENDAR_ID;
-        
+
         if (!clientEmail || !privateKey || !calendarId) {
             throw new Error("Missing required environment variables for Google Calendar: FB_CLIENT_EMAIL, FB_PRIVATE_KEY, GOOGLE_CALENDAR_ID.");
         }
-        
+
         return { clientEmail, privateKey, calendarId };
     } catch(error: any) {
         console.error("Failed to get Google service account credentials from environment variables:", error.message);
