@@ -29,6 +29,7 @@ export async function createLog(
   try {
     let logDetails: any = {
       description: `<strong>${user.name}</strong> realizó la acción: ${action}`,
+      comment: details.comment || null,
     };
 
     if (action === 'login') {
@@ -40,8 +41,7 @@ export async function createLog(
     }
 
     if (action === 'add_comment' && details.comment) {
-      logDetails.description = `<strong>${user.name}</strong> comentó: "${details.comment}"`;
-      logDetails.comment = details.comment;
+      logDetails.description = `<strong>${user.name}</strong> añadió un comentario.`;
     }
 
     if (details.ticket) {

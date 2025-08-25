@@ -332,7 +332,7 @@ export default function TicketDetailPage() {
   };
 
 
-  const handleUpdate = async (field: keyof Ticket, value: any) => {
+  const handleUpdate = async (field: keyof Ticket, value: any, commentText?: string) => {
     if (!ticket || !currentUser) return;
     if (isSST) {
       toast({ variant: 'destructive', title: 'Acción no permitida', description: 'El rol SST no puede modificar tickets.'});
@@ -349,7 +349,7 @@ export default function TicketDetailPage() {
           return;
       }
       // This check should only apply to technicians updating progress
-      if (currentUser.role === 'Servicios Generales' && ticket.status !== 'Asignado' && value !== 'Asignado' && !comment.trim()) {
+      if (currentUser.role === 'Servicios Generales' && ticket.status !== 'Asignado' && value !== 'Asignado' && !(commentText || comment).trim()) {
         toast({
             variant: "destructive",
             title: "Comentario Requerido",
@@ -369,7 +369,7 @@ export default function TicketDetailPage() {
         updates.resolvedAt = new Date().toISOString();
     }
 
-    let logDetails: any = { ticket, oldValue, newValue: value };
+    let logDetails: any = { ticket, oldValue, newValue: value, comment: commentText || comment };
 
     if (field === 'priority') {
         const createdAt = new Date(ticket.createdAt);
@@ -391,8 +391,9 @@ export default function TicketDetailPage() {
         await createLog(currentUser, `update_${field}`, logDetails);
       }
       
-      if(comment.trim()){
-         await createLog(currentUser, 'add_comment', { ticket, comment });
+      // If there was a comment during a status change, log it separately.
+      if ( (commentText || comment).trim() && field !== 'status') {
+         await createLog(currentUser, 'add_comment', { ticket, comment: commentText || comment });
       }
 
       setComment('');
@@ -456,8 +457,7 @@ export default function TicketDetailPage() {
             evidence: arrayUnion(...uploadedEvidence),
         });
         
-        await createLog(currentUser, 'update_status', { ticket, oldValue: ticket.status, newValue: 'Requiere Aprobación' });
-        await createLog(currentUser, 'add_comment', { ticket, comment });
+        await createLog(currentUser, 'update_status', { ticket, oldValue: ticket.status, newValue: 'Requiere Aprobación', comment });
 
 
         setFilesToUpload([]); // Limpiar archivos después de la subida exitosa
@@ -519,7 +519,7 @@ export default function TicketDetailPage() {
     }
     
     const newStatus = approve ? 'Cerrado' : 'Asignado'; // Si se rechaza, vuelve a 'Asignado'
-    await handleUpdate('status', newStatus);
+    await handleUpdate('status', newStatus, `Ticket ${approve ? 'aprobado' : 'rechazado'} por ${currentUser.name}.`);
 
     toast({
         title: `Ticket ${approve ? 'Aprobado y Cerrado' : 'Rechazado'}`,
@@ -847,11 +847,11 @@ export default function TicketDetailPage() {
                                 <div className="flex-shrink-0">
                                    <LogIcon action={log.action} />
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <p dangerouslySetInnerHTML={{ __html: log.details.description }} />
                                     {log.details.comment && (
                                         <blockquote className="mt-1 pl-3 border-l-2 border-border italic text-muted-foreground">
-                                            {log.details.comment}
+                                            "{log.details.comment}"
                                         </blockquote>
                                     )}
                                     <p className="text-xs text-muted-foreground mt-1">

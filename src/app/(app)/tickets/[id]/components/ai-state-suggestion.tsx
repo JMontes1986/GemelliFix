@@ -25,7 +25,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface AiStateSuggestionProps {
     ticket: Ticket;
-    onStatusChange: (newStatus: string) => void;
+    onStatusChange: (newStatus: string, comment?: string) => void;
     currentUser: User | null;
 }
 
@@ -80,10 +80,15 @@ export default function AiStateSuggestion({ ticket, onStatusChange, currentUser 
   
   const handleActionFromSuggestion = () => {
     if (suggestion && suggestion.isActionable) {
-        const recommendedStatus = suggestion.recommendation.match(/'([^']+)'/);
-        if(recommendedStatus && recommendedStatus[1]) {
-            onStatusChange(recommendedStatus[1]);
+        // Extract status from a recommendation like "Suggest 'Asignado' status."
+        const match = suggestion.recommendation.match(/'([^']+)'/);
+        const newStatus = match ? match[1] : null;
+
+        if (newStatus) {
+            onStatusChange(newStatus, `Cambio de estado sugerido por IA: ${suggestion.analysis}`);
             setIsOpen(false);
+        } else {
+            toast({ variant: 'destructive', title: 'Error de IA', description: 'No se pudo determinar el estado recomendado.' });
         }
     }
   }
