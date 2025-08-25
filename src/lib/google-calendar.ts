@@ -1,3 +1,4 @@
+
 import { google } from 'googleapis';
 
 const getServiceAccountCredentials = () => {
@@ -26,7 +27,8 @@ const getJwtClient = () => {
             clientEmail,
             undefined,
             privateKey,
-            SCOPES
+            SCOPES,
+            clientEmail // Impersonation subject
         );
     } catch(error) {
         console.error("Could not create Google JWT client:", error);
