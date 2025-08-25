@@ -138,7 +138,17 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
         </button>
          <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
             <AlertDialogTrigger asChild>
-                <button onClick={(e) => {e.stopPropagation(); if (!event.recurrenceId) {onDelete('single'); return;} setIsDeleteOpen(true);}} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
+                <button 
+                    onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if (!event.recurrenceId) {
+                            onDelete('single'); 
+                            return;
+                        }
+                        setIsDeleteOpen(true);
+                    }} 
+                    className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white')}
+                >
                     <Trash2 className="h-3 w-3" />
                 </button>
             </AlertDialogTrigger>
@@ -150,7 +160,7 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
                     <AlertDialogAction onClick={(e) => {e.stopPropagation(); onDelete('single');}}>Eliminar este evento</AlertDialogAction>
                     <AlertDialogAction onClick={(e) => {e.stopPropagation(); onDelete('future');}}>Eliminar este y futuros</AlertDialogAction>
                 </AlertDialogFooter>
@@ -1148,3 +1158,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
