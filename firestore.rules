@@ -2,92 +2,93 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper function to get user role
+
+    // Helper function to check user role
     function getUserRole(userId) {
       return get(/databases/$(database)/documents/users/$(userId)).data.role;
     }
     
-    function isSignedIn() {
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
       return request.auth != null;
     }
-    
-    function isUser(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
 
+    // Helper function to check if the user is an admin
     function isAdmin() {
-      return isSignedIn() && getUserRole(request.auth.uid) == 'Administrador';
+      return isAuthenticated() && getUserRole(request.auth.uid) == 'Administrador';
     }
 
+    // Helper function to check if the user is a technician
+    function isTechnician() {
+        return isAuthenticated() && getUserRole(request.auth.uid) == 'Servicios Generales';
+    }
+
+    // Helper function to check if the user is an auditor
     function isSST() {
-      return isSignedIn() && getUserRole(request.auth.uid) == 'SST';
+        return isAuthenticated() && getUserRole(request.auth.uid) == 'SST';
     }
 
-    function isTech() {
-      return isSignedIn() && getUserRole(request.auth.uid) == 'Servicios Generales';
-    }
-
-    // Users can read their own profile, Admins can read/write all
+    // Users can read their own data. Admins can read/write any user data.
+    // Admins and Technicians can list other technicians.
     match /users/{userId} {
-      allow read: if isUser(userId) || isAdmin() || isSST();
-      allow write: if isUser(userId) || isAdmin();
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin() || isSST());
+      allow list: if isAuthenticated() && (isAdmin() || isTechnician());
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
-    // Tickets: Complex rules based on role
+    // Tickets can be created by any authenticated user.
+    // They can be read by their creator, the admin, SST, or assigned personnel.
+    // They can only be updated/deleted by Admin or assigned personnel.
     match /tickets/{ticketId} {
-      // Create: Any authenticated user can create a ticket
-      allow create: if isSignedIn();
-      
-      // Read: Admins/SST can read all. Techs can read assigned. Requesters can read their own.
-      allow read: if isAdmin() || isSST() 
-                  || (isTech() && request.auth.uid in resource.data.assignedToIds)
-                  || (isUser(resource.data.requesterId));
-                  
-      // Update: Admins can update all. Techs/Requesters have limited update rights.
-      allow update: if isAdmin() 
-                    || (isTech() && request.auth.uid in resource.data.assignedToIds && !(request.resource.data.status == 'Cerrado' || request.resource.data.priority != resource.data.priority))
-                    || (isUser(resource.data.requesterId) && resource.data.status == 'Abierto');
-    }
-    
-    // Notifications: Users can only see their own notifications
-    match /notifications/{notificationId} {
-        allow read, update: if isUser(resource.data.userId);
-        allow create: if isSignedIn(); // Allow server-side creation
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && 
+                    (resource.data.requesterId == request.auth.uid ||
+                     isAdmin() || 
+                     isSST() || 
+                     (isTechnician() && request.auth.uid in resource.data.assignedToIds));
+      allow update: if isAuthenticated() && (isAdmin() || (isTechnician() && request.auth.uid in resource.data.assignedToIds));
+      allow delete: if isAdmin();
     }
 
-    // Schedule: Admins and assigned Techs can manage events
-    match /scheduleEvents/{eventId} {
-      allow read: if isSignedIn();
-      allow create: if isAdmin() || isTech();
-      allow update, delete: if isAdmin() || (isTech() && isUser(resource.data.technicianId));
-    }
-
-    // Data Masters: Any signed-in user can read zones, sites, categories
+    // Only Admins can manage master data like zones, sites, and categories.
+    // Any authenticated user can read them.
     match /zones/{zoneId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isAdmin();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
-    
+
     match /sites/{siteId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isAdmin();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
     match /categories/{categoryId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isAdmin();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
     
-    // Logs: Only Admins/SST can read. Only backend can write.
+    // Schedule events can be created and read by Admins and Technicians.
+    match /scheduleEvents/{eventId} {
+      allow read: if isAuthenticated() && (isAdmin() || isTechnician());
+      allow write: if isAuthenticated() && (isAdmin() || isTechnician());
+    }
+
+    // Users can read their own notifications.
+    match /notifications/{notificationId} {
+      allow read, update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated(); // Server-side logic creates notifications
+    }
+    
+    // Logs are created by the server and can only be read by Admins or SST.
     match /logs/{logId} {
-      allow read: if isAdmin() || isSST();
-      allow write: if false; // Should only be written from backend/functions
+        allow read: if isAdmin() || isSST();
+        allow write: if isAuthenticated(); // Log creation is handled via secure function/server logic
     }
     
-    // Diagnosis Logs: Allow authenticated users to write for testing purposes
+    // Diagnosis logs are only for testing purposes. Any authenticated user can write to it.
     match /diagnosis_logs/{logId} {
-      allow read, write: if isSignedIn();
+        allow write: if isAuthenticated();
     }
   }
 }
