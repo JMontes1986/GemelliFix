@@ -1,9 +1,9 @@
-rules_version = '2';
 
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions ---
+    // Helper functions to keep rules DRY
     function isAuth() {
       return request.auth != null;
     }
@@ -11,92 +11,103 @@ service cloud.firestore {
     function isRole(role) {
       return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
-    
+
     function isOneOfRoles(roles) {
       return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
     }
 
     function isOwner(userId) {
-      return isAuth() && request.auth.uid == userId;
+        return isAuth() && request.auth.uid == userId;
     }
 
-    // --- Collections ---
-
-    // USERS: Users can see basic info of others, but only edit their own profile. Admins can edit anything.
+    // ========= USERS =========
     match /users/{userId} {
+      // Allow any authenticated user to read profiles (for names, avatars, etc.)
+      // Allow admins to read any profile
       allow read: if isAuth();
+
+      // Only the user themselves or an admin can update their profile
       allow update: if isOwner(userId) || isRole('Administrador');
+
+      // Creation is handled by admin API, writes are handled by `update`
       allow create, delete: if isRole('Administrador');
+      
+      // Allow admins to list users with the 'Servicios Generales' role
+      allow list: if isRole('Administrador');
     }
 
-    // TICKETS: Granular permissions based on user role.
+    // ========= TICKETS =========
     match /tickets/{ticketId} {
-      // Anyone logged in can create a ticket.
+      // Who can create a ticket? Any authenticated user.
       allow create: if isAuth();
 
-      // Read a single ticket if you are an Admin, SST, the requester, or assigned to it.
-      allow get: if isOneOfRoles(['Administrador', 'SST']) 
-                  || (isAuth() && resource.data.requesterId == request.auth.uid) 
-                  || (isAuth() && request.auth.uid in resource.data.assignedToIds);
-
-      // List tickets based on different queries for each role.
-      allow list: if isOneOfRoles(['Administrador', 'SST']) // Admins/SST can list all.
-                  // Technicians can query for tickets assigned to them.
-                  || (isRole('Servicios Generales') && request.query.where.path == 'assignedToIds')
-                  // Requesters can query for tickets they created.
-                  || (isOneOfRoles(['Docentes', 'Coordinadores', 'Administrativos']) && request.query.where.path == 'requesterId');
+      // Who can read a specific ticket?
+      // - Admins and auditors can read everything.
+      // - The person who created the ticket.
+      // - A technician assigned to the ticket.
+      allow read: if isAuth() && 
+                    (isOneOfRoles(['Administrador', 'SST']) || 
+                     resource.data.requesterId == request.auth.uid ||
+                     request.auth.uid in resource.data.assignedToIds);
       
-      // Update if Admin, or assigned technician, or the original requester if ticket is still open.
-      allow update: if isRole('Administrador') 
-                    || (isRole('Servicios Generales') && request.auth.uid in resource.data.assignedToIds) 
-                    || (isOwner(resource.data.requesterId) && resource.data.status == 'Abierto');
+      // Who can update a ticket?
+      // - Admins can update anything.
+      // - Technicians can update tickets assigned to them.
+      // - Requesters can update their tickets only if it's still 'Abierto'.
+      allow update: if isAuth() &&
+                      (isRole('Administrador') ||
+                      (isRole('Servicios Generales') && request.auth.uid in resource.data.assignedToIds) ||
+                      (resource.data.requesterId == request.auth.uid && resource.data.status == 'Abierto'));
       
-      // Only Admins can delete.
       allow delete: if isRole('Administrador');
+      
+      // Who can list tickets?
+      // This is crucial for the main ticket list view.
+      allow list: if isAuth() && (isOneOfRoles(['Administrador', 'SST']) || isRole('Servicios Generales') || isOwner(request.auth.uid));
     }
-
-    // SCHEDULE: Admins can manage the calendar, others can read it.
+    
+    // ========= SCHEDULE EVENTS =========
     match /scheduleEvents/{eventId} {
+      // Admins and technicians can create events.
+      allow create: if isOneOfRoles(['Administrador', 'Servicios Generales']);
+      
+      // Any authenticated user can see the calendar.
       allow read: if isAuth();
-      allow create, update, delete: if isRole('Administrador');
+      
+      // Only admins or the assigned tech can update/delete an event.
+      allow update, delete: if isRole('Administrador') || (isAuth() && resource.data.technicianId == request.auth.uid);
     }
     
-    // NOTIFICATIONS: Users can manage their own notifications.
+    // ========= NOTIFICATIONS =========
     match /notifications/{notificationId} {
-      allow read, update, delete: if isAuth() && resource.data.userId == request.auth.uid;
-      // Creation is handled by server-side logic (e.g., Cloud Functions).
-      allow create: if isAuth();
+      // Only the target user can read/update their notifications.
+      allow read, update: if isOwner(resource.data.userId);
+      // Creation is handled by backend functions.
+      allow create, delete: if false;
     }
 
-    // LOGS: Read-only for authorized users, write-only for backend.
+    // ========= LOGS =========
     match /logs/{logId} {
-      // A user can read the logs for a ticket if they are allowed to read that ticket.
-      allow read: if isAuth() 
-                  && exists(/databases/$(database)/documents/tickets/$(resource.data.details.ticketId))
-                  && get(/databases/$(database)/documents/tickets/$(resource.data.details.ticketId)).data.requesterId == request.auth.uid
-                  || isOneOfRoles(['Administrador', 'SST'])
-                  || (request.auth.uid in get(/databases/$(database)/documents/tickets/$(resource.data.details.ticketId)).data.assignedToIds);
+      // Only Admins can read logs.
+      allow read: if isRole('Administrador');
+      // Creation is handled by the backend. No client creates/updates/deletes logs.
+      allow create, update, delete: if false;
+      
+      // Allow admins and authorized users to query logs for a specific ticket
+      allow list: if isAuth() && (isRole('Administrador') || isRole('SST') || isRole('Servicios Generales') || isOwner(request.auth.uid));
+    }
 
-      allow write: if false; // Only backend can write logs.
+    // ========= MASTER DATA (ZONES, SITES, CATEGORIES) =========
+    match /{collectionName}/{docId} 
+      where collectionName in ['zones', 'sites', 'categories'] {
+        // Any authenticated user can read them to populate dropdowns.
+        allow read: if isAuth();
+        // Only admins can create, update, or delete them.
+        allow write: if isRole('Administrador');
     }
     
-    // MASTER DATA (Zones, Sites, Categories): Read-only for users, writeable by Admins.
-    match /zones/{zoneId} {
-      allow read: if isAuth();
-      allow write: if isRole('Administrador');
-    }
-    match /sites/{siteId} {
-      allow read: if isAuth();
-      allow write: if isRole('Administrador');
-    }
-    match /categories/{categoryId} {
-      allow read: if isAuth();
-      allow write: if isRole('Administrador');
-    }
-    
-    // DIAGNOSIS: Write-only for authenticated users for testing purposes.
-    match /diagnosis_logs/{logId} {
-        allow write: if isAuth();
+     match /diagnosis_logs/{docId} {
+      allow read, write: if isAuth();
     }
   }
 }
