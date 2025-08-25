@@ -18,7 +18,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { categories } from '@/lib/data';
 import {
   File,
   User,
@@ -45,7 +44,7 @@ import {
   LogIn,
   PenSquare,
 } from 'lucide-react';
-import type { Ticket, User as CurrentUser, Attachment, Log } from '@/lib/types';
+import type { Ticket, User as CurrentUser, Attachment, Log, Category } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AiSuggestion from './components/ai-suggestion';
 import AiStateSuggestion from './components/ai-state-suggestion';
@@ -176,6 +175,7 @@ export default function TicketDetailPage() {
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [technicians, setTechnicians] = useState<CurrentUser[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
   const [comment, setComment] = useState("");
   const [logs, setLogs] = useState<Log[]>([]);
@@ -203,8 +203,18 @@ export default function TicketDetailPage() {
                         console.error("Error fetching technicians:", error);
                         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
                     });
+
+                    // Fetch all categories for the admin dropdown
+                    const qCategories = query(collection(db, 'categories'), orderBy('name'));
+                    const unsubscribeCategories = onSnapshot(qCategories, (snapshot) => {
+                        const cats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
+                        setCategories(cats);
+                    });
                     
-                    return () => unsubscribe_technicians();
+                    return () => {
+                        unsubscribe_technicians();
+                        unsubscribeCategories();
+                    };
                 }
             }
         }
