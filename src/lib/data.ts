@@ -26,17 +26,16 @@ export const sites: Site[] = [
 ];
 
 export const categories: Category[] = [
-    { id: 'cat-1', name: 'Electricidad' },
-    { id: 'cat-2', name: 'Sistemas y Tecnología' },
-    { id: 'cat-3', name: 'Infraestructura y Obras Civiles' },
-    { id: 'cat-4', name: 'Fontanería e Hidráulica' },
-    { id: 'cat-5', name: 'Carpintería y Mobiliario' },
-    { id: 'cat-6', name: 'Pintura y Acabados' },
-    { id: 'cat-7', name: 'Aseo y Limpieza' },
-    { id: 'cat-8', name: 'Zonas Verdes y Jardinería' },
-    { id: 'cat-9', name: 'Seguridad y Emergencias' },
-    { id: 'cat-10', name: 'Eventos y Logística' },
-    { id: 'cat-11', name: 'General' },
+    { id: 'cat-1', name: 'Limpieza de baños' },
+    { id: 'cat-2', name: 'Limpieza de salones' },
+    { id: 'cat-3', name: 'Limpieza de comedor y cafetería' },
+    { id: 'cat-4', name: 'Limpieza de oficinas y administrativos' },
+    { id: 'cat-5', name: 'Limpieza de pasillos y hall' },
+    { id: 'cat-6', name: 'Recolección y basuras' },
+    { id: 'cat-7', name: 'Mantenimiento de infraestructura' },
+    { id: 'cat-8', name: 'Zonas verdes y exteriores' },
+    { id: 'cat-9', name: 'Apoyo logístico y varios' },
+    { id: 'cat-10', name: 'Otros' },
 ];
 
 
