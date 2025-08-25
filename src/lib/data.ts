@@ -1,4 +1,5 @@
 
+
 import type { Zone, Site, Ticket, Notification, User, ScheduleEvent, Category } from '@/lib/types';
 
 export const users: User[] = [
@@ -26,16 +27,16 @@ export const sites: Site[] = [
 ];
 
 export const categories: Category[] = [
-    { id: 'cat-1', name: 'Limpieza de baños' },
-    { id: 'cat-2', name: 'Limpieza de salones' },
-    { id: 'cat-3', name: 'Limpieza de comedor y cafetería' },
-    { id: 'cat-4', name: 'Limpieza de oficinas y administrativos' },
-    { id: 'cat-5', name: 'Limpieza de pasillos y hall' },
-    { id: 'cat-6', name: 'Recolección y basuras' },
-    { id: 'cat-7', name: 'Mantenimiento de infraestructura' },
-    { id: 'cat-8', name: 'Zonas verdes y exteriores' },
-    { id: 'cat-9', name: 'Apoyo logístico y varios' },
-    { id: 'cat-10', name: 'Otros' },
+    { id: 'cat-1', name: 'Aseo y Limpieza' },
+    { id: 'cat-2', name: 'Electricidad' },
+    { id: 'cat-3', name: 'Plomería' },
+    { id: 'cat-4', name: 'Infraestructura' },
+    { id: 'cat-5', name: 'Mobiliario' },
+    { id: 'cat-6', name: 'Equipos de Cómputo' },
+    { id: 'cat-7', name: 'Redes y Conectividad' },
+    { id: 'cat-8', name: 'Zonas Verdes' },
+    { id: 'cat-9', name: 'Apoyo Logístico' },
+    { id: 'cat-10', name: 'Otro' },
 ];
 
 
@@ -69,3 +70,4 @@ export const scheduleEvents: ScheduleEvent[] = [
         ticketId: '1'
     },
 ];
+
