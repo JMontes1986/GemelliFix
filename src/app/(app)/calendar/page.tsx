@@ -730,10 +730,8 @@ export default function CalendarPage() {
     };
 
     const handleDeleteClick = (event: ScheduleEvent) => {
-        if (event.recurrenceId) {
-            setDeleteDialogState({ isOpen: true, eventToDelete: event });
-        } else {
-            // For single events, delete directly
+        setDeleteDialogState({ eventToDelete: event, isOpen: true });
+        if (!event.recurrenceId) {
             handleConfirmDelete('single');
         }
     };
@@ -896,7 +894,7 @@ export default function CalendarPage() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-      <AlertDialog open={deleteDialogState.isOpen} onOpenChange={(open) => setDeleteDialogState({ isOpen: open, eventToDelete: open ? deleteDialogState.eventToDelete : null })}>
+      <AlertDialog open={deleteDialogState.isOpen && !!deleteDialogState.eventToDelete?.recurrenceId} onOpenChange={(open) => setDeleteDialogState({ isOpen: open, eventToDelete: open ? deleteDialogState.eventToDelete : null })}>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Eliminar evento recurrente</AlertDialogTitle>
@@ -1176,5 +1174,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-
-    
