@@ -71,7 +71,7 @@ export async function createLog(
       logDetails.field = field;
       logDetails.description = `<strong>${user.name}</strong> actualizó la <strong>${friendlyField}</strong> de '${
         logDetails.oldValue || 'ninguno'
-      }' a '<strong>${logDetails.newValue}</strong>'.`;
+      }' a '<strong>${logDetails.newValue || 'ninguno'}</strong>'.`;
     }
 
     await addDoc(collection(db, 'logs'), {

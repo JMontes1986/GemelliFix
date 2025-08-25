@@ -780,6 +780,7 @@ export default function TicketDetailPage() {
                         </div>
                         <div>
                             <label className="text-sm font-medium">Adjuntar Evidencia</label>
+                            <p className="text-xs text-muted-foreground mb-2">Cualquiera de los técnicos asignados puede subir la evidencia en nombre del equipo.</p>
                             <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md">
                                 <div className="space-y-1 text-center">
                                     <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
