@@ -43,6 +43,7 @@ import {
   Send,
   LogIn,
   PenSquare,
+  AlertCircle,
 } from 'lucide-react';
 import type { Ticket, User as CurrentUser, Attachment, Log, Category } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -210,6 +211,9 @@ export default function TicketDetailPage() {
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
   const [comment, setComment] = useState("");
   const [logs, setLogs] = useState<Log[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(true);
+  const [logError, setLogError] = useState<string | null>(null);
+
 
   // State for manual assignment dialog
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
@@ -306,6 +310,8 @@ export default function TicketDetailPage() {
     });
     
     // Fetch logs for the ticket
+    setIsLoadingLogs(true);
+    setLogError(null);
     const logsQuery = query(
       collection(db, 'logs'), 
       where('details.ticketId', '==', ticketId),
@@ -317,24 +323,24 @@ export default function TicketDetailPage() {
             fetchedLogs.push({ id: doc.id, ...doc.data()} as Log);
         });
         setLogs(fetchedLogs);
+        setIsLoadingLogs(false);
     }, (err) => {
         console.error("Error fetching logs: ", err);
-        // Inform user that a new index might be required
         if (err.code === 'failed-precondition') {
-            toast({
-                variant: 'destructive',
-                title: 'Índice de base de datos requerido',
-                description: 'La consulta de historial necesita un índice. Por favor, créalo en la consola de Firebase.',
-                duration: 10000,
-            });
+            setLogError('La consulta del historial necesita un índice de base de datos que no existe. Por favor, crea el índice en la consola de Firebase como sugiere el mensaje de error de la consola y vuelve a cargar la página.');
+        } else if (err.code === 'permission-denied') {
+            setLogError('No tienes permisos suficientes para ver el historial de este ticket.');
+        } else {
+            setLogError('Ocurrió un error al cargar el historial.');
         }
+        setIsLoadingLogs(false);
     });
 
     return () => {
         unsubscribe();
         unsubscribeLogs();
     };
-}, [ticketId, toast]);
+}, [ticketId]);
 
 
   const canEdit = currentUser?.role === 'Administrador';
@@ -920,7 +926,17 @@ export default function TicketDetailPage() {
             </CardHeader>
             <CardContent>
                 <div className="space-y-4 text-sm">
-                    {logs.length > 0 ? (
+                    {isLoadingLogs ? (
+                        <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : logError ? (
+                        <div className="flex flex-col items-center justify-center text-center text-destructive bg-destructive/10 p-4 rounded-md">
+                            <AlertCircle className="w-8 h-8 mb-2" />
+                            <p className="font-semibold">Error al Cargar el Historial</p>
+                            <p className="text-xs">{logError}</p>
+                        </div>
+                    ) : logs.length > 0 ? (
                         logs.map((log) => (
                              <div key={log.id} className="flex gap-3">
                                 <div className="flex-shrink-0">
@@ -940,7 +956,7 @@ export default function TicketDetailPage() {
                             </div>
                         ))
                     ) : (
-                        <p className="text-muted-foreground">No hay historial para este ticket.</p>
+                        <p className="text-muted-foreground text-center py-4">No hay historial para este ticket.</p>
                     )}
                 </div>
             </CardContent>
