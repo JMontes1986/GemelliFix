@@ -88,6 +88,7 @@ import {
     AccordionItem,
     AccordionTrigger,
   } from "@/components/ui/accordion"
+import { Badge } from '@/components/ui/badge';
 
 
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -489,7 +490,7 @@ export default function CalendarPage() {
                 const createEventInstance = (start: Date, end: Date, technicianId: string) => {
                     const tech = techniciansToDisplay.find(t => t.id === technicianId);
                     if (!tech) return;
-
+    
                     const baseEvent: Omit<ScheduleEvent, 'id' | 'recurrenceId'> = {
                         title: newEventTitle,
                         description: newEventDescription,
@@ -1106,3 +1107,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
