@@ -18,6 +18,7 @@ import {
   User as UserIcon,
   Pencil,
   Trash2,
+  CalendarDays,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,7 +37,6 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import {
   Dialog,
@@ -68,7 +68,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { addDays, addMonths, addWeeks, format } from 'date-fns';
+import { addDays, addMonths, addWeeks, format, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -95,7 +95,7 @@ const generateColorFromString = (id: string, name?: string): string => {
 };
 
 
-const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: ScheduleEvent, color: string, onClick: () => void, onEdit: () => void, onDelete: () => void }) => {
+const EventCard = ({ event, color, onClick, onEdit, onDelete, isSelected }: { event: ScheduleEvent, color: string, onClick: () => void, onEdit: (e: React.MouseEvent) => void, onDelete: (e: React.MouseEvent) => void, isSelected: boolean }) => {
   const eventStartDate = event.start;
   const eventEndDate = event.end;
   
@@ -118,7 +118,8 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
   return (
     <div
       className={cn(
-        'absolute w-full rounded-lg border text-xs shadow-sm transition-all z-10 text-left group flex flex-col'
+        'absolute w-full rounded-lg border text-xs shadow-sm transition-all z-10 text-left group flex flex-col',
+        isSelected && 'ring-2 ring-primary ring-offset-2'
       )}
       style={{
         top: `${top}px`,
@@ -132,7 +133,7 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
         color: textColor,
       }}
     >
-       <div 
+        <div 
             className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20"
         >
             <button onClick={onEdit} className={cn("p-1 rounded-full hover:bg-black/10", textColor === 'black' ? 'text-black' : 'text-white' )}>
@@ -153,24 +154,6 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete }: { event: Schedul
   );
 };
 
-
-const UnassignedTicketCard = ({ ticket }: { ticket: Ticket }) => (
-    <div
-      className="p-2 rounded-lg border border-dashed bg-card text-card-foreground mb-2 cursor-grab"
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("ticketId", ticket.id);
-        e.dataTransfer.setData("ticketTitle", ticket.title);
-        e.dataTransfer.setData("ticketDescription", ticket.description);
-        e.dataTransfer.setData("ticketCategory", ticket.category);
-        e.dataTransfer.setData("ticketPriority", ticket.priority);
-        e.dataTransfer.setData("ticketCreatedAt", ticket.createdAt);
-      }}
-    >
-      <p className="font-semibold text-sm">{ticket.code}</p>
-      <p className="text-xs text-muted-foreground">{ticket.title}</p>
-    </div>
-);
 
 function AiAssignmentDialog({ 
     isOpen, 
@@ -338,7 +321,6 @@ export default function CalendarPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
     const [events, setEvents] = useState<ScheduleEvent[]>([]);
-    const [unassignedTickets, setUnassignedTickets] = useState<Ticket[]>([]);
     const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
     const [isLoadingAi, setIsLoadingAi] = useState(false);
     const [aiSuggestion, setAiSuggestion] = useState<SuggestCalendarAssignmentOutput | null>(null);
@@ -419,19 +401,6 @@ export default function CalendarPage() {
     useEffect(() => {
         if (!currentUser) return;
 
-        const ticketsQuery = query(collection(db, 'tickets'), where('status', 'in', ['Abierto', 'Asignado']));
-        const unsubscribeTickets = onSnapshot(ticketsQuery, (snapshot) => {
-            const ticketsData = snapshot.docs.map(doc => {
-                 const data = doc.data();
-                 return { 
-                    id: doc.id,
-                    ...data,
-                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
-                } as Ticket
-            });
-            setUnassignedTickets(ticketsData.filter(t => !t.assignedToIds || t.assignedToIds.length === 0));
-        });
-
         const q = query(collection(db, 'scheduleEvents'));
         const unsubscribeEvents = onSnapshot(q, (snapshot) => {
             const fetchedEvents = snapshot.docs.map(doc => {
@@ -455,7 +424,6 @@ export default function CalendarPage() {
 
         return () => {
             unsubscribeEvents();
-            unsubscribeTickets();
         };
     }, [toast, currentUser]);
 
@@ -707,7 +675,8 @@ export default function CalendarPage() {
         }
     };
     
-    const handleEditEvent = (event: ScheduleEvent) => {
+    const handleEditEvent = (e: React.MouseEvent, event: ScheduleEvent) => {
+        e.stopPropagation();
         if (event.recurrenceId) {
             setEditingEvent(event);
             setIsEditRecurrenceDialogOpen(true);
@@ -729,7 +698,8 @@ export default function CalendarPage() {
         setIsManualDialogOpen(true);
     };
 
-    const handleDeleteClick = (event: ScheduleEvent) => {
+    const handleDeleteClick = (e: React.MouseEvent, event: ScheduleEvent) => {
+        e.stopPropagation();
         setDeleteDialogState({ eventToDelete: event, isOpen: true });
         if (!event.recurrenceId) {
             handleConfirmDelete('single');
@@ -827,6 +797,11 @@ export default function CalendarPage() {
     });
 
     const datesToDisplay = viewMode === 'week' ? weekDates : [currentDate];
+    
+    const visibleEvents = events.filter(e => {
+        const eventDate = startOfDay(e.start);
+        return datesToDisplay.some(d => startOfDay(d).getTime() === eventDate.getTime());
+    }).sort((a, b) => a.start.getTime() - b.start.getTime());
 
     const eventsByTechnicianAndDay = (technicianId: string, day: Date) => {
         return events.filter(e => {
@@ -839,6 +814,11 @@ export default function CalendarPage() {
     const handleEventClick = (event: ScheduleEvent) => {
         setSelectedEvent(event);
     };
+    
+    const handleAgendaItemClick = (event: ScheduleEvent) => {
+        setCurrentDate(event.start);
+        setSelectedEvent(event);
+    }
 
     const handleDateChange = (direction: 'prev' | 'next') => {
         const increment = direction === 'next' ? 1 : -1;
@@ -1069,19 +1049,34 @@ export default function CalendarPage() {
       </div>
 
       <div className="grid grid-cols-[240px_1fr] gap-4 overflow-hidden h-full">
-        {/* Unassigned & Technicians Column */}
+        {/* Agenda & Technicians Column */}
         <div className="flex flex-col gap-4">
             <Card className="flex flex-col bg-muted/30 h-1/2">
                 <CardHeader className="py-3 px-4 border-b">
-                    <CardTitle className="font-headline text-base">Tickets sin Asignar</CardTitle>
+                    <CardTitle className="font-headline text-base flex items-center gap-2">
+                        <CalendarDays className="w-5 h-5" />
+                        Agenda del Día
+                    </CardTitle>
                 </CardHeader>
-                <CardContent className="p-2 flex-1 overflow-y-auto"
-                    onDragOver={(e) => e.preventDefault()}
-                >
-                    {unassignedTickets.length > 0 ? unassignedTickets.map((ticket) => (
-                      <UnassignedTicketCard key={ticket.id} ticket={ticket} />
-                    )) : (
-                        <p className="text-sm text-muted-foreground p-4 text-center">¡No hay tickets pendientes!</p>
+                <CardContent className="p-2 flex-1 overflow-y-auto">
+                    {visibleEvents.length > 0 ? (
+                        visibleEvents.map((event) => (
+                           <button 
+                             key={event.id} 
+                             onClick={() => handleAgendaItemClick(event)}
+                             className={cn(
+                                "w-full text-left p-2 rounded-md hover:bg-background/80 transition-colors",
+                                selectedEvent?.id === event.id && "bg-background shadow-sm"
+                             )}
+                            >
+                                <p className="font-semibold text-sm truncate">{event.title}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {format(event.start, 'd MMM, h:mm a', { locale: es })}
+                                </p>
+                           </button>
+                        ))
+                    ) : (
+                        <p className="text-sm text-muted-foreground p-4 text-center">¡No hay eventos programados!</p>
                     )}
                 </CardContent>
             </Card>
@@ -1158,8 +1153,9 @@ export default function CalendarPage() {
                                 event={event} 
                                 color={generateColorFromString(tech.id, tech.name)} 
                                 onClick={() => handleEventClick(event)}
-                                onEdit={() => handleEditEvent(event)}
-                                onDelete={() => handleDeleteClick(event)}
+                                onEdit={(e) => handleEditEvent(e, event)}
+                                onDelete={(e) => handleDeleteClick(e, event)}
+                                isSelected={selectedEvent?.id === event.id}
                              />
                         ))}
                       </div>
