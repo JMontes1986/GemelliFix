@@ -3,7 +3,7 @@
   "indexes": [
     {
       "collectionGroup": "logs",
-      "queryScope": "COLLECTION_GROUP",
+      "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "details.ticketId", "order": "ASCENDING" },
         { "fieldPath": "timestamp", "order": "ASCENDING" }
