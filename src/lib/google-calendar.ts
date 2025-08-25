@@ -7,7 +7,7 @@ const getServiceAccountCredentials = () => {
         const calendarId = process.env.GOOGLE_CALENDAR_ID;
 
         if (!clientEmail || !privateKey || !calendarId) {
-            throw new Error("Missing required environment variables for Google Calendar: FB_CLIENT_EMAIL, FB_PRIVATE_KEY, GOOGLE_CALENDAR_ID.");
+            throw new Error("Missing required environment variables for Google Calendar: FB_CLIENT_EMAIL, FB_PRIVATE_KEY, and GOOGLE_CALENDAR_ID must all be set.");
         }
 
         return { clientEmail, privateKey, calendarId };
