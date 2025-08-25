@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -19,6 +18,7 @@ import {
   Pencil,
   Trash2,
   CalendarDays,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -701,9 +701,6 @@ export default function CalendarPage() {
     const handleDeleteClick = (e: React.MouseEvent, event: ScheduleEvent) => {
         e.stopPropagation();
         setDeleteDialogState({ eventToDelete: event, isOpen: true });
-        if (!event.recurrenceId) {
-            handleConfirmDelete('single');
-        }
     };
     
     const handleConfirmDelete = async (mode: 'single' | 'future') => {
@@ -874,19 +871,34 @@ export default function CalendarPage() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-      <AlertDialog open={deleteDialogState.isOpen && !!deleteDialogState.eventToDelete?.recurrenceId} onOpenChange={(open) => setDeleteDialogState({ isOpen: open, eventToDelete: open ? deleteDialogState.eventToDelete : null })}>
+        <AlertDialog open={deleteDialogState.isOpen} onOpenChange={(open) => setDeleteDialogState({ isOpen: open, eventToDelete: open ? deleteDialogState.eventToDelete : null })}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Eliminar evento recurrente</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Este es un evento recurrente. ¿Cómo te gustaría eliminarlo?
-                    </AlertDialogDescription>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="text-destructive"/>
+                        Confirmar Eliminación
+                    </AlertDialogTitle>
+                    {deleteDialogState.eventToDelete?.recurrenceId ? (
+                         <AlertDialogDescription>
+                            Este es un evento recurrente. ¿Cómo te gustaría eliminarlo?
+                        </AlertDialogDescription>
+                    ) : (
+                        <AlertDialogDescription>
+                            ¿Estás seguro de que deseas eliminar este evento? Esta acción no se puede deshacer.
+                        </AlertDialogDescription>
+                    )}
                 </AlertDialogHeader>
-                <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleConfirmDelete('single')}>Eliminar este evento</AlertDialogAction>
-                    <AlertDialogAction onClick={() => handleConfirmDelete('future')}>Eliminar este y futuros</AlertDialogAction>
-                </AlertDialogFooter>
+                {deleteDialogState.eventToDelete?.recurrenceId ? (
+                    <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <AlertDialogAction onClick={() => handleConfirmDelete('single')}>Eliminar solo este evento</AlertDialogAction>
+                        <AlertDialogAction onClick={() => handleConfirmDelete('future')} variant="destructive">Eliminar este y futuros</AlertDialogAction>
+                    </AlertDialogFooter>
+                ) : (
+                     <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleConfirmDelete('single')} variant="destructive">Confirmar Borrado</AlertDialogAction>
+                    </AlertDialogFooter>
+                )}
             </AlertDialogContent>
         </AlertDialog>
       <div className="flex items-center justify-between pb-4">
@@ -1170,3 +1182,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
