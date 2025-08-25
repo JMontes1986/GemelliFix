@@ -7,6 +7,7 @@ export type User = {
   email: string;
   avatar: string;
   role: 'Administrador' | 'Servicios Generales' | 'Docentes' | 'Coordinadores' | 'Administrativos' | 'SST';
+  createdAt?: any;
 };
 
 export type Zone = {
@@ -109,3 +110,4 @@ export type Log = {
     
 
     
+

@@ -11,8 +11,9 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, getDocs, query, where } from 'firebase-admin/firestore';
+import { getAdminApp } from '@/lib/firebaseAdmin';
+import { getFirestore } from 'firebase-admin/firestore';
 import type { User } from '@/lib/types';
 
 const SuggestTechnicianAssignmentInputSchema = z.object({
@@ -43,7 +44,11 @@ const techniciansTool = ai.defineTool(
         })),
     },
     async () => {
-        const q = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+        // Use the Admin SDK to bypass client-side security rules for this server-side operation
+        const adminApp = getAdminApp();
+        const adminDb = getFirestore(adminApp);
+
+        const q = query(collection(adminDb, 'users'), where('role', '==', 'Servicios Generales'));
         const querySnapshot = await getDocs(q);
         const technicians = querySnapshot.docs.map(doc => {
             const data = doc.data() as User;
@@ -101,5 +106,4 @@ const suggestTechnicianAssignmentFlow = ai.defineFlow(
     return output!;
   }
 );
-
     
