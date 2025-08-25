@@ -373,7 +373,7 @@ export default function TicketDetailPage() {
   };
 
 
-  const handleUpdate = async (field: keyof Ticket, value: any, commentText?: string) => {
+  const handleUpdate = async (field: keyof Ticket | 'multiple', value: any, commentText?: string) => {
     if (!ticket || !currentUser) return;
     if (isSST) {
       toast({ variant: 'destructive', title: 'Acción no permitida', description: 'El rol SST no puede modificar tickets.'});
@@ -402,27 +402,31 @@ export default function TicketDetailPage() {
 
     setIsUpdating(true);
     const docRef = doc(db, "tickets", ticket.id);
-    const oldValue = ticket[field];
+    const oldValue = field !== 'multiple' ? ticket[field] : null;
     
-    let updates: { [key: string]: any } = { [field]: value };
+    let updates: { [key: string]: any };
+    let logDetails: any;
 
-    if (field === 'status' && (value === 'Cerrado' || value === 'Resuelto')) {
-        updates.resolvedAt = new Date().toISOString();
+    if (field === 'multiple') {
+        updates = value; // value is an object with multiple updates
+        logDetails = { ticket, oldValue: ticket.status, newValue: updates.status, comment: commentText || comment };
+    } else {
+        updates = { [field]: value };
+        logDetails = { ticket, oldValue, newValue: value, comment: commentText || comment };
     }
-
-    let logDetails: any = { ticket, oldValue, newValue: value, comment: commentText || comment };
-
-    if (field === 'priority') {
+    
+    if (field === 'priority' || (field === 'multiple' && 'priority' in updates)) {
+        const priority = field === 'multiple' ? updates.priority : value;
         const createdAt = new Date(ticket.createdAt);
         let newDueDate = new Date(createdAt);
-        switch(value) {
+        switch(priority) {
             case 'Urgente': newDueDate.setHours(createdAt.getHours() + 12); break;
             case 'Alta': newDueDate.setHours(createdAt.getHours() + 24); break;
             case 'Media': newDueDate.setHours(createdAt.getHours() + 36); break;
             case 'Baja': newDueDate.setHours(createdAt.getHours() + 48); break;
         }
         updates.dueDate = newDueDate;
-        logDetails.newValue = `${value} (vence: ${newDueDate.toLocaleDateString()})`;
+        logDetails.newValue = `${priority} (vence: ${newDueDate.toLocaleDateString()})`;
     }
     
     try {
@@ -430,10 +434,12 @@ export default function TicketDetailPage() {
 
       if (field === 'status' || field === 'priority') {
         await createLog(currentUser, `update_${field}`, logDetails);
+      } else if (field === 'multiple') {
+        await createLog(currentUser, `update_status`, logDetails);
       }
       
       // If there was a comment during a status change, log it separately.
-      if ( (commentText || comment).trim() && field === 'status') {
+      if ( (commentText || comment).trim() && (field === 'status' || field === 'multiple')) {
          await createLog(currentUser, 'add_comment', { ticket, comment: commentText || comment });
       }
 
@@ -441,7 +447,7 @@ export default function TicketDetailPage() {
 
       toast({
         title: "Ticket Actualizado",
-        description: `El campo ${field} ha sido cambiado.`,
+        description: `La información del ticket ha sido actualizada.`,
       });
     } catch (error: any) {
       console.error("Error updating ticket: ", error);
@@ -564,7 +570,12 @@ export default function TicketDetailPage() {
     }
     
     const newStatus = approve ? 'Cerrado' : 'Asignado'; // Si se rechaza, vuelve a 'Asignado'
-    await handleUpdate('status', newStatus, `Ticket ${approve ? 'aprobado' : 'rechazado'} por ${currentUser.name}.`);
+    const updates: any = { status: newStatus };
+    if (approve) {
+        updates.resolvedAt = new Date().toISOString();
+    }
+    
+    await handleUpdate('multiple', updates, `Ticket ${approve ? 'aprobado' : 'rechazado'} por ${currentUser.name}.`);
 
     toast({
         title: `Ticket ${approve ? 'Aprobado y Cerrado' : 'Rechazado'}`,
