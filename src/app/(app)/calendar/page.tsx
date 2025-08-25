@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot, updateDoc, Timestamp, writeBatch, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot, updateDoc, Timestamp, writeBatch, deleteDoc, orderBy } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
   ChevronLeft,
@@ -66,7 +66,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from '@/components/ui/dropdown-menu';
-import type { ScheduleEvent, Ticket, User } from '@/lib/types';
+import type { ScheduleEvent, Ticket, User, Category } from '@/lib/types';
 import { cn, createLog } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
@@ -81,7 +81,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { addDays, addMonths, addWeeks, format, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { categories as predefinedTaskTitles } from '@/lib/data';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
     Accordion,
@@ -343,6 +342,7 @@ export default function CalendarPage() {
     const { toast } = useToast();
     const router = useRouter();
     const [allTechnicians, setAllTechnicians] = useState<User[]>([]);
+    const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
     const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
 
@@ -442,8 +442,17 @@ export default function CalendarPage() {
             setIsLoadingData(false);
         });
 
+        // Fetch all categories for the manual task creation dropdown
+        const catQuery = query(collection(db, 'categories'), orderBy('name'));
+        const unsubscribeCats = onSnapshot(catQuery, (snapshot) => {
+            const cats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
+            setAllCategories(cats);
+        });
+
+
         return () => {
             unsubscribeEvents();
+            unsubscribeCats();
         };
     }, [toast, currentUser]);
 
@@ -494,7 +503,6 @@ export default function CalendarPage() {
                 // Creation logic
                 const batch = writeBatch(db);
                 let eventCount = 0;
-                const recurrenceId = isRecurring ? `rec-${Date.now()}` : undefined;
                 
                 const createEventInstance = (start: Date, end: Date, technicianId: string) => {
                     const tech = allTechnicians.find(t => t.id === technicianId);
@@ -509,7 +517,8 @@ export default function CalendarPage() {
                         technicianId: technicianId,
                     };
                     
-                    if (isRecurring && recurrenceId) {
+                    if (isRecurring) {
+                      const recurrenceId = `rec-${Date.now()}`;
                       baseEvent.recurrenceId = recurrenceId;
                     }
                     
@@ -855,7 +864,7 @@ export default function CalendarPage() {
                                 <SelectValue placeholder="Seleccionar tarea" />
                             </SelectTrigger>
                             <SelectContent>
-                                {predefinedTaskTitles.map(task => <SelectItem key={task.id} value={task.name}>{task.name}</SelectItem>)}
+                                {allCategories.map(task => <SelectItem key={task.id} value={task.name}>{task.name}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
@@ -1123,3 +1132,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
