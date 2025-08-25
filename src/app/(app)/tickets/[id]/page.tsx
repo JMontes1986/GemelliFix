@@ -315,14 +315,14 @@ export default function TicketDetailPage() {
     const logsQuery = query(
       collection(db, 'logs'), 
       where('details.ticketId', '==', ticketId),
-      orderBy('timestamp', 'desc')
+      orderBy('timestamp', 'asc') // Fetch in ascending order
     );
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
         const fetchedLogs: Log[] = [];
         snapshot.forEach(doc => {
             fetchedLogs.push({ id: doc.id, ...doc.data()} as Log);
         });
-        setLogs(fetchedLogs);
+        setLogs(fetchedLogs.reverse()); // Reverse on the client to show newest first
         setIsLoadingLogs(false);
     }, (err) => {
         console.error("Error fetching logs: ", err);
