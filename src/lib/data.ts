@@ -70,4 +70,3 @@ export const scheduleEvents: ScheduleEvent[] = [
         ticketId: '1'
     },
 ];
-
