@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -485,7 +484,7 @@ export default function CalendarPage() {
                     const tech = techniciansToDisplay.find(t => t.id === technicianId);
                     if (!tech) return;
 
-                    const baseEvent: Omit<ScheduleEvent, 'id'> = {
+                    const baseEvent: Omit<ScheduleEvent, 'id' | 'recurrenceId'> = {
                         title: newEventTitle,
                         description: newEventDescription,
                         start: start,
@@ -494,21 +493,26 @@ export default function CalendarPage() {
                         technicianId: technicianId,
                     };
                     
-                    const eventData: any = { ...baseEvent };
-                    if (isRecurring) {
-                        eventData.recurrenceId = `rec-${Date.now()}`;
-                    }
-
                     const eventRef = doc(collection(db, 'scheduleEvents'));
-                    batch.set(eventRef, eventData);
                     
-                    createCalendarNotification(tech.name, eventData);
+                    if (isRecurring) {
+                        const eventData: Omit<ScheduleEvent, 'id'> = {
+                            ...baseEvent,
+                            recurrenceId: `rec-${Date.now()}`
+                        };
+                        batch.set(eventRef, eventData);
+                        createCalendarNotification(tech.name, eventData);
+                    } else {
+                        const eventData: Omit<ScheduleEvent, 'id'> = baseEvent;
+                         batch.set(eventRef, eventData);
+                         createCalendarNotification(tech.name, eventData);
+                    }
                     
                     createCalendarEvent({
-                        summary: eventData.title,
-                        description: eventData.description || 'Sin descripción.',
-                        start: { dateTime: eventData.start.toISOString(), timeZone: 'America/Bogota' },
-                        end: { dateTime: eventData.end.toISOString(), timeZone: 'America/Bogota' },
+                        summary: baseEvent.title,
+                        description: baseEvent.description || 'Sin descripción.',
+                        start: { dateTime: baseEvent.start.toISOString(), timeZone: 'America/Bogota' },
+                        end: { dateTime: baseEvent.end.toISOString(), timeZone: 'America/Bogota' },
                     });
 
                     eventCount++;
@@ -966,7 +970,7 @@ export default function CalendarPage() {
 
       <div className="grid grid-cols-[240px_1fr] gap-4 overflow-hidden h-full">
         {/* Agenda & Technicians Column */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 overflow-y-hidden">
             <Card className="flex flex-col bg-muted/30 h-1/2">
                 <CardHeader className="py-3 px-4 border-b">
                     <CardTitle className="font-headline text-base flex items-center gap-2">
@@ -974,7 +978,7 @@ export default function CalendarPage() {
                         Agenda del Día
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-0 flex-1">
+                <CardContent className="p-0 flex-1 overflow-y-auto">
                     <ScrollArea className="h-full p-2">
                         {visibleEvents.length > 0 ? (
                             visibleEvents.map((event) => (
@@ -1080,3 +1084,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
