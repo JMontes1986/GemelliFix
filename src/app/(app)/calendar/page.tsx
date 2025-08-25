@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -470,21 +471,23 @@ export default function CalendarPage() {
                 const batch = writeBatch(db);
                 let eventCount = 0;
                 const tech = techniciansToDisplay.find(t => t.id === newEventTechnicianId);
-                const recurrenceId = isRecurring ? `rec-${Date.now()}` : undefined;
 
                 const createEventInstance = (start: Date, end: Date) => {
-                    const newEvent: Omit<ScheduleEvent, 'id'> = {
+                    const baseEvent: Omit<ScheduleEvent, 'id' | 'recurrenceId'> = {
                         title: newEventTitle,
                         description: newEventDescription,
                         start: start,
                         end: end,
                         type: 'task',
                         technicianId: newEventTechnicianId,
-                        recurrenceId,
                     };
                     
+                    const newEvent: Omit<ScheduleEvent, 'id'> = isRecurring 
+                        ? { ...baseEvent, recurrenceId: `rec-${Date.now()}` }
+                        : baseEvent;
+
                     const eventRef = doc(collection(db, 'scheduleEvents'));
-                    batch.set(eventRef, { ...newEvent });
+                    batch.set(eventRef, newEvent);
                     
                     if (tech) {
                         createCalendarNotification(tech.name, newEvent);
@@ -1042,4 +1045,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
 
