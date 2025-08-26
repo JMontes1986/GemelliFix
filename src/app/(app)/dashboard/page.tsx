@@ -75,6 +75,7 @@ import { startOfWeek, format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
@@ -90,27 +91,29 @@ function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: b
                         El asistente de IA ha analizado los KPIs actuales de mantenimiento.
                     </DialogDescription>
                 </DialogHeader>
-                {isLoading && (
-                    <div className="space-y-4 py-4">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-1/2" />
-                    </div>
-                )}
-                {analysis && (
-                   <div className="prose prose-sm max-w-full text-muted-foreground">
-                        <ReactMarkdown
-                            components={{
-                                p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                                ul: ({node, ...props}) => <ul className="list-disc pl-5 space-y-1" {...props} />,
-                                li: ({node, ...props}) => <li className="text-muted-foreground" {...props} />,
-                            }}
-                        >
-                            {analysis.summary}
-                        </ReactMarkdown>
-                    </div>
-                )}
+                <ScrollArea className="max-h-[60vh] pr-6 -mr-6">
+                    {isLoading && (
+                        <div className="space-y-4 py-4">
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-1/2" />
+                        </div>
+                    )}
+                    {analysis && (
+                    <div className="prose prose-sm max-w-full text-muted-foreground py-4">
+                            <ReactMarkdown
+                                components={{
+                                    p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                                    ul: ({node, ...props}) => <ul className="list-disc pl-5 space-y-1" {...props} />,
+                                    li: ({node, ...props}) => <li className="text-muted-foreground" {...props} />,
+                                }}
+                            >
+                                {analysis.summary}
+                            </ReactMarkdown>
+                        </div>
+                    )}
+                </ScrollArea>
             </DialogContent>
         </Dialog>
     );
