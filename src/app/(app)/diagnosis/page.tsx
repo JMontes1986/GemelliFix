@@ -25,7 +25,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { db, auth } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, type DocumentReference, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, type DocumentReference, query, where, getDocs, limit, doc, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Zap, BrainCircuit, AlertTriangle, CalendarPlus, UserPlus, Fingerprint } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -47,6 +47,15 @@ const diagnosisSchema = z.object({
 
 type DiagnosisFormValues = z.infer<typeof diagnosisSchema>;
 
+type UserTest = {
+  id: string;
+  title: string;
+  status: 'ok' | 'fail' | 'skip';
+  detail?: string;
+  ms?: number;
+};
+
+
 export default function DiagnosisPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
@@ -59,6 +68,9 @@ export default function DiagnosisPage() {
   // State for isolated calendar test
   const [isolatedDate, setIsolatedDate] = React.useState<Date | undefined>(new Date());
   const [isolatedTitle, setIsolatedTitle] = React.useState('');
+  
+  const [userTests, setUserTests] = React.useState<UserTest[]>([]);
+  const [otherUserUid, setOtherUserUid] = React.useState(''); // uid para probar lectura privada de otro usuario
 
 
   React.useEffect(() => {
@@ -393,6 +405,84 @@ export default function DiagnosisPage() {
         setIsLoading(false);
     }
   };
+  
+  const runUserAccessTests = async () => {
+    if (!currentUser) {
+      setExecutionResult({
+        status: 'Error de Autenticación',
+        message: 'Debes iniciar sesión para ejecutar las pruebas de usuarios.',
+      });
+      return;
+    }
+
+    const add = (r: UserTest) =>
+      setUserTests((prev) => {
+        const next = [...prev.filter((x) => x.id !== r.id), r];
+        next.sort((a, b) => a.id.localeCompare(b.id));
+        return next;
+      });
+
+    const exec = async (
+      id: string,
+      title: string,
+      fn: () => Promise<void>,
+      skip = false
+    ) => {
+      const start = performance.now();
+      if (skip) {
+        add({ id, title, status: 'skip' });
+        return;
+      }
+      try {
+        await fn();
+        add({ id, title, status: 'ok', ms: Math.round(performance.now() - start) });
+      } catch (e: any) {
+        add({
+          id,
+          title,
+          status: 'fail',
+          detail: e?.message || String(e),
+          ms: Math.round(performance.now() - start),
+        });
+      }
+    };
+
+    setUserTests([]);
+
+    // 01) Leer mi propio documento /users/{uid}
+    await exec('01', 'Leer mi perfil (/users/{uid})', async () => {
+      const snap = await getDoc(doc(db, 'users', currentUser.uid));
+      if (!snap.exists()) throw new Error('Mi documento en /users no existe');
+    });
+
+    // 02) Listar usuarios (solo Admin) -> si tus reglas lo restringen por rol, aquí verás el error
+    await exec('02', 'Listar /users (solo Admin)', async () => {
+      const qs = await getDocs(query(collection(db, 'users'), orderBy('name'), limit(5)));
+      // permitido aunque el resultado esté vacío
+      void qs;
+    });
+
+    // 03) Leer el perfil privado de otro usuario -> debería FALLAR para no-Admins
+    await exec(
+      '03',
+      'Leer perfil de OTRO usuario (/users/{otherUid})',
+      async () => {
+        if (!otherUserUid.trim()) throw new Error('Ingresa un UID en el campo "Otro usuario (UID)"');
+        const snap = await getDoc(doc(db, 'users', otherUserUid.trim()));
+        if (!snap.exists()) throw new Error('El documento /users/{otherUid} no existe');
+      },
+      !otherUserUid.trim()
+    );
+
+    // Resumen rápido en el panel principal
+    const failed = userTests.some((t) => t.status === 'fail');
+    setExecutionResult({
+      status: failed ? 'Error' : 'Éxito',
+      message: failed
+        ? 'Una o más pruebas de acceso a usuarios fallaron. Revisa el detalle en la tabla de “Pruebas de Usuarios”.'
+        : 'Todas las pruebas de acceso a usuarios pasaron.',
+    });
+  };
 
   return (
     <div className="flex flex-col items-center justify-start py-8 gap-8">
@@ -450,6 +540,79 @@ export default function DiagnosisPage() {
               <p>Asegúrate de añadirlo dentro del array <code className="bg-yellow-200/50 px-1 py-0.5 rounded">"indexes"</code> existente, sin eliminar los otros índices. Después de guardar el cambio, el sistema debería aplicar la configuración.</p>
           </CardContent>
       </Card>
+      
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle className="font-headline text-2xl">Pruebas de Usuarios (Firestore)</CardTitle>
+          <CardDescription>
+            Verifica lecturas típicas sobre la colección <code>/users</code>: tu propio perfil, listado global (solo Admin) y el
+            intento de leer el perfil privado de otro usuario (debería fallar si no eres Admin).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium">Otro usuario (UID)</label>
+              <Input
+                placeholder="uid-de-otro-usuario"
+                value={otherUserUid}
+                onChange={(e) => setOtherUserUid(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Opcional: si lo completas se intentará leer <code>/users/{'{otherUid}'}</code>.
+              </p>
+            </div>
+            <div className="flex items-end">
+              <Button className="w-full" onClick={runUserAccessTests} disabled={isAuthLoading}>
+                {isAuthLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Ejecutar pruebas de usuarios
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-4 overflow-x-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40">
+                <tr>
+                  <th className="p-3 text-left w-16">#</th>
+                  <th className="p-3 text-left">Prueba</th>
+                  <th className="p-3 text-left w-24">Estado</th>
+                  <th className="p-3 text-left w-16">ms</th>
+                  <th className="p-3 text-left">Detalle / Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {userTests.length === 0 ? (
+                  <tr>
+                    <td className="p-6 text-center text-muted-foreground" colSpan={5}>
+                      Aún no has ejecutado pruebas de usuarios.
+                    </td>
+                  </tr>
+                ) : (
+                  userTests
+                    .sort((a, b) => a.id.localeCompare(b.id))
+                    .map((t) => (
+                      <tr key={t.id} className="border-t">
+                        <td className="p-3 font-mono">{t.id}</td>
+                        <td className="p-3">{t.title}</td>
+                        <td className="p-3">
+                          {t.status === 'ok' && <span className="inline-flex rounded bg-emerald-100 px-2 py-0.5 text-emerald-800">OK</span>}
+                          {t.status === 'fail' && <span className="inline-flex rounded bg-red-100 px-2 py-0.5 text-red-800">FALLÓ</span>}
+                          {t.status === 'skip' && <span className="inline-flex rounded bg-zinc-100 px-2 py-0.5 text-zinc-800">Omitida</span>}
+                        </td>
+                        <td className="p-3">{t.ms ?? ''}</td>
+                        <td className="p-3">
+                          <pre className="whitespace-pre-wrap break-words">{t.detail ?? ''}</pre>
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
 
       <Card className="w-full max-w-2xl">
         <CardHeader>
@@ -692,5 +855,3 @@ export default function DiagnosisPage() {
     </div>
   );
 }
-
-    
