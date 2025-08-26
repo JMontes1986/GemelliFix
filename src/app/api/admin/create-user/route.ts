@@ -4,12 +4,9 @@ export const runtime = 'nodejs'; // Evita el runtime de Edge
 export const dynamic = 'force-dynamic'; // Evita el pre-renderizado en el build
 
 import { NextResponse } from 'next/server';
-
-// Import these dynamically to ensure environment variables are loaded.
 import { getAdminApp } from '@/lib/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-
 
 export async function POST(req: Request) {
   try {

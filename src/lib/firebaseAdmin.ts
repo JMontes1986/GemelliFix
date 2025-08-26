@@ -1,10 +1,18 @@
 
 import { cert, getApps, initializeApp, getApp, App } from 'firebase-admin/app';
 
-// This is a robust way to ensure the Admin App is initialized only once.
-let adminApp: App | undefined;
+/**
+ * Ensures that the Firebase Admin SDK is initialized only once.
+ * This is the central function for accessing the Admin App instance.
+ * @returns {App} The initialized Firebase Admin App.
+ */
+export function getAdminApp(): App {
+  // If the default app is already initialized, return it.
+  if (getApps().length > 0) {
+    return getApp();
+  }
 
-function createAdminApp(): App {
+  // Otherwise, create a new app.
   const projectId = process.env.FB_PROJECT_ID;
   const clientEmail = process.env.FB_CLIENT_EMAIL;
   const privateKey = process.env.FB_PRIVATE_KEY;
@@ -17,7 +25,6 @@ function createAdminApp(): App {
 
   try {
     const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
-    // Always initialize the default app. Do not use a named app to avoid conflicts.
     return initializeApp({
       credential: cert({ projectId, clientEmail, privateKey: formattedPrivateKey }),
     });
@@ -28,19 +35,4 @@ function createAdminApp(): App {
     }
     throw error;
   }
-}
-
-export function getAdminApp(): App {
-    if (adminApp) {
-        return adminApp;
-    }
-
-    const apps = getApps();
-    if (apps.length > 0) {
-        adminApp = getApp();
-        return adminApp;
-    }
-
-    adminApp = createAdminApp();
-    return adminApp;
 }
