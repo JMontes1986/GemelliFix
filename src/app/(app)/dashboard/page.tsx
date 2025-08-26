@@ -183,7 +183,6 @@ export default function DashboardPage() {
   }, [toast, tickets.length, technicians.length]);
 
   const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto' && t.status !== 'Cancelado').length;
-  const overdueTickets = tickets.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Cerrado' && t.status !== 'Resuelto' && t.status !== 'Cancelado').length;
   
   const closedTickets = tickets.filter(t => t.status === 'Cerrado' || t.status === 'Resuelto');
   
@@ -194,6 +193,13 @@ export default function DashboardPage() {
   const slaCompliance = closedTickets.length > 0
     ? Math.round((slaCompliantTickets.length / closedTickets.length) * 100)
     : 100;
+    
+  const overdueTickets = tickets.filter(t => {
+      if (t.status === 'Cerrado' || t.status === 'Resuelto' || t.status === 'Cancelado') {
+          return false;
+      }
+      return new Date() > new Date(t.dueDate);
+  }).length;
 
   const resolutionTimes = closedTickets
     .map(t => {
@@ -290,26 +296,21 @@ export default function DashboardPage() {
         const weekStart = startOfWeek(createdAt, { weekStartsOn: 1 });
         const weekKey = format(weekStart, 'yyyy-MM-dd');
 
+        // Initialize the week if it doesn't exist
         if (!weeklyData[weekKey]) {
             weeklyData[weekKey] = { created: 0, closed: 0, overdue: 0 };
         }
 
+        // Increment created count for the creation week
         weeklyData[weekKey].created++;
-
+        
+        // If the ticket is closed, increment the closed count for its creation week
         if (ticket.resolvedAt) {
-            const resolvedAt = parseISO(ticket.resolvedAt);
-            const resolvedWeekStart = startOfWeek(resolvedAt, { weekStartsOn: 1 });
-            const resolvedWeekKey = format(resolvedWeekStart, 'yyyy-MM-dd');
-            if (!weeklyData[resolvedWeekKey]) {
-                weeklyData[resolvedWeekKey] = { created: 0, closed: 0, overdue: 0 };
-            }
-            weeklyData[resolvedWeekKey].closed++;
+            weeklyData[weekKey].closed++;
         }
 
-        if (new Date(ticket.dueDate) < new Date() && ticket.status !== 'Cerrado' && ticket.status !== 'Resuelto') {
-             if (!weeklyData[weekKey]) {
-                weeklyData[weekKey] = { created: 0, closed: 0, overdue: 0 };
-            }
+        // If the ticket is currently overdue, increment the overdue count for its creation week
+        if (new Date() > new Date(ticket.dueDate) && ticket.status !== 'Cerrado' && ticket.status !== 'Resuelto' && ticket.status !== 'Cancelado') {
             weeklyData[weekKey].overdue++;
         }
     });
