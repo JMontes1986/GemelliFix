@@ -21,6 +21,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,6 +38,7 @@ import { diagnoseRequesterAccess } from '@/ai/flows/diagnose-requester-access';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar } from '@/components/ui/calendar';
 import { addDays } from 'date-fns';
+import { Label } from '@/components/ui/label';
 
 
 // Esquema de validación simple para el formulario de diagnóstico
