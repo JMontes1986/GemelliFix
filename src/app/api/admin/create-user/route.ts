@@ -25,8 +25,9 @@ export async function POST(req: Request) {
     const db = getFirestore(adminApp);
 
     const decodedToken = await auth.verifyIdToken(idToken);
+    const userClaims = (await auth.getUser(decodedToken.uid)).customClaims;
     
-    if (decodedToken.role !== 'Administrador') {
+    if (userClaims?.role !== 'Administrador') {
       return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
     }
 
@@ -46,6 +47,8 @@ export async function POST(req: Request) {
       avatar: avatar || null,
       createdAt: new Date(),
     });
+    
+    // The onUserCreated Cloud Function will automatically set the custom claim.
 
     return NextResponse.json({ ok: true, uid: userRec.uid });
 
@@ -62,7 +65,7 @@ export async function POST(req: Request) {
         message = 'Server-side Firebase Admin credentials are not configured. Check your environment variables.';
         status = 500;
     } else if (err.message?.includes('Failed to parse Firebase private key')) {
-        message = 'Server-side Firebase Admin credentials are not formatted correctly.';
+        message = 'Server-side Firebase Admin credentials are not formatted correctly. Ensure the private key is stored correctly.';
         status = 500;
     } else if (err.code === 'auth/email-already-exists') {
         message = 'The email address is already in use by another account.';
