@@ -18,7 +18,7 @@ async function assertAdmin(request: Request) {
   // Política: verifica en Firestore si el usuario tiene rol Administrador
   const db = getFirestore(app);
   const snap = await db.collection("users").doc(decoded.uid).get();
-  if (!snap.exists || snap.get("role") !== "Administrador") {
+  if (!snap.exists() || snap.get("role") !== "Administrador") {
     throw new Error("forbidden-not-admin");
   }
   return decoded.uid;
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     ) {
       status = 500;
       msg =
-        "Server-side Firebase Admin credentials are not formatted correctly. Check FIREBASE_ADMIN_B64 (JSON base64) or FB_PRIVATE_KEY.";
+        "Server-side Firebase Admin credentials are not formatted correctly. Check FB_PROJECT_ID, FB_CLIENT_EMAIL and FB_PRIVATE_KEY.";
     } else if (err.errorInfo?.message) {
       msg = err.errorInfo.message;
     } else if (err.message) {

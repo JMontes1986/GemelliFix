@@ -1,79 +1,46 @@
 // src/lib/firebaseAdmin.ts
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 
-type SaJson = {
-  project_id: string;
-  client_email: string;
-  private_key: string;
-};
+function getAdminApp(): App {
+  // Si la app ya está inicializada, la devuelve para evitar errores.
+  const apps = getApps();
+  if (apps.length > 0) {
+    return apps[0];
+  }
 
-function readFromBase64(): SaJson | null {
-  const b64 = process.env.FIREBASE_ADMIN_B64;
-  if (!b64) return null;
+  // Lee las credenciales desde las variables de entorno.
+  const projectId = process.env.FB_PROJECT_ID;
+  const clientEmail = process.env.FB_CLIENT_EMAIL;
+  const privateKey = process.env.FB_PRIVATE_KEY;
+
+  // Valida que todas las variables necesarias estén presentes.
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      "Firebase Admin environment variables not set. Ensure FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY are correctly configured in your .env file."
+    );
+  }
+
+  // Reemplaza los caracteres de escape '\\n' por saltos de línea reales '\n'.
+  // Esto es crucial porque las variables de entorno almacenan la clave privada en una sola línea.
+  const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
 
   try {
-    const jsonStr = Buffer.from(b64, "base64").toString("utf8");
-    const parsed = JSON.parse(jsonStr);
-
-    if (!parsed?.private_key || !parsed?.client_email || !parsed?.project_id) {
-      throw new Error(
-        "El JSON decodificado no tiene {project_id, client_email, private_key}."
-      );
+    // Inicializa y devuelve la app de Firebase Admin.
+    return initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey: formattedPrivateKey,
+      }),
+    });
+  } catch (error: any) {
+    // Proporciona un mensaje de error más detallado si la inicialización falla.
+    console.error("Firebase Admin SDK initialization error:", error.message);
+    if (error.code === 'app/invalid-credential' || error.message?.includes('PEM')) {
+      throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted in your environment variables.');
     }
-    return {
-      project_id: parsed.project_id,
-      client_email: parsed.client_email,
-      private_key: parsed.private_key,
-    };
-  } catch (e) {
-    // Lanza un mensaje claro para debugging
-    throw new Error(
-      "Failed to parse FIREBASE_ADMIN_B64. Make sure it is a valid Base64 encoded JSON string."
-    );
+    throw error;
   }
 }
 
-function readFromSplitVars(): SaJson | null {
-  const projectId = process.env.FB_PROJECT_ID || process.env.GCLOUD_PROJECT;
-  const clientEmail = process.env.FB_CLIENT_EMAIL;
-  let privateKey = process.env.FB_PRIVATE_KEY;
-
-  if (!projectId || !clientEmail || !privateKey) return null;
-
-  // Corrige los \n escapados si vienen en una sola línea
-  if (privateKey.includes("\\n")) {
-    privateKey = privateKey.replace(/\\n/g, "\n");
-  }
-
-  return { project_id: projectId, client_email: clientEmail, private_key: privateKey };
-}
-
-function getCredential() {
-  const fromB64 = readFromBase64();
-  const fromSplit = !fromB64 ? readFromSplitVars() : null;
-  const sa = fromB64 ?? fromSplit;
-
-  if (!sa) {
-    throw new Error(
-      "No se encontraron credenciales Admin. Define FIREBASE_ADMIN_B64 (JSON base64) o FB_PROJECT_ID/FB_CLIENT_EMAIL/FB_PRIVATE_KEY."
-    );
-  }
-
-  if (!sa.private_key.startsWith("-----BEGIN")) {
-    throw new Error(
-      "La private_key no tiene formato PEM válido (debe iniciar con '-----BEGIN PRIVATE KEY-----')."
-    );
-  }
-
-  return cert({
-    projectId: sa.project_id,
-    clientEmail: sa.client_email,
-    privateKey: sa.private_key,
-  });
-}
-
-export function getAdminApp(): App {
-  const apps = getApps();
-  if (apps.length) return apps[0];
-  return initializeApp({ credential: getCredential() });
-}
+export { getAdminApp };
