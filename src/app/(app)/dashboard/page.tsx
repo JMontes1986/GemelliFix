@@ -147,9 +147,37 @@ export default function DashboardPage() {
   const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
   const [analysisResult, setAnalysisResult] = React.useState<AnalyzeDashboardOutput | null>(null);
   const { toast } = useToast();
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const router = useRouter();
+
 
   React.useEffect(() => {
     setIsLoading(true);
+
+     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        if (firebaseUser) {
+            try {
+                const userDocRef = doc(db, 'users', firebaseUser.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+                    setCurrentUser(userData);
+
+                    if (userData.role !== 'Administrador' && userData.role !== 'SST') {
+                        router.push('/tickets');
+                        return;
+                    }
+                } else {
+                    router.push('/login');
+                }
+            } catch (error) {
+                 console.error("Error fetching user data:", error);
+                 router.push('/login');
+            }
+        } else {
+            router.push('/login');
+        }
+    });
     
     // Fetch Tickets
     const qTickets = query(collection(db, 'tickets'));
@@ -164,7 +192,7 @@ export default function DashboardPage() {
         ticketsData.push({ ...data, id: doc.id, createdAt, dueDate, resolvedAt } as Ticket);
       });
       setTickets(ticketsData);
-      if (technicians.length > 0) setIsLoading(false);
+      if (technicians.length > 0 || !currentUser || currentUser.role === 'SST') setIsLoading(false);
     }, (error) => {
       console.error("Error fetching tickets for dashboard: ", error);
       toast({
@@ -188,10 +216,11 @@ export default function DashboardPage() {
     });
     
     return () => {
+        unsubscribeAuth();
         unsubscribeTickets();
         unsubscribeTechnicians();
     };
-  }, [toast, tickets.length, technicians.length]);
+  }, [toast, tickets.length, technicians.length, currentUser, router]);
 
   const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto' && t.status !== 'Cancelado').length;
   
@@ -426,7 +455,7 @@ export default function DashboardPage() {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
   
-  if (isLoading) {
+  if (isLoading || !currentUser) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -711,31 +740,33 @@ export default function DashboardPage() {
                 )}
             </CardContent>
         </Card>
-        <Card>
-            <CardHeader>
-                <CardTitle className="font-headline flex items-center gap-2"><TrendingUp className="h-5 w-5" />Productividad de Equipo</CardTitle>
-                <CardDescription>Tickets resueltos y tiempo promedio por técnico.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
-                    <div className="space-y-4">
-                        {productivityData.map(tech => (
-                             <div key={tech.name} className="flex items-center">
-                                <Avatar className="h-9 w-9">
-                                    <AvatarImage src={tech.avatar} />
-                                    <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div className="ml-4 space-y-1">
-                                    <p className="text-sm font-medium leading-none">{tech.name}</p>
-                                    <p className="text-sm text-muted-foreground">{tech.resolvedCount} resueltos - {tech.avgTime}h prom.</p>
+        {currentUser?.role !== 'SST' && (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline flex items-center gap-2"><TrendingUp className="h-5 w-5" />Productividad de Equipo</CardTitle>
+                    <CardDescription>Tickets resueltos y tiempo promedio por técnico.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
+                        <div className="space-y-4">
+                            {productivityData.map(tech => (
+                                <div key={tech.name} className="flex items-center">
+                                    <Avatar className="h-9 w-9">
+                                        <AvatarImage src={tech.avatar} />
+                                        <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="ml-4 space-y-1">
+                                        <p className="text-sm font-medium leading-none">{tech.name}</p>
+                                        <p className="text-sm text-muted-foreground">{tech.resolvedCount} resueltos - {tech.avgTime}h prom.</p>
+                                    </div>
+                                    <div className="ml-auto font-medium">{tech.resolvedCount}</div>
                                 </div>
-                                <div className="ml-auto font-medium">{tech.resolvedCount}</div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        )}
       </div>
 
        <Card>
