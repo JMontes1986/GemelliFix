@@ -9,26 +9,26 @@ import { cert, getApps, initializeApp, getApp, App } from 'firebase-admin/app';
 function createAdminApp(): App {
   const projectId = process.env.FB_PROJECT_ID;
   const clientEmail = process.env.FB_CLIENT_EMAIL;
-  // The Base64 encoded key is the most reliable way to handle private keys in env variables.
-  const privateKeyB64 = process.env.FB_PRIVATE_KEY_B64;
+  const privateKey = process.env.FB_PRIVATE_KEY;
 
-  if (!projectId || !clientEmail || !privateKeyB64) {
+  if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
-      'Firebase Admin environment variables are not set. Ensure FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY_B64 are correctly configured in your .env file.'
+      'Firebase Admin environment variables are not set. Ensure FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY are correctly configured in your .env file.'
     );
   }
 
   try {
-    // Decode the Base64 private key to its original format.
-    const privateKey = Buffer.from(privateKeyB64, 'base64').toString('utf-8');
-    
+    // This is the crucial step: replace the literal '\n' characters from the
+    // environment variable with actual newline characters.
+    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+
     return initializeApp({
-      credential: cert({ projectId, clientEmail, privateKey }),
+      credential: cert({ projectId, clientEmail, privateKey: formattedPrivateKey }),
     });
   } catch (error: any) {
     console.error("Firebase Admin SDK initialization error:", error.message);
     if (error.code === 'app/invalid-credential' || error.message?.includes('PEM') || error.message?.includes('parse')) {
-      throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted and Base64 encoded in your environment variables.');
+      throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted in your environment variables.');
     }
     throw error;
   }
