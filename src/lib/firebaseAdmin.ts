@@ -12,26 +12,28 @@ export function getAdminApp(): App {
     return getApp();
   }
 
-  // Otherwise, create a new app.
   const projectId = process.env.FB_PROJECT_ID;
   const clientEmail = process.env.FB_CLIENT_EMAIL;
-  const privateKey = process.env.FB_PRIVATE_KEY;
+  // Prioritize the new Base64 encoded key
+  const privateKeyB64 = process.env.FB_PRIVATE_KEY_B64;
 
-  if (!projectId || !clientEmail || !privateKey) {
+  if (!projectId || !clientEmail || !privateKeyB64) {
     throw new Error(
-      'Firebase Admin environment variables are not set. Ensure FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY are correctly configured.'
+      'Firebase Admin environment variables are not set. Ensure FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY_B64 are correctly configured in your .env file.'
     );
   }
 
   try {
-    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+    // Decode the Base64 private key
+    const privateKey = Buffer.from(privateKeyB64, 'base64').toString('utf-8');
+    
     return initializeApp({
-      credential: cert({ projectId, clientEmail, privateKey: formattedPrivateKey }),
+      credential: cert({ projectId, clientEmail, privateKey }),
     });
   } catch (error: any) {
     console.error("Firebase Admin SDK initialization error:", error.message);
     if (error.code === 'app/invalid-credential' || error.message?.includes('PEM') || error.message?.includes('parse')) {
-      throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted in your environment variables.');
+      throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted and Base64 encoded in your environment variables.');
     }
     throw error;
   }
