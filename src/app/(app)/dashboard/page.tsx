@@ -15,6 +15,7 @@ import {
   LineChart,
   Grid,
   TrendingUp,
+  Star,
 } from 'lucide-react';
 import {
   Bar,
@@ -205,6 +206,15 @@ export default function DashboardPage() {
     
   const averageResolutionTime = resolutionTimes.length > 0 ? resolutionTimes.reduce((a, b) => a + b, 0) / resolutionTimes.length : 0;
   const mttrHours = Math.round(averageResolutionTime / (1000 * 60 * 60));
+  
+  const satisfactionRatings = tickets
+    .map(t => t.satisfactionRating)
+    .filter((rating): rating is number => typeof rating === 'number' && rating > 0);
+  
+  const averageSatisfaction = satisfactionRatings.length > 0
+    ? (satisfactionRatings.reduce((a, b) => a + b, 0) / satisfactionRatings.length).toFixed(1)
+    : 'N/A';
+  const satisfactionResponseCount = satisfactionRatings.length;
 
 
   const ticketsByZoneData = Object.entries(
@@ -438,7 +448,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tickets Abiertos</CardTitle>
@@ -477,6 +487,16 @@ export default function DashboardPage() {
           <CardContent>
              {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold">{mttrHours}</div>}
             <p className="text-xs text-muted-foreground">Tiempo medio de resolución</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Satisfacción</CardTitle>
+            <Star className="h-4 w-4 text-yellow-400" />
+          </CardHeader>
+          <CardContent>
+             {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold">{averageSatisfaction} / 5</div>}
+            <p className="text-xs text-muted-foreground">Basado en {satisfactionResponseCount} respuestas</p>
           </CardContent>
         </Card>
       </div>
