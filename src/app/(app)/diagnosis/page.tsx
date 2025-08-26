@@ -662,29 +662,29 @@ export default function DiagnosisPage() {
       
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">Pruebas de Usuarios (Firestore)</CardTitle>
+          <CardTitle className="font-headline text-2xl">Pruebas de Acceso a Usuarios (Firestore)</CardTitle>
           <CardDescription>
-            Verifica lecturas típicas sobre la colección <code>/users</code>: tu propio perfil, listado global (solo Admin) y el
-            intento de leer el perfil privado de otro usuario (debería fallar si no eres Admin).
+            Verifica los permisos de lectura sobre la colección <code>/users</code> para distintos escenarios: tu propio perfil, un listado general (admin) y el perfil de otro usuario.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium">Otro usuario (UID)</label>
+              <Label htmlFor="other-user-uid">Otro usuario (UID)</Label>
               <Input
+                id="other-user-uid"
                 placeholder="uid-de-otro-usuario"
                 value={otherUserUid}
                 onChange={(e) => setOtherUserUid(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">
-                Opcional: si lo completas se intentará leer <code>/users/{'{otherUserUid}'}</code>.
-              </p>
+              <FormDescription>
+                Opcional: UID para la prueba de "Leer perfil de OTRO usuario".
+              </FormDescription>
             </div>
             <div className="flex items-end">
               <Button className="w-full" onClick={runUserAccessTests} disabled={isAuthLoading}>
-                {isAuthLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Ejecutar pruebas de usuarios
+                {isAuthLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Fingerprint className="mr-2 h-4 w-4"/>}
+                Ejecutar Pruebas
               </Button>
             </div>
           </div>
@@ -693,18 +693,18 @@ export default function DiagnosisPage() {
             <table className="w-full text-sm">
               <thead className="bg-muted/40">
                 <tr>
-                  <th className="p-3 text-left w-16">#</th>
-                  <th className="p-3 text-left">Prueba</th>
-                  <th className="p-3 text-left w-24">Estado</th>
-                  <th className="p-3 text-left w-16">ms</th>
-                  <th className="p-3 text-left">Detalle / Error</th>
+                  <th className="p-3 text-left font-semibold w-16">#</th>
+                  <th className="p-3 text-left font-semibold">Prueba</th>
+                  <th className="p-3 text-left font-semibold w-24">Estado</th>
+                  <th className="p-3 text-left font-semibold w-16">ms</th>
+                  <th className="p-3 text-left font-semibold">Detalle / Error</th>
                 </tr>
               </thead>
               <tbody>
                 {userTests.length === 0 ? (
                   <tr>
                     <td className="p-6 text-center text-muted-foreground" colSpan={5}>
-                      Aún no has ejecutado pruebas de usuarios.
+                      Aún no has ejecutado las pruebas de acceso a usuarios.
                     </td>
                   </tr>
                 ) : (
@@ -715,13 +715,13 @@ export default function DiagnosisPage() {
                         <td className="p-3 font-mono">{t.id}</td>
                         <td className="p-3">{t.title}</td>
                         <td className="p-3">
-                          {t.status === 'ok' && <span className="inline-flex rounded bg-emerald-100 px-2 py-0.5 text-emerald-800">OK</span>}
-                          {t.status === 'fail' && <span className="inline-flex rounded bg-red-100 px-2 py-0.5 text-red-800">FALLÓ</span>}
-                          {t.status === 'skip' && <span className="inline-flex rounded bg-zinc-100 px-2 py-0.5 text-zinc-800">Omitida</span>}
+                          {t.status === 'ok' && <span className="inline-flex rounded-md bg-green-100 px-2 py-1 text-sm font-semibold text-green-800">OK</span>}
+                          {t.status === 'fail' && <span className="inline-flex rounded-md bg-red-100 px-2 py-1 text-sm font-semibold text-red-800">FALLÓ</span>}
+                          {t.status === 'skip' && <span className="inline-flex rounded-md bg-gray-100 px-2 py-1 text-sm font-semibold text-gray-800">Omitida</span>}
                         </td>
                         <td className="p-3">{t.ms ?? ''}</td>
                         <td className="p-3">
-                          <pre className="whitespace-pre-wrap break-words">{t.detail ?? ''}</pre>
+                          <pre className="text-xs whitespace-pre-wrap break-words">{t.detail ?? ''}</pre>
                         </td>
                       </tr>
                     ))
@@ -731,15 +731,15 @@ export default function DiagnosisPage() {
           </div>
           {permHints.length > 0 && (
             <div className="mt-6 rounded-md border p-4 bg-muted/30">
-              <h4 className="font-headline text-lg mb-3">Sugerencias de permisos / índices</h4>
+              <h4 className="font-headline text-lg mb-3">Sugerencias de Permisos / Índices</h4>
               <div className="space-y-4">
                 {permHints.map((h) => (
                   <div key={h.id} className="space-y-2">
                     <div className="font-medium">{h.title}</div>
                     {h.note && <p className="text-sm text-muted-foreground">{h.note}</p>}
                     {h.snippet && (
-                      <pre className="bg-zinc-950/90 text-zinc-100 text-xs p-3 rounded overflow-x-auto">
-          {h.snippet}
+                      <pre className="bg-gray-900 text-white text-xs p-3 rounded-md overflow-x-auto">
+                        <code>{h.snippet}</code>
                       </pre>
                     )}
                   </div>
