@@ -1,3 +1,4 @@
+
 // src/lib/firebaseAdmin.ts
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 
@@ -73,7 +74,9 @@ function getCredential() {
 }
 
 export function getAdminApp(): App {
-  const apps = getApps();
-  if (apps.length) return apps[0];
+  // Si ya existe una app de admin, la reutilizamos. Si no, la creamos.
+  if (getApps().length) {
+    return getApps()[0];
+  }
   return initializeApp({ credential: getCredential() });
 }

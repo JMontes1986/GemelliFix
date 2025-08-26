@@ -1,25 +1,22 @@
 
 // app/api/admin/create-user/route.ts
-export const runtime = 'nodejs'; // Evita el runtime de Edge
-export const dynamic = 'force-dynamic'; // Evita el pre-renderizado en el build
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    // Importaciones perezosas para que no se evalúen durante el build:
-    const [{ getAdminApp }, { getAuth }, { getFirestore }] = await Promise.all([
-      import('@/lib/firebaseAdmin'),
-      import('firebase-admin/auth'),
-      import('firebase-admin/firestore'),
-    ]);
+    // Importaciones dinámicas para asegurar que se cargan en el entorno correcto
+    const { getAdminApp } = await import('@/lib/firebaseAdmin');
+    const { getAuth } = await import('firebase-admin/auth');
+    const { getFirestore } = await import('firebase-admin/firestore');
 
     const { name, email, password, role, avatar } = await req.json();
 
-    // Validar token del que llama
     const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
     if (!idToken) {
-        return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
     }
 
     const adminApp = getAdminApp();
@@ -28,10 +25,9 @@ export async function POST(req: Request) {
 
     const decodedToken = await auth.verifyIdToken(idToken);
     
-    // Se verifica el rol usando el custom claim del token, que es más seguro.
     const userClaims = (await auth.getUser(decodedToken.uid)).customClaims;
     if (userClaims?.role !== 'Administrador') {
-        return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
+      return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
     }
 
     const userRec = await auth.createUser({
@@ -41,10 +37,8 @@ export async function POST(req: Request) {
       photoURL: avatar || undefined,
     });
 
-    // La Cloud Function `onUserCreated` se encargará de poner el custom claim del rol.
-    // Aquí solo guardamos el documento en Firestore.
     await db.collection('users').doc(userRec.uid).set({
-      id: userRec.uid,
+      id: userRec.uid, // Asegurar que el id y el uid se guardan
       uid: userRec.uid,
       name,
       email,
@@ -54,6 +48,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true, uid: userRec.uid });
+
   } catch (err: any) {
     console.error('create-user error:', err);
     let message = 'An unknown error occurred.';
