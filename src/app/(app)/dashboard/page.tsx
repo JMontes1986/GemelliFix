@@ -167,6 +167,50 @@ export default function DashboardPage() {
                         router.push('/tickets');
                         return;
                     }
+
+                    // Fetch Tickets
+                    const qTickets = query(collection(db, 'tickets'));
+                    const unsubscribeTickets = onSnapshot(qTickets, (querySnapshot) => {
+                      const ticketsData: Ticket[] = [];
+                      querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
+                        const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
+                        const resolvedAt = data.resolvedAt?.toDate ? data.resolvedAt.toDate().toISOString() : undefined;
+                        
+                        ticketsData.push({ ...data, id: doc.id, createdAt, dueDate, resolvedAt } as Ticket);
+                      });
+                      setTickets(ticketsData);
+                      if (technicians.length > 0 || userData.role === 'SST') setIsLoading(false);
+                    }, (error) => {
+                      console.error("Error fetching tickets for dashboard: ", error);
+                      toast({
+                        variant: "destructive",
+                        title: "Error al Cargar Datos",
+                        description: "No se pudieron obtener los datos para el dashboard.",
+                      });
+                      setIsLoading(false);
+                    });
+
+                    // Fetch Technicians only for Admins
+                    if (userData.role === 'Administrador') {
+                        const qTechnicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+                        const unsubscribeTechnicians = onSnapshot(qTechnicians, (querySnapshot) => {
+                            const techData: User[] = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+                            setTechnicians(techData);
+                            setIsLoading(false);
+                        }, (error) => {
+                            console.error("Error fetching technicians:", error);
+                            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
+                            setIsLoading(false);
+                        });
+                        return () => unsubscribeTechnicians();
+                    } else {
+                        setIsLoading(false); // For SST, loading is done.
+                    }
+
+                    return () => unsubscribeTickets();
+
                 } else {
                     router.push('/login');
                 }
@@ -179,48 +223,10 @@ export default function DashboardPage() {
         }
     });
     
-    // Fetch Tickets
-    const qTickets = query(collection(db, 'tickets'));
-    const unsubscribeTickets = onSnapshot(qTickets, (querySnapshot) => {
-      const ticketsData: Ticket[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
-        const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
-        const resolvedAt = data.resolvedAt?.toDate ? data.resolvedAt.toDate().toISOString() : undefined;
-        
-        ticketsData.push({ ...data, id: doc.id, createdAt, dueDate, resolvedAt } as Ticket);
-      });
-      setTickets(ticketsData);
-      if (technicians.length > 0 || !currentUser || currentUser.role === 'SST') setIsLoading(false);
-    }, (error) => {
-      console.error("Error fetching tickets for dashboard: ", error);
-      toast({
-        variant: "destructive",
-        title: "Error al Cargar Datos",
-        description: "No se pudieron obtener los datos para el dashboard.",
-      });
-      setIsLoading(false);
-    });
-
-    // Fetch Technicians
-    const qTechnicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-    const unsubscribeTechnicians = onSnapshot(qTechnicians, (querySnapshot) => {
-        const techData: User[] = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-        setTechnicians(techData);
-        if (tickets.length > 0) setIsLoading(false);
-    }, (error) => {
-        console.error("Error fetching technicians:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
-        setIsLoading(false);
-    });
-    
     return () => {
         unsubscribeAuth();
-        unsubscribeTickets();
-        unsubscribeTechnicians();
     };
-  }, [toast, tickets.length, technicians.length, currentUser, router]);
+  }, [toast, router]);
 
   const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto' && t.status !== 'Cancelado').length;
   
