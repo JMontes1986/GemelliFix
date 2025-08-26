@@ -356,6 +356,11 @@ export default function TicketDetailPage() {
   const isSST = currentUser?.role === 'SST';
   const isRequester = currentUser?.id === ticket?.requesterId;
   const isAssignedToCurrentUser = ticket?.assignedToIds?.includes(currentUser?.id ?? '') ?? false;
+  const shouldShowSurvey = ticket?.status === 'Cerrado' && (
+      (isRequester && !canEdit) || // Show to requester to fill out
+      (canEdit) // Always show to admin
+  );
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -843,7 +848,7 @@ export default function TicketDetailPage() {
           </Card>
         )}
 
-        {isRequester && currentUser.role !== 'Administrador' && ticket.status === 'Cerrado' && (
+        {shouldShowSurvey && (
             <Card>
                 <CardHeader>
                     <CardTitle className="font-headline text-lg flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500" /> Encuesta de Satisfacción del Servicio</CardTitle>
@@ -852,20 +857,20 @@ export default function TicketDetailPage() {
                     {ticket.satisfactionRating ? (
                         <div className="text-center p-4 bg-muted rounded-lg">
                             <h4 className="font-semibold">¡Gracias por tu opinión!</h4>
-                            <p className="text-muted-foreground mt-2">Calificaste este servicio con:</p>
+                            <p className="text-muted-foreground mt-2">Calificación registrada:</p>
                             <div className="flex justify-center gap-1 mt-2">
                                 {[1, 2, 3, 4, 5].map(star => (
                                     <Star key={star} className={cn("w-6 h-6", ticket.satisfactionRating && ticket.satisfactionRating >= star ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground')} />
                                 ))}
                             </div>
-                            {ticket.satisfactionComment && <p className="text-sm italic mt-2">"{ticket.satisfactionComment}"</p>}
+                            {ticket.satisfactionComment && <p className="text-sm italic mt-2">Comentario: "{ticket.satisfactionComment}"</p>}
                         </div>
                     ) : (
                         <div className="space-y-4">
                             <p className="text-muted-foreground">Por favor, califica de 1 a 5 estrellas la calidad del servicio recibido, donde 5 es excelente.</p>
                             <div className="flex justify-center gap-2">
                                 {[1, 2, 3, 4, 5].map(rating => (
-                                    <Button key={rating} variant={satisfactionRating === rating ? 'default' : 'outline'} size="icon" onClick={() => setSatisfactionRating(rating)} disabled={isUpdating}>
+                                    <Button key={rating} variant={satisfactionRating === rating ? 'default' : 'outline'} size="icon" onClick={() => setSatisfactionRating(rating)} disabled={isUpdating || canEdit}>
                                         {rating}
                                     </Button>
                                 ))}
@@ -877,13 +882,13 @@ export default function TicketDetailPage() {
                                     placeholder="Tu opinión nos ayuda a mejorar..." 
                                     value={satisfactionComment}
                                     onChange={(e) => setSatisfactionComment(e.target.value)}
-                                    disabled={isUpdating}
+                                    disabled={isUpdating || canEdit}
                                 />
                             </div>
                         </div>
                     )}
                 </CardContent>
-                {!ticket.satisfactionRating && (
+                {!ticket.satisfactionRating && !canEdit && (
                      <CardFooter>
                         <Button className="w-full" onClick={handleSatisfactionSubmit} disabled={isUpdating || satisfactionRating === 0}>
                             {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -1048,7 +1053,7 @@ export default function TicketDetailPage() {
                              <div key={log.id} className="flex gap-3">
                                 <div className="flex-shrink-0">
                                    <LogIcon action={log.action} />
-                                </div>
+                                d_v>
                                 <div className="flex-1">
                                     <p>{renderLogDescription(log)}</p>
                                     {log.details.comment && (
