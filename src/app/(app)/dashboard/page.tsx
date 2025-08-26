@@ -114,6 +114,15 @@ const getSlaProgressColor = (priority: string) => {
     }
 }
 
+const formatHours = (hours: number): string => {
+    if (hours < 24) {
+        return `${Math.round(hours)}h`;
+    }
+    const days = Math.floor(hours / 24);
+    const remainingHours = Math.round(hours % 24);
+    return `${days}d ${remainingHours}h`;
+};
+
 
 export default function DashboardPage() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
@@ -133,7 +142,7 @@ export default function DashboardPage() {
         const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
         const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
         const resolvedAt = data.resolvedAt?.toDate ? data.resolvedAt.toDate().toISOString() : undefined;
-
+        
         ticketsData.push({ ...data, id: doc.id, createdAt, dueDate, resolvedAt } as Ticket);
       });
       setTickets(ticketsData);
@@ -270,6 +279,42 @@ export default function DashboardPage() {
             ...data
         }))
         .sort((a, b) => new Date(a.week).getTime() - new Date(b.week).getTime());
+  }, [tickets]);
+
+  const lifecycleData = React.useMemo(() => {
+    const durations = {
+      toAssignment: [] as number[],
+      toInProgress: [] as number[],
+      toResolved: [] as number[],
+    };
+
+    tickets.forEach(ticket => {
+      const history = ticket.statusHistory;
+      if (!history) return;
+
+      const createdAt = new Date(ticket.createdAt).getTime();
+      const assignedAt = history.Asignado ? new Date(history.Asignado).getTime() : null;
+      const inProgressAt = history['En Progreso'] ? new Date(history['En Progreso']).getTime() : null;
+      const resolvedAt = history.Resuelto ? new Date(history.Resuelto).getTime() : null;
+      
+      if (assignedAt) {
+        durations.toAssignment.push((assignedAt - createdAt) / (1000 * 3600));
+      }
+      if (inProgressAt && assignedAt) {
+        durations.toInProgress.push((inProgressAt - assignedAt) / (1000 * 3600));
+      }
+      if (resolvedAt && inProgressAt) {
+        durations.toResolved.push((resolvedAt - inProgressAt) / (1000 * 3600));
+      }
+    });
+
+    const getAverage = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+    return [
+      { name: 'Abierto → Asignado', time: getAverage(durations.toAssignment) },
+      { name: 'Asignado → En Progreso', time: getAverage(durations.toInProgress) },
+      { name: 'En Progreso → Resuelto', time: getAverage(durations.toResolved) },
+    ];
   }, [tickets]);
 
 
@@ -473,7 +518,8 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-        <Card className="lg:col-span-3">
+       <div className="grid gap-4 lg:grid-cols-3">
+         <Card className="lg:col-span-2">
             <CardHeader>
                 <CardTitle className="font-headline">Tendencias de Tickets</CardTitle>
                 <CardDescription>Evolución semanal del número de tickets creados, cerrados y vencidos.</CardDescription>
@@ -501,6 +547,38 @@ export default function DashboardPage() {
                 )}
             </CardContent>
         </Card>
+        <Card>
+            <CardHeader>
+                <CardTitle className="font-headline">Tiempo Promedio por Etapa</CardTitle>
+                <CardDescription>Promedio de horas que un ticket pasa en cada fase hasta ser resuelto.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
+                    <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={lifecycleData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" unit="h" />
+                            <YAxis dataKey="name" type="category" width={110} fontSize={12} />
+                            <Tooltip 
+                                formatter={(value: number) => [formatHours(value), 'Tiempo Promedio']}
+                                cursor={{fill: 'hsl(var(--muted))'}}
+                                contentStyle={{
+                                    backgroundColor: 'hsl(var(--background))',
+                                    borderColor: 'hsl(var(--border))',
+                                    borderRadius: 'var(--radius)'
+                                }}
+                            />
+                            <Bar dataKey="time" name="Horas" barSize={20}>
+                                {lifecycleData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                )}
+            </CardContent>
+        </Card>
+      </div>
 
 
        <Card>

@@ -296,6 +296,7 @@ export default function TicketDetailPage() {
                 assignedToIds: data.assignedToIds || [],
                 attachments: data.attachments || [],
                 evidence: data.evidence || [],
+                statusHistory: data.statusHistory || {},
             };
             setTicket(ticketData);
             setSelectedPersonnelIds(ticketData.assignedToIds || []);
@@ -404,7 +405,7 @@ export default function TicketDetailPage() {
     const docRef = doc(db, "tickets", ticket.id);
     const oldValue = field !== 'multiple' ? ticket[field] : null;
     
-    let updates: { [key: string]: any };
+    let updates: { [key: string]: any } = {};
     let logDetails: any;
 
     if (field === 'multiple') {
@@ -413,6 +414,13 @@ export default function TicketDetailPage() {
     } else {
         updates = { [field]: value };
         logDetails = { ticket, oldValue, newValue: value, comment: commentText || comment };
+    }
+
+    // Add status history tracking
+    if (field === 'status' || (field === 'multiple' && updates.status)) {
+        const newStatus = field === 'status' ? value : updates.status;
+        const statusKey = `statusHistory.${newStatus}`;
+        updates[statusKey] = new Date().toISOString();
     }
     
     if (field === 'priority' || (field === 'multiple' && 'priority' in updates)) {
@@ -502,6 +510,7 @@ export default function TicketDetailPage() {
         await updateDoc(docRef, {
             status: 'Requiere Aprobación',
             evidence: arrayUnion(...uploadedEvidence),
+            'statusHistory.Requiere Aprobación': new Date().toISOString()
         });
         
         await createLog(currentUser, 'update_status', { ticket, oldValue: ticket.status, newValue: 'Requiere Aprobación', comment });
@@ -546,6 +555,7 @@ export default function TicketDetailPage() {
         assignedToIds: personnelIds,
         assignedTo: personnelNames,
         status: newStatus,
+        'statusHistory.Asignado': new Date().toISOString()
     });
     setIsUpdating(false);
     setIsAssignDialogOpen(false); // Close dialog on success
@@ -573,6 +583,8 @@ export default function TicketDetailPage() {
     const updates: any = { status: newStatus };
     if (approve) {
         updates.resolvedAt = new Date().toISOString();
+        const statusKey = `statusHistory.${newStatus}`;
+        updates[statusKey] = updates.resolvedAt;
     }
     
     await handleUpdate('multiple', updates, `Ticket ${approve ? 'aprobado' : 'rechazado'} por ${currentUser.name}.`);

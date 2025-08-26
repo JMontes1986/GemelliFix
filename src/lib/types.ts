@@ -50,6 +50,9 @@ export type Ticket = {
   requesterId: string;
   attachments?: Attachment[];
   evidence?: Attachment[];
+  statusHistory?: {
+    [key in Ticket['status']]?: string;
+  };
 };
 
 export type Technician = {
@@ -110,4 +113,5 @@ export type Log = {
     
 
     
+
 
