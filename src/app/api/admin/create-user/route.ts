@@ -1,3 +1,4 @@
+
 // app/api/admin/create-user/route.ts
 export const runtime = "nodejs";
 import { NextResponse } from "next/server";
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
 
     // Crea doc en Firestore
     await db.collection("users").doc(userRecord.uid).set({
+      id: userRecord.uid,
+      uid: userRecord.uid,
       name,
       email,
       role,
