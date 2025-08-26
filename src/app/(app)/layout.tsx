@@ -25,7 +25,7 @@ import {
   Star,
 } from 'lucide-react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, limit, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, limit, updateDoc, orderBy } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { GemelliFixLogo } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -214,7 +214,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         if (firebaseUser) {
             try {
               const userDocRef = doc(db, 'users', firebaseUser.uid);
-              let userDocSnap = await getDoc(userDocRef);
+              const userDocSnap = await getDoc(userDocRef);
 
               if (!userDocSnap.exists()) {
                   console.warn(`User document not found for UID: ${firebaseUser.uid}. Creating a new profile.`);
@@ -227,32 +227,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       role: 'Docentes',
                   };
                   await setDoc(userDocRef, { ...newUser, createdAt: serverTimestamp() });
-                  userDocSnap = await getDoc(userDocRef);
-                  if (!userDocSnap.exists()) {
-                    throw new Error("Failed to create and fetch user document.");
-                  }
+                  // Re-fetch after creation to ensure we have fresh data
+                  const freshSnap = await getDoc(userDocRef);
+                   if (!freshSnap.exists()) throw new Error("Failed to create and fetch user document.");
+                   setCurrentUser({ id: freshSnap.id, ...freshSnap.data() } as User);
+
+              } else {
+                 const firestoreData = userDocSnap.data() as Omit<User, 'id'>;
+                 const idTokenResult = await firebaseUser.getIdTokenResult(true);
+                 const tokenRole = idTokenResult.claims.role as User['role'] | undefined;
+
+                 const userData: User = { 
+                     id: userDocSnap.id, 
+                     ...firestoreData, 
+                     // The token is the source of truth for the role.
+                     // The Firestore role is a fallback.
+                     role: tokenRole || firestoreData.role
+                 };
+                 setCurrentUser(userData);
+                 await fetchAndSetPendingSurvey(userData);
               }
-
-              const firestoreData = userDocSnap.data() as User;
-              let userRole = firestoreData.role;
-              
-              if (!userRole) {
-                  console.warn(`User ${firestoreData.email} has no role in Firestore. Assigning default 'Docentes' role.`);
-                  userRole = 'Docentes';
-                  await setDoc(userDocRef, { role: userRole }, { merge: true });
-              }
-
-              const idTokenResult = await firebaseUser.getIdTokenResult(true);
-              const tokenRole = idTokenResult.claims.role as User['role'] | undefined;
-              
-              const userData: User = { 
-                  id: userDocSnap.id, 
-                  ...firestoreData, 
-                  role: tokenRole || userRole
-              };
-
-              setCurrentUser(userData);
-              await fetchAndSetPendingSurvey(userData);
 
             } catch (error) {
               console.error("Error verifying user session or getting data. Logging out.", error);
