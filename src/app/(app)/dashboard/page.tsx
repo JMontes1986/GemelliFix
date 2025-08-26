@@ -12,6 +12,7 @@ import {
   Sparkles,
   MapPin,
   Users,
+  LineChart,
 } from 'lucide-react';
 import {
   Bar,
@@ -20,7 +21,11 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  Cell
+  Cell,
+  Line as RechartsLine,
+  LineChart as RechartsLineChart,
+  CartesianGrid,
+  Legend,
 } from "recharts"
 import {
   Card,
@@ -63,6 +68,8 @@ import { Progress } from '@/components/ui/progress';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { startOfWeek, format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 
 function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
@@ -224,6 +231,47 @@ export default function DashboardPage() {
       Media: calculateSlaByPriority('Media'),
       Baja: calculateSlaByPriority('Baja'),
   };
+
+  const ticketTrendsData = React.useMemo(() => {
+    const weeklyData: { [week: string]: { created: number, closed: number, overdue: number } } = {};
+
+    tickets.forEach(ticket => {
+        const createdAt = parseISO(ticket.createdAt);
+        const weekStart = startOfWeek(createdAt, { weekStartsOn: 1 });
+        const weekKey = format(weekStart, 'yyyy-MM-dd');
+
+        if (!weeklyData[weekKey]) {
+            weeklyData[weekKey] = { created: 0, closed: 0, overdue: 0 };
+        }
+
+        weeklyData[weekKey].created++;
+
+        if (ticket.resolvedAt) {
+            const resolvedAt = parseISO(ticket.resolvedAt);
+            const resolvedWeekStart = startOfWeek(resolvedAt, { weekStartsOn: 1 });
+            const resolvedWeekKey = format(resolvedWeekStart, 'yyyy-MM-dd');
+            if (!weeklyData[resolvedWeekKey]) {
+                weeklyData[resolvedWeekKey] = { created: 0, closed: 0, overdue: 0 };
+            }
+            weeklyData[resolvedWeekKey].closed++;
+        }
+
+        if (new Date(ticket.dueDate) < new Date() && ticket.status !== 'Cerrado' && ticket.status !== 'Resuelto') {
+             if (!weeklyData[weekKey]) {
+                weeklyData[weekKey] = { created: 0, closed: 0, overdue: 0 };
+            }
+            weeklyData[weekKey].overdue++;
+        }
+    });
+
+    return Object.entries(weeklyData)
+        .map(([week, data]) => ({
+            week: format(parseISO(week), "dd LLL", { locale: es }),
+            ...data
+        }))
+        .sort((a, b) => new Date(a.week).getTime() - new Date(b.week).getTime());
+  }, [tickets]);
+
 
   const handleAnalysis = async () => {
     setAnalysisOpen(true);
@@ -424,6 +472,36 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+        <Card className="lg:col-span-3">
+            <CardHeader>
+                <CardTitle className="font-headline">Tendencias de Tickets</CardTitle>
+                <CardDescription>Evolución semanal del número de tickets creados, cerrados y vencidos.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
+                <ResponsiveContainer width="100%" height={300}>
+                    <RechartsLineChart data={ticketTrendsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                        <Tooltip
+                             contentStyle={{
+                                backgroundColor: 'hsl(var(--background))',
+                                borderColor: 'hsl(var(--border))',
+                                borderRadius: 'var(--radius)'
+                            }}
+                        />
+                        <Legend />
+                        <RechartsLine type="monotone" dataKey="created" name="Creados" stroke="#0088FE" strokeWidth={2} />
+                        <RechartsLine type="monotone" dataKey="closed" name="Cerrados" stroke="#00C49F" strokeWidth={2} />
+                        <RechartsLine type="monotone" dataKey="overdue" name="Vencidos" stroke="#FF8042" strokeWidth={2} />
+                    </RechartsLineChart>
+                </ResponsiveContainer>
+                )}
+            </CardContent>
+        </Card>
+
 
        <Card>
         <CardHeader>
