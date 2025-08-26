@@ -13,6 +13,7 @@ import {
   MapPin,
   Users,
   LineChart,
+  Grid,
 } from 'lucide-react';
 import {
   Bar,
@@ -199,6 +200,16 @@ export default function DashboardPage() {
         const requesterName = ticket.requester || "Desconocido";
         acc[requesterName] = (acc[requesterName] || 0) + 1;
         return acc;
+    }, {} as Record<string, number>)
+  ).map(([name, total]) => ({ name, total }))
+   .sort((a,b) => b.total - a.total)
+   .slice(0, 5);
+
+   const ticketsByCategoryData = Object.entries(
+    tickets.reduce((acc, ticket) => {
+      const categoryName = ticket.category || "Sin Categoría";
+      acc[categoryName] = (acc[categoryName] || 0) + 1;
+      return acc;
     }, {} as Record<string, number>)
   ).map(([name, total]) => ({ name, total }))
    .sort((a,b) => b.total - a.total)
@@ -423,7 +434,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Tickets por Zona</CardTitle>
+            <CardTitle className="font-headline flex items-center gap-2"><MapPin className="h-5 w-5"/>Tickets por Zona</CardTitle>
             <CardDescription>Volumen de solicitudes activas por cada zona.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -460,7 +471,7 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Top Solicitantes</CardTitle>
+            <CardTitle className="font-headline flex items-center gap-2"><Users className="h-5 w-5"/>Top Solicitantes</CardTitle>
             <CardDescription>Usuarios que más solicitudes han creado.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -495,7 +506,47 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-        <Card>
+         <Card>
+          <CardHeader>
+            <CardTitle className="font-headline flex items-center gap-2"><Grid className="h-5 w-5"/>Categorías con más Solicitudes</CardTitle>
+            <CardDescription>Top 5 de categorías que generan más tickets.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-[200px] w-full" /> : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={ticketsByCategoryData} layout="vertical" margin={{ left: 20 }}>
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    width={100}
+                    />
+                  <Tooltip 
+                    cursor={{fill: 'hsl(var(--muted))'}}
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      borderColor: 'hsl(var(--border))',
+                      borderRadius: 'var(--radius)'
+                    }}
+                  />
+                  <Bar dataKey="total" radius={[0, 4, 4, 0]}>
+                    {ticketsByCategoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[(index + 1) % COLORS.length]} /> // Offset colors
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+       <div className="grid gap-4 lg:grid-cols-2">
+         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Cumplimiento de SLA por Prioridad</CardTitle>
             <CardDescription>Rendimiento del equipo según la urgencia.</CardDescription>
@@ -516,45 +567,14 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-       <div className="grid gap-4 lg:grid-cols-3">
-         <Card className="lg:col-span-2">
-            <CardHeader>
-                <CardTitle className="font-headline">Tendencias de Tickets</CardTitle>
-                <CardDescription>Evolución semanal del número de tickets creados, cerrados y vencidos.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
-                <ResponsiveContainer width="100%" height={300}>
-                    <RechartsLineChart data={ticketTrendsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <Tooltip
-                             contentStyle={{
-                                backgroundColor: 'hsl(var(--background))',
-                                borderColor: 'hsl(var(--border))',
-                                borderRadius: 'var(--radius)'
-                            }}
-                        />
-                        <Legend />
-                        <RechartsLine type="monotone" dataKey="created" name="Creados" stroke="#0088FE" strokeWidth={2} />
-                        <RechartsLine type="monotone" dataKey="closed" name="Cerrados" stroke="#00C49F" strokeWidth={2} />
-                        <RechartsLine type="monotone" dataKey="overdue" name="Vencidos" stroke="#FF8042" strokeWidth={2} />
-                    </RechartsLineChart>
-                </ResponsiveContainer>
-                )}
-            </CardContent>
-        </Card>
         <Card>
             <CardHeader>
                 <CardTitle className="font-headline">Tiempo Promedio por Etapa</CardTitle>
                 <CardDescription>Promedio de horas que un ticket pasa en cada fase hasta ser resuelto.</CardDescription>
             </CardHeader>
             <CardContent>
-                {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
-                    <ResponsiveContainer width="100%" height={300}>
+                {isLoading ? <Skeleton className="h-[200px] w-full" /> : (
+                    <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={lifecycleData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis type="number" unit="h" />
@@ -579,6 +599,35 @@ export default function DashboardPage() {
             </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+            <CardTitle className="font-headline">Tendencias de Tickets</CardTitle>
+            <CardDescription>Evolución semanal del número de tickets creados, cerrados y vencidos.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
+            <ResponsiveContainer width="100%" height={300}>
+                <RechartsLineChart data={ticketTrendsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <Tooltip
+                         contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
+                            borderColor: 'hsl(var(--border))',
+                            borderRadius: 'var(--radius)'
+                        }}
+                    />
+                    <Legend />
+                    <RechartsLine type="monotone" dataKey="created" name="Creados" stroke="#0088FE" strokeWidth={2} />
+                    <RechartsLine type="monotone" dataKey="closed" name="Cerrados" stroke="#00C49F" strokeWidth={2} />
+                    <RechartsLine type="monotone" dataKey="overdue" name="Vencidos" stroke="#FF8042" strokeWidth={2} />
+                </RechartsLineChart>
+            </ResponsiveContainer>
+            )}
+        </CardContent>
+      </Card>
 
 
        <Card>
@@ -639,3 +688,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
