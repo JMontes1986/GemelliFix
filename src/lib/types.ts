@@ -54,6 +54,8 @@ export type Ticket = {
   statusHistory?: {
     [key in Ticket['status']]?: string;
   };
+  satisfactionRating?: number;
+  satisfactionComment?: string;
 };
 
 export type Technician = {
@@ -113,6 +115,7 @@ export type Log = {
     
 
     
+
 
 
 

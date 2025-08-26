@@ -44,6 +44,7 @@ import {
   LogIn,
   PenSquare,
   AlertCircle,
+  Star,
 } from 'lucide-react';
 import type { Ticket, User as CurrentUser, Attachment, Log, Category } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -218,6 +219,11 @@ export default function TicketDetailPage() {
   // State for manual assignment dialog
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
+  
+  // State for satisfaction survey
+  const [satisfactionRating, setSatisfactionRating] = useState<number>(0);
+  const [satisfactionComment, setSatisfactionComment] = useState("");
+
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -297,6 +303,8 @@ export default function TicketDetailPage() {
                 attachments: data.attachments || [],
                 evidence: data.evidence || [],
                 statusHistory: data.statusHistory || {},
+                satisfactionRating: data.satisfactionRating,
+                satisfactionComment: data.satisfactionComment,
             };
             setTicket(ticketData);
             setSelectedPersonnelIds(ticketData.assignedToIds || []);
@@ -595,6 +603,31 @@ export default function TicketDetailPage() {
     });
   };
 
+  const handleSatisfactionSubmit = async () => {
+    if (!ticket || !currentUser) return;
+    if (satisfactionRating === 0) {
+        toast({ variant: 'destructive', title: 'Calificación requerida', description: 'Por favor, selecciona una calificación de 1 a 5.' });
+        return;
+    }
+    
+    setIsUpdating(true);
+    try {
+        const docRef = doc(db, 'tickets', ticket.id);
+        await updateDoc(docRef, {
+            satisfactionRating: satisfactionRating,
+            satisfactionComment: satisfactionComment,
+        });
+
+        toast({ title: '¡Gracias por tus comentarios!', description: 'Tu opinión ha sido registrada.' });
+        // The component will re-render with the new ticket data, hiding the form
+    } catch (error: any) {
+        console.error("Error submitting satisfaction survey:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar tu calificación.' });
+    } finally {
+        setIsUpdating(false);
+    }
+  };
+
 
   if (isLoading || !currentUser) {
     return (
@@ -808,6 +841,57 @@ export default function TicketDetailPage() {
               </CardFooter>
             )}
           </Card>
+        )}
+
+        {isRequester && currentUser.role !== 'Administrador' && ticket.status === 'Cerrado' && (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline text-lg flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500" /> Encuesta de Satisfacción del Servicio</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {ticket.satisfactionRating ? (
+                        <div className="text-center p-4 bg-muted rounded-lg">
+                            <h4 className="font-semibold">¡Gracias por tu opinión!</h4>
+                            <p className="text-muted-foreground mt-2">Calificaste este servicio con:</p>
+                            <div className="flex justify-center gap-1 mt-2">
+                                {[1, 2, 3, 4, 5].map(star => (
+                                    <Star key={star} className={cn("w-6 h-6", ticket.satisfactionRating && ticket.satisfactionRating >= star ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground')} />
+                                ))}
+                            </div>
+                            {ticket.satisfactionComment && <p className="text-sm italic mt-2">"{ticket.satisfactionComment}"</p>}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <p className="text-muted-foreground">Por favor, califica de 1 a 5 estrellas la calidad del servicio recibido, donde 5 es excelente.</p>
+                            <div className="flex justify-center gap-2">
+                                {[1, 2, 3, 4, 5].map(rating => (
+                                    <Button key={rating} variant={satisfactionRating === rating ? 'default' : 'outline'} size="icon" onClick={() => setSatisfactionRating(rating)} disabled={isUpdating}>
+                                        {rating}
+                                    </Button>
+                                ))}
+                            </div>
+                            <div>
+                                <Label htmlFor="satisfaction-comment">Comentarios Adicionales (Opcional)</Label>
+                                <Textarea 
+                                    id="satisfaction-comment" 
+                                    placeholder="Tu opinión nos ayuda a mejorar..." 
+                                    value={satisfactionComment}
+                                    onChange={(e) => setSatisfactionComment(e.target.value)}
+                                    disabled={isUpdating}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+                {!ticket.satisfactionRating && (
+                     <CardFooter>
+                        <Button className="w-full" onClick={handleSatisfactionSubmit} disabled={isUpdating || satisfactionRating === 0}>
+                            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Enviar Calificación
+                        </Button>
+                    </CardFooter>
+                )}
+            </Card>
         )}
 
       </div>
