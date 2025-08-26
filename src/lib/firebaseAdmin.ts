@@ -2,7 +2,7 @@
 import { cert, getApps, initializeApp, getApp, App } from 'firebase-admin/app';
 
 // This is a robust way to ensure the Admin App is initialized only once.
-let adminApp: App;
+let adminApp: App | undefined;
 
 function createAdminApp(): App {
   const projectId = process.env.FB_PROJECT_ID;
@@ -31,8 +31,16 @@ function createAdminApp(): App {
 }
 
 export function getAdminApp(): App {
-  if (getApps().length > 0) {
-    return getApp();
-  }
-  return createAdminApp();
+    if (adminApp) {
+        return adminApp;
+    }
+
+    const apps = getApps();
+    if (apps.length > 0) {
+        adminApp = getApp();
+        return adminApp;
+    }
+
+    adminApp = createAdminApp();
+    return adminApp;
 }
