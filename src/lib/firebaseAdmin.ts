@@ -1,5 +1,6 @@
 
 // src/lib/firebaseAdmin.ts
+import 'dotenv/config'; // Asegura que las variables de entorno se carguen primero
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 
 type SaJson = {
@@ -74,9 +75,7 @@ function getCredential() {
 }
 
 export function getAdminApp(): App {
-  // Si ya existe una app de admin, la reutilizamos. Si no, la creamos.
-  if (getApps().length) {
-    return getApps()[0];
-  }
+  const apps = getApps();
+  if (apps.length) return apps[0];
   return initializeApp({ credential: getCredential() });
 }

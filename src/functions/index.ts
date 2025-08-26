@@ -1,6 +1,7 @@
 
 
 'use strict';
+import 'dotenv/config';
 /**
  * @fileOverview Cloud Functions for Firebase.
  * This file contains the backend logic that responds to events in Firebase,
