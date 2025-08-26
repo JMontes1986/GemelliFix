@@ -4,25 +4,27 @@ export const runtime = 'nodejs'; // Evita el runtime de Edge
 export const dynamic = 'force-dynamic'; // Evita el pre-renderizado en el build
 
 import { NextResponse } from 'next/server';
-import { getAdminApp } from '@/lib/firebaseAdmin';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
 
 export async function POST(req: Request) {
-  const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
-  if (!idToken) {
-    return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
-  }
-
   try {
+    // Importaciones perezosas para que no se evalúen durante el build:
+    const [{ getAdminApp }, { getAuth }, { getFirestore }] = await Promise.all([
+      import('@/lib/firebaseAdmin'),
+      import('firebase-admin/auth'),
+      import('firebase-admin/firestore'),
+    ]);
+    
     const { name, email, password, role, avatar } = await req.json();
+
+    const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!idToken) {
+      return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
+    }
 
     const adminApp = getAdminApp();
     const auth = getAuth(adminApp);
     const db = getFirestore(adminApp);
 
-    // Verify the admin's token first. If this fails, it will throw an error.
-    // This is the most secure way to check for admin privileges.
     const decodedToken = await auth.verifyIdToken(idToken);
     
     if (decodedToken.role !== 'Administrador') {
@@ -36,8 +38,6 @@ export async function POST(req: Request) {
       photoURL: avatar || undefined,
     });
 
-    // The `onUserCreated` Cloud Function will handle setting the custom claim.
-    // Here we just save the document in Firestore.
     await db.collection('users').doc(userRec.uid).set({
       id: userRec.uid,
       uid: userRec.uid,
