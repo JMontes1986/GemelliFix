@@ -1,6 +1,9 @@
 
 import { cert, getApps, initializeApp, getApp, App } from 'firebase-admin/app';
 
+// This is a robust way to ensure the Admin App is initialized only once.
+let adminApp: App;
+
 function createAdminApp(): App {
   const projectId = process.env.FB_PROJECT_ID;
   const clientEmail = process.env.FB_CLIENT_EMAIL;
@@ -14,10 +17,9 @@ function createAdminApp(): App {
 
   try {
     const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
-    // Inicializa la app por defecto, sin un nombre específico.
     return initializeApp({
       credential: cert({ projectId, clientEmail, privateKey: formattedPrivateKey }),
-    });
+    }, 'firebase-admin-app'); // Give the app a unique name to avoid conflicts
   } catch (error: any) {
     console.error("Firebase Admin SDK initialization error:", error.message);
     if (error.code === 'app/invalid-credential' || error.message?.includes('PEM') || error.message?.includes('parse')) {
@@ -28,10 +30,18 @@ function createAdminApp(): App {
 }
 
 export function getAdminApp(): App {
-  // Busca la app por defecto. Si no existe, la crea.
-  const adminApp = getApps().find(app => app.name === '[DEFAULT]');
   if (adminApp) {
     return adminApp;
   }
-  return getApps().length > 0 ? getApp() : createAdminApp();
+
+  // Find an existing initialized app with our unique name
+  const existingApp = getApps().find(app => app.name === 'firebase-admin-app');
+  if (existingApp) {
+    adminApp = existingApp;
+    return adminApp;
+  }
+  
+  // If no app exists, create it
+  adminApp = createAdminApp();
+  return adminApp;
 }

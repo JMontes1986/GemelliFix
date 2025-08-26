@@ -5,15 +5,14 @@ export const dynamic = 'force-dynamic'; // Evita el pre-renderizado en el build
 
 import { NextResponse } from 'next/server';
 
+// Import these dynamically to ensure environment variables are loaded.
+import { getAdminApp } from '@/lib/firebaseAdmin';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+
+
 export async function POST(req: Request) {
   try {
-    // Importaciones perezosas para que no se evalúen durante el build:
-    const [{ getAdminApp }, { getAuth }, { getFirestore }] = await Promise.all([
-      import('@/lib/firebaseAdmin'),
-      import('firebase-admin/auth'),
-      import('firebase-admin/firestore'),
-    ]);
-    
     const { name, email, password, role, avatar } = await req.json();
 
     const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
