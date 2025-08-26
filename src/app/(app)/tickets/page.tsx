@@ -453,6 +453,66 @@ export default function TicketsPage() {
         setIsUpdating(false);
     }
   };
+
+  const handleExport = () => {
+    if (tickets.length === 0) {
+        toast({
+            title: "No hay datos para exportar",
+            description: "La tabla de solicitudes está vacía.",
+        });
+        return;
+    }
+
+    const headers = [
+        "Código", "Título", "Descripción", "Zona", "Sitio", "Categoría", 
+        "Prioridad", "Estado", "Solicitante", "Asignado a", "Fecha de Creación", 
+        "Fecha de Vencimiento", "Fecha de Resolución"
+    ];
+    
+    const sanitizeForCsv = (value: any) => {
+        if (value === null || value === undefined) {
+            return "";
+        }
+        let str = String(value);
+        // If the string contains a comma, double quote, or newline, wrap it in double quotes.
+        if (str.search(/("|,|\n)/g) >= 0) {
+            str = `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+    };
+
+    const csvContent = [
+        headers.join(','),
+        ...tickets.map(ticket => [
+            sanitizeForCsv(ticket.code),
+            sanitizeForCsv(ticket.title),
+            sanitizeForCsv(ticket.description),
+            sanitizeForCsv(ticket.zone),
+            sanitizeForCsv(ticket.site),
+            sanitizeForCsv(ticket.category),
+            sanitizeForCsv(ticket.priority),
+            sanitizeForCsv(ticket.status),
+            sanitizeForCsv(ticket.requester),
+            sanitizeForCsv(ticket.assignedTo?.join('; ') || 'Sin Asignar'),
+            sanitizeForCsv(ticket.createdAt ? new Date(ticket.createdAt).toLocaleString('es-CO') : ''),
+            sanitizeForCsv(ticket.dueDate ? new Date(ticket.dueDate).toLocaleString('es-CO') : ''),
+            sanitizeForCsv(ticket.resolvedAt ? new Date(ticket.resolvedAt).toLocaleString('es-CO') : '')
+        ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "tickets_export.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    toast({ title: 'Exportación Iniciada', description: 'La descarga de tu archivo CSV ha comenzado.' });
+  };
   
   const statuses: Ticket['status'][] = ['Abierto', 'Asignado', 'Requiere Aprobación', 'En Progreso', 'Resuelto', 'Cancelado', 'Cerrado'];
   const filteredTickets = (status: Ticket['status']) => tickets.filter(t => t.status === status);
@@ -473,7 +533,10 @@ export default function TicketsPage() {
               <DropdownMenuLabel>Filtrar por</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem>Zona</DropdownMenuItem><DropdownMenuItem>Prioridad</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" variant="outline" className="h-7 gap-1"><File className="h-3.5 w-3.5" /><span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Exportar</span></Button>
+          <Button size="sm" variant="outline" className="h-7 gap-1" onClick={handleExport}>
+            <File className="h-3.5 w-3.5" />
+            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Exportar</span>
+          </Button>
         </div>
       </div>
        <Card>
