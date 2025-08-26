@@ -55,6 +55,13 @@ type UserTest = {
   ms?: number;
 };
 
+type PermHint = {
+  id: string;           // para desduplicar
+  title: string;        // título corto
+  snippet?: string;     // regla/index sugerido
+  note?: string;        // explicación
+};
+
 
 export default function DiagnosisPage() {
   const { toast } = useToast();
@@ -71,7 +78,7 @@ export default function DiagnosisPage() {
   
   const [userTests, setUserTests] = React.useState<UserTest[]>([]);
   const [otherUserUid, setOtherUserUid] = React.useState(''); // uid para probar lectura privada de otro usuario
-
+  const [permHints, setPermHints] = React.useState<PermHint[]>([]);
 
   React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -406,6 +413,116 @@ export default function DiagnosisPage() {
     }
   };
   
+  const pushHint = (hint: PermHint) =>
+    setPermHints((prev) => (prev.some((h) => h.id === hint.id) ? prev : [...prev, hint]));
+
+  /**
+   * Genera ayudas concretas según la prueba y el error recibido.
+   * testId: '01' (leer mi perfil), '02' (listar /users), '03' (leer otro perfil)
+   */
+  const buildHintsForError = (testId: string, code?: string, message?: string) => {
+    // Comunes
+    if (code === 'unauthenticated') {
+      pushHint({
+        id: 'auth-login',
+        title: 'Debes estar autenticado',
+        note:
+          'Inicia sesión antes de la prueba. Si ya lo estás, forzar refresh del token: `await auth.currentUser?.getIdToken(true)`.',
+      });
+      return;
+    }
+
+    if (code === 'failed-precondition' && /index/i.test(message || '')) {
+      pushHint({
+        id: 'index-users',
+        title: 'Falta índice de Firestore',
+        note:
+          'La consulta necesita un índice. Añade este bloque a tu `firestore.indexes.json` (en el array "indexes") y despliega.',
+        snippet: `{
+    "collectionGroup": "users",
+    "queryScope": "COLLECTION",
+    "fields": [
+      { "fieldPath": "role", "order": "ASCENDING" },
+      { "fieldPath": "name", "order": "ASCENDING" }
+    ]
+  }`,
+      });
+      return;
+    }
+
+    // Específicos por prueba
+    if (testId === '01' && code === 'permission-denied') {
+      // Leer mi propio perfil
+      pushHint({
+        id: 'rule-users-read-self',
+        title: 'Permitir leer mi propio perfil',
+        note:
+          'Autoriza que un usuario lea /users/{uid} solo si su UID coincide. Si usas claims de admin, esto no las reemplaza.',
+        snippet: `match /users/{userId} {
+    allow read: if request.auth != null && request.auth.uid == userId;
+  }`,
+      });
+    }
+
+    if (testId === '02') {
+      // Listar /users (solo Admin normalmente)
+      if (code === 'permission-denied') {
+        pushHint({
+          id: 'rule-users-list-admin',
+          title: 'Permitir listar /users solo a Admin',
+          note:
+            'Define una función isAdmin() basada en custom claims y úsala para permitir "list". Asegúrate de asignar el claim admin=true a tu usuario.',
+          snippet: `function isAdmin() {
+    return request.auth != null && request.auth.token.admin == true;
+  }
+  match /users/{userId} {
+    allow list: if isAdmin();
+    allow read: if isAdmin() || request.auth.uid == userId;
+  }`,
+        });
+        pushHint({
+          id: 'admin-claims',
+          title: 'Asignar custom claim admin=true',
+          note:
+            'En tu backend (Admin SDK) asigna el claim y luego en el cliente fuerza refresh del token.',
+          snippet: `// Backend (Node Admin SDK):
+  await admin.auth().setCustomUserClaims(uid, { admin: true });
+  
+  // Frontend:
+  await auth.currentUser?.getIdToken(true); // refresca los claims en el cliente`,
+        });
+      }
+    }
+
+    if (testId === '03') {
+      // Leer el perfil de otro usuario (debería fallar si NO eres admin)
+      if (code === 'permission-denied') {
+        pushHint({
+          id: 'rule-users-read-other-admin',
+          title: 'Leer perfil de otro usuario: solo Admin',
+          note:
+            'Si necesitas permitir esto, restringe a usuarios con claim admin=true. Para usuarios normales debe seguir prohibido.',
+          snippet: `function isAdmin() {
+    return request.auth != null && request.auth.token.admin == true;
+  }
+  match /users/{userId} {
+    allow read: if isAdmin() || request.auth.uid == userId;
+  }`,
+        });
+      }
+    }
+
+    // Mensaje genérico si nada anterior aplicó
+    if (code === 'permission-denied' && (message || '').length > 0) {
+      pushHint({
+        id: `generic-perm-${testId}`,
+        title: 'Permiso insuficiente',
+        note:
+          'Revisa que request.auth no sea null y que las condiciones de tus reglas coincidan con el UID/claim del usuario actual.',
+      });
+    }
+  };
+
   const runUserAccessTests = async () => {
     if (!currentUser) {
       setExecutionResult({
@@ -444,10 +561,12 @@ export default function DiagnosisPage() {
           detail: e?.message || String(e),
           ms: Math.round(performance.now() - start),
         });
+        buildHintsForError(id, e?.code, e?.message);
       }
     };
 
     setUserTests([]);
+    setPermHints([]);
 
     // 01) Leer mi propio documento /users/{uid}
     await exec('01', 'Leer mi perfil (/users/{uid})', async () => {
@@ -559,7 +678,7 @@ export default function DiagnosisPage() {
                 onChange={(e) => setOtherUserUid(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Opcional: si lo completas se intentará leer <code>/users/{'{otherUid}'}</code>.
+                Opcional: si lo completas se intentará leer <code>/users/{'{otherUserUid}'}</code>.
               </p>
             </div>
             <div className="flex items-end">
@@ -610,6 +729,24 @@ export default function DiagnosisPage() {
               </tbody>
             </table>
           </div>
+          {permHints.length > 0 && (
+            <div className="mt-6 rounded-md border p-4 bg-muted/30">
+              <h4 className="font-headline text-lg mb-3">Sugerencias de permisos / índices</h4>
+              <div className="space-y-4">
+                {permHints.map((h) => (
+                  <div key={h.id} className="space-y-2">
+                    <div className="font-medium">{h.title}</div>
+                    {h.note && <p className="text-sm text-muted-foreground">{h.note}</p>}
+                    {h.snippet && (
+                      <pre className="bg-zinc-950/90 text-zinc-100 text-xs p-3 rounded overflow-x-auto">
+          {h.snippet}
+                      </pre>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
