@@ -187,23 +187,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [pendingSurveyTicket, setPendingSurveyTicket] = React.useState<Ticket | null>(null);
 
   const fetchAndSetPendingSurvey = React.useCallback(async (user: User) => {
-    if (user.role === 'Administrador') return; // Admins don't get surveys
+    if (user.role === 'Administrador' || user.role === 'SST' || user.role === 'Servicios Generales') return;
 
+    // Simplified query to avoid complex index requirements.
+    // Filtering will happen on the client.
     const q = query(
-      collection(db, 'tickets'),
-      where('requesterId', '==', user.uid),
-      where('status', '==', 'Cerrado'),
-      where('satisfactionSurveyCompleted', '==', false),
-      orderBy('resolvedAt', 'asc'),
-      limit(1)
+        collection(db, 'tickets'),
+        where('requesterId', '==', user.uid),
+        orderBy('createdAt', 'desc') // Order to get recent ones first
     );
     
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      const ticketDoc = querySnapshot.docs[0];
-      setPendingSurveyTicket({ id: ticketDoc.id, ...ticketDoc.data() } as Ticket);
-    } else {
-      setPendingSurveyTicket(null);
+    try {
+        const querySnapshot = await getDocs(q);
+        
+        // Client-side filtering
+        const firstPendingSurvey = querySnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Ticket))
+            .find(ticket => 
+                ticket.status === 'Cerrado' &&
+                ticket.satisfactionSurveyCompleted === false
+            );
+            
+        if (firstPendingSurvey) {
+            setPendingSurveyTicket(firstPendingSurvey);
+        } else {
+            setPendingSurveyTicket(null);
+        }
+    } catch (error) {
+        console.error("Error fetching tickets for survey check:", error);
+        // Do not block user login if this fails
+        setPendingSurveyTicket(null);
     }
   }, []);
 
