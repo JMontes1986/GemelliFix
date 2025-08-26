@@ -190,18 +190,32 @@ export default function DashboardPage() {
 
 
   const calculateSlaByPriority = (priority: Ticket['priority']): number => {
-    const priorityTickets = tickets.filter(t => t.priority === priority);
-    const closedPriorityTickets = priorityTickets.filter(t => t.status === 'Cerrado' || t.status === 'Resuelto');
-
-    if (closedPriorityTickets.length === 0) {
-        return 100;
+    const relevantTickets = tickets.filter(t => t.priority === priority);
+    if (relevantTickets.length === 0) {
+        return 100; // Si no hay tickets, el cumplimiento es del 100%
     }
+    
+    // Contar incumplimientos: 1. Cerrados tarde, 2. Abiertos y ya vencidos.
+    const nonCompliantCount = relevantTickets.filter(t => {
+        const isClosed = t.status === 'Cerrado' || t.status === 'Resuelto';
+        const isOverdue = new Date() > new Date(t.dueDate);
+        
+        // Incumplimiento si se cerró y tiene fecha de resolución posterior al vencimiento.
+        if (isClosed && t.resolvedAt) {
+            return new Date(t.resolvedAt) > new Date(t.dueDate);
+        }
+        
+        // Incumplimiento si no está cerrado y ya está vencido.
+        if (!isClosed && isOverdue) {
+            return true;
+        }
 
-    const compliantTickets = closedPriorityTickets.filter(t => 
-        t.resolvedAt && new Date(t.resolvedAt) <= new Date(t.dueDate)
-    );
+        return false;
+    }).length;
 
-    return Math.round((compliantTickets.length / closedPriorityTickets.length) * 100);
+    const compliantCount = relevantTickets.length - nonCompliantCount;
+    
+    return Math.round((compliantCount / relevantTickets.length) * 100);
   };
 
   const slaByPriority = {
