@@ -416,9 +416,14 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-4">
       <AiAnalysisDialog open={isAnalysisOpen} onOpenChange={setAnalysisOpen} analysis={analysisResult} isLoading={isLoadingAnalysis} />
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-headline font-bold tracking-tight">
-          Dashboard de Líder
-        </h1>
+        <div>
+            <h1 className="text-2xl font-headline font-bold tracking-tight">
+                Sistema de Inteligencia de Mantenimiento (MIM)
+            </h1>
+            <p className="text-muted-foreground">
+                Una vista centralizada de las operaciones de mantenimiento.
+            </p>
+        </div>
         <div className="flex items-center gap-2">
            <Button onClick={handleAnalysis} variant="outline" disabled={isLoading}>
               <Sparkles className="mr-2 h-4 w-4" />
