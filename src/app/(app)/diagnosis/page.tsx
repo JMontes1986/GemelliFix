@@ -21,7 +21,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -679,9 +678,9 @@ export default function DiagnosisPage() {
                 value={otherUserUid}
                 onChange={(e) => setOtherUserUid(e.target.value)}
               />
-              <FormDescription>
+              <p className="text-sm text-muted-foreground">
                 Opcional: UID para la prueba de "Leer perfil de OTRO usuario".
-              </FormDescription>
+              </p>
             </div>
             <div className="flex items-end">
               <Button className="w-full" onClick={runUserAccessTests} disabled={isAuthLoading}>
