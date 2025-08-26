@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       disabled: false,
     });
 
-    // Crea doc en Firestore
+    // Crea doc en Firestore, asegurando que id y uid se guarden correctamente.
     await db.collection("users").doc(userRecord.uid).set({
       id: userRecord.uid,
       uid: userRecord.uid,
