@@ -1,47 +1,79 @@
+// src/lib/firebaseAdmin.ts
+import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 
-import { cert, getApps, initializeApp, App, Credential } from "firebase-admin/app";
+type SaJson = {
+  project_id: string;
+  client_email: string;
+  private_key: string;
+};
 
-/**
- * Retrieves the singleton instance of the Firebase Admin App.
- * If it's not already initialized, it will be created using the
- * credentials from the environment variables.
- * @returns {App} The initialized Firebase Admin App.
- */
-export function getAdminApp(): App {
-  const apps = getApps();
-  // If the app is already initialized, return it to prevent re-initialization.
-  if (apps.length) {
-    return apps[0];
+function readFromBase64(): SaJson | null {
+  const b64 = process.env.FIREBASE_ADMIN_B64;
+  if (!b64) return null;
+
+  try {
+    const jsonStr = Buffer.from(b64, "base64").toString("utf8");
+    const parsed = JSON.parse(jsonStr);
+
+    if (!parsed?.private_key || !parsed?.client_email || !parsed?.project_id) {
+      throw new Error(
+        "El JSON decodificado no tiene {project_id, client_email, private_key}."
+      );
+    }
+    return {
+      project_id: parsed.project_id,
+      client_email: parsed.client_email,
+      private_key: parsed.private_key,
+    };
+  } catch (e) {
+    // Lanza un mensaje claro para debugging
+    throw new Error(
+      "Failed to parse FIREBASE_ADMIN_B64. Make sure it is a valid Base64 encoded JSON string."
+    );
+  }
+}
+
+function readFromSplitVars(): SaJson | null {
+  const projectId = process.env.FB_PROJECT_ID || process.env.GCLOUD_PROJECT;
+  const clientEmail = process.env.FB_CLIENT_EMAIL;
+  let privateKey = process.env.FB_PRIVATE_KEY;
+
+  if (!projectId || !clientEmail || !privateKey) return null;
+
+  // Corrige los \n escapados si vienen en una sola línea
+  if (privateKey.includes("\\n")) {
+    privateKey = privateKey.replace(/\\n/g, "\n");
   }
 
-  // Otherwise, initialize it with the decoded credentials.
-  const projectId = process.env.FB_PROJECT_ID;
-  const clientEmail = process.env.FB_CLIENT_EMAIL;
-  const privateKey = process.env.FB_PRIVATE_KEY; // Using the direct key
+  return { project_id: projectId, client_email: clientEmail, private_key: privateKey };
+}
 
-  if (!projectId || !clientEmail || !privateKey) {
+function getCredential() {
+  const fromB64 = readFromBase64();
+  const fromSplit = !fromB64 ? readFromSplitVars() : null;
+  const sa = fromB64 ?? fromSplit;
+
+  if (!sa) {
     throw new Error(
-      'Firebase Admin environment variables are not set. Ensure FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY are correctly configured.'
+      "No se encontraron credenciales Admin. Define FIREBASE_ADMIN_B64 (JSON base64) o FB_PROJECT_ID/FB_CLIENT_EMAIL/FB_PRIVATE_KEY."
     );
   }
 
-  try {
-    // The private key from environment variables often has escaped newlines.
-    // This replaces the literal '\n' characters with actual newline characters.
-    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
-    
-    return initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail,
-        privateKey: formattedPrivateKey,
-      }),
-    });
-  } catch (error: any) {
-    console.error("Firebase Admin SDK initialization error:", error.message);
-    if (error.code === 'app/invalid-credential' || error.message?.includes('PEM') || error.message?.includes('parse')) {
-      throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted in your environment variables.');
-    }
-    throw error;
+  if (!sa.private_key.startsWith("-----BEGIN")) {
+    throw new Error(
+      "La private_key no tiene formato PEM válido (debe iniciar con '-----BEGIN PRIVATE KEY-----')."
+    );
   }
+
+  return cert({
+    projectId: sa.project_id,
+    clientEmail: sa.client_email,
+    privateKey: sa.private_key,
+  });
+}
+
+export function getAdminApp(): App {
+  const apps = getApps();
+  if (apps.length) return apps[0];
+  return initializeApp({ credential: getCredential() });
 }
