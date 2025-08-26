@@ -17,7 +17,7 @@ export function getAdminApp(): App {
   // Otherwise, initialize it with the decoded credentials.
   const projectId = process.env.FB_PROJECT_ID;
   const clientEmail = process.env.FB_CLIENT_EMAIL;
-  const privateKey = process.env.FB_PRIVATE_KEY;
+  const privateKey = process.env.FB_PRIVATE_KEY; // Using the direct key
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
@@ -26,7 +26,10 @@ export function getAdminApp(): App {
   }
 
   try {
+    // The private key from environment variables often has escaped newlines.
+    // This replaces the literal '\n' characters with actual newline characters.
     const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+    
     return initializeApp({
       credential: cert({
         projectId,
