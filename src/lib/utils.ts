@@ -48,9 +48,14 @@ export async function createLog(
         logDetails.field = action.replace('update_', '') as Log['details']['field'];
     }
 
+    const userId = user.id || user.uid;
+    if (!userId) {
+      console.error("Could not determine user ID for logging.");
+      return;
+    }
 
     await addDoc(collection(db, 'logs'), {
-      userId: user.id,
+      userId: userId,
       userEmail: user.email,
       userName: user.name,
       action: action,
