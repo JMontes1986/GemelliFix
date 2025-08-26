@@ -2,8 +2,8 @@
 import { config } from 'dotenv';
 config(); // Carga las variables de entorno primero
 
-import 'next/dist/server/lib/server-ipc/init';
-import { defineNextjsDevHandler } from '@genkit-ai/next/dev';
+// This file is for running Genkit in development mode.
+// It is not part of the Next.js application build.
 import { firebase } from '@genkit-ai/firebase';
 
 import '@/ai/flows/suggest-technician-assignment.ts';
@@ -18,7 +18,9 @@ import '@/ai/flows/ask-ai-assistant.ts';
 import '@/ai/flows/diagnose-requester-access.ts';
 import '@/ai/flows/suggest-ticket-title.ts';
 
-export default defineNextjsDevHandler({
+// This is the developer UI and flow server for Genkit.
+// It is not the Next.js dev handler.
+export default {
     plugins: [firebase()],
     port: 9002
-});
+};
