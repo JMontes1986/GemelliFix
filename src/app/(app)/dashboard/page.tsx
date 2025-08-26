@@ -74,6 +74,7 @@ import { Loader2 } from 'lucide-react';
 import { startOfWeek, format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ReactMarkdown from 'react-markdown';
 
 
 function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
@@ -98,10 +99,17 @@ function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: b
                     </div>
                 )}
                 {analysis && (
-                    <div
-                        className="prose prose-sm prose-p:text-muted-foreground"
-                        dangerouslySetInnerHTML={{ __html: analysis.summary }}
-                    />
+                   <div className="prose prose-sm max-w-full text-muted-foreground">
+                        <ReactMarkdown
+                            components={{
+                                p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                                ul: ({node, ...props}) => <ul className="list-disc pl-5 space-y-1" {...props} />,
+                                li: ({node, ...props}) => <li className="text-muted-foreground" {...props} />,
+                            }}
+                        >
+                            {analysis.summary}
+                        </ReactMarkdown>
+                    </div>
                 )}
             </DialogContent>
         </Dialog>
