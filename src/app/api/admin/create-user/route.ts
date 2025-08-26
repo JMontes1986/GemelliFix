@@ -1,6 +1,4 @@
-
 // app/api/admin/create-user/route.ts
-import 'dotenv/config'; // Asegura que las variables de entorno se carguen primero
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
