@@ -21,10 +21,11 @@ import {
   Loader2,
   ChevronsLeft,
   ChevronsRight,
-  Sparkles
+  Sparkles,
+  Star,
 } from 'lucide-react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, limit, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { GemelliFixLogo } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -52,6 +53,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -60,8 +68,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { User } from '@/lib/types';
+import type { User, Ticket } from '@/lib/types';
 import AiAssistant from './components/ai-assistant';
+import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 function CollapseToggle() {
     const { state, toggleSidebar } = useSidebar();
@@ -81,6 +92,89 @@ function CollapseToggle() {
     )
 }
 
+function SatisfactionSurveyModal({
+  ticket,
+  isOpen,
+  onClose,
+}: {
+  ticket: Ticket | null;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [rating, setRating] = React.useState(0);
+  const [comment, setComment] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    if (ticket) {
+      setRating(0);
+      setComment('');
+    }
+  }, [ticket]);
+
+  if (!ticket) return null;
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const docRef = doc(db, 'tickets', ticket.id);
+      await updateDoc(docRef, {
+        satisfactionRating: rating > 0 ? rating : null,
+        satisfactionComment: comment,
+        satisfactionSurveyCompleted: true,
+      });
+      toast({ title: '¡Gracias por tus comentarios!', description: 'Tu opinión ha sido registrada.' });
+      onClose(); // Cierra el modal y permite que el layout busque la siguiente encuesta
+    } catch (error) {
+      console.error('Error submitting survey:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar tu calificación.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={() => {}}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-headline text-lg flex items-center gap-2">
+            <Star className="w-5 h-5 text-yellow-500" />
+            Encuesta de Satisfacción
+          </DialogTitle>
+          <DialogDescription>
+            Por favor, califica el servicio recibido para el ticket: <strong>{ticket.code} - {ticket.title}</strong>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4 space-y-4">
+          <p className="text-muted-foreground text-sm">Tu opinión es muy importante para nosotros. Califica de 1 a 5 estrellas la calidad del servicio recibido, donde 5 es excelente.</p>
+          <div className="flex justify-center gap-2">
+            {[1, 2, 3, 4, 5].map(star => (
+              <Button key={star} variant={rating === star ? 'default' : 'outline'} size="icon" onClick={() => setRating(star)} disabled={isSubmitting}>
+                {star}
+              </Button>
+            ))}
+          </div>
+          <div>
+            <Label htmlFor="satisfaction-comment-modal">Comentarios Adicionales (Opcional)</Label>
+            <Textarea
+              id="satisfaction-comment-modal"
+              placeholder="Tu opinión nos ayuda a mejorar..."
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
+        </div>
+        <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {rating === 0 ? 'Omitir y Enviar' : 'Enviar Calificación'}
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -88,6 +182,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isMounted, setIsMounted] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const [isLoadingUser, setIsLoadingUser] = React.useState(true);
+  
+  // State for satisfaction survey modal
+  const [pendingSurveyTicket, setPendingSurveyTicket] = React.useState<Ticket | null>(null);
+
+  const fetchAndSetPendingSurvey = React.useCallback(async (user: User) => {
+    if (user.role === 'Administrador') return; // Admins don't get surveys
+
+    const q = query(
+      collection(db, 'tickets'),
+      where('requesterId', '==', user.uid),
+      where('status', '==', 'Cerrado'),
+      where('satisfactionSurveyCompleted', '==', false),
+      orderBy('resolvedAt', 'asc'),
+      limit(1)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const ticketDoc = querySnapshot.docs[0];
+      setPendingSurveyTicket({ id: ticketDoc.id, ...ticketDoc.data() } as Ticket);
+    } else {
+      setPendingSurveyTicket(null);
+    }
+  }, []);
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -98,7 +216,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               const userDocRef = doc(db, 'users', firebaseUser.uid);
               let userDocSnap = await getDoc(userDocRef);
 
-              // **Auto-repair mechanism:** If user exists in Auth but not Firestore, create them.
               if (!userDocSnap.exists()) {
                   console.warn(`User document not found for UID: ${firebaseUser.uid}. Creating a new profile.`);
                   const newUser: User = {
@@ -107,26 +224,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       name: firebaseUser.displayName || firebaseUser.email || 'Nuevo Usuario',
                       email: firebaseUser.email || '',
                       avatar: firebaseUser.photoURL || `https://placehold.co/100x100.png`,
-                      role: 'Docentes', // Assign a default, safe role
+                      role: 'Docentes',
                   };
                   await setDoc(userDocRef, { ...newUser, createdAt: serverTimestamp() });
-                  
-                  // Re-fetch the document to ensure we have the fresh data
                   userDocSnap = await getDoc(userDocRef);
                   if (!userDocSnap.exists()) {
-                    // If it still doesn't exist after creation, something is seriously wrong.
                     throw new Error("Failed to create and fetch user document.");
                   }
               }
 
-              // Proceed with role and data validation
               const firestoreData = userDocSnap.data() as User;
               let userRole = firestoreData.role;
               
-              // Fallback for older users who might not have a role in Firestore
               if (!userRole) {
                   console.warn(`User ${firestoreData.email} has no role in Firestore. Assigning default 'Docentes' role.`);
-                  userRole = 'Docentes'; // Assign default role
+                  userRole = 'Docentes';
                   await setDoc(userDocRef, { role: userRole }, { merge: true });
               }
 
@@ -136,10 +248,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               const userData: User = { 
                   id: userDocSnap.id, 
                   ...firestoreData, 
-                  role: tokenRole || userRole // Prefer token role, but fallback to Firestore role
+                  role: tokenRole || userRole
               };
 
               setCurrentUser(userData);
+              await fetchAndSetPendingSurvey(userData);
 
             } catch (error) {
               console.error("Error verifying user session or getting data. Logging out.", error);
@@ -153,7 +266,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [router, fetchAndSetPendingSurvey]);
   
   const isActive = (path: string) => pathname === path;
   const showFab = isMounted && pathname !== '/tickets/create';
@@ -172,6 +285,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={false}>
+      <SatisfactionSurveyModal 
+        isOpen={!!pendingSurveyTicket}
+        ticket={pendingSurveyTicket}
+        onClose={() => {
+            setPendingSurveyTicket(null);
+            if(currentUser) fetchAndSetPendingSurvey(currentUser); // Check for the next one
+        }}
+      />
       <Sidebar collapsible="icon">
         <SidebarHeader className="p-4 flex items-center justify-center">
         </SidebarHeader>

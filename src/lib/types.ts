@@ -56,6 +56,7 @@ export type Ticket = {
   };
   satisfactionRating?: number;
   satisfactionComment?: string;
+  satisfactionSurveyCompleted?: boolean;
 };
 
 export type Technician = {
@@ -115,6 +116,7 @@ export type Log = {
     
 
     
+
 
 
 

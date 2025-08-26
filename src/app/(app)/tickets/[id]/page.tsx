@@ -305,6 +305,7 @@ export default function TicketDetailPage() {
                 statusHistory: data.statusHistory || {},
                 satisfactionRating: data.satisfactionRating,
                 satisfactionComment: data.satisfactionComment,
+                satisfactionSurveyCompleted: data.satisfactionSurveyCompleted,
             };
             setTicket(ticketData);
             setSelectedPersonnelIds(ticketData.assignedToIds || []);
@@ -357,8 +358,8 @@ export default function TicketDetailPage() {
   const isRequester = currentUser?.id === ticket?.requesterId;
   const isAssignedToCurrentUser = ticket?.assignedToIds?.includes(currentUser?.id ?? '') ?? false;
   const shouldShowSurvey = ticket?.status === 'Cerrado' && (
-      (isRequester && !canEdit) || // Show to requester to fill out
-      (canEdit) // Always show to admin
+      (isRequester && currentUser?.role !== 'Administrador') || 
+      (canEdit) 
   );
 
 
@@ -621,10 +622,10 @@ export default function TicketDetailPage() {
         await updateDoc(docRef, {
             satisfactionRating: satisfactionRating,
             satisfactionComment: satisfactionComment,
+            satisfactionSurveyCompleted: true,
         });
 
         toast({ title: '¡Gracias por tus comentarios!', description: 'Tu opinión ha sido registrada.' });
-        // The component will re-render with the new ticket data, hiding the form
     } catch (error: any) {
         console.error("Error submitting satisfaction survey:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar tu calificación.' });
@@ -651,15 +652,15 @@ export default function TicketDetailPage() {
             <Card><CardContent className="p-6"><Skeleton className="h-24 w-full" /></CardContent></Card>
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
-    return <Card><CardHeader><CardTitle>Error</CardTitle></CardHeader><CardContent><p className="text-red-500">{error}</p></CardContent></Card>
+    return <Card><CardHeader><CardTitle>Error</CardTitle></CardHeader><CardContent><p className="text-red-500">{error}</p></CardContent></Card>;
   }
   
   if (!ticket) {
-     return <Card><CardHeader><CardTitle>Ticket no encontrado</CardTitle></CardHeader><CardContent><p>El ticket que buscas no existe o ha sido eliminado.</p></CardContent></Card>
+     return <Card><CardHeader><CardTitle>Ticket no encontrado</CardTitle></CardHeader><CardContent><p>El ticket que buscas no existe o ha sido eliminado.</p></CardContent></Card>;
   }
   
   const assignedPersonnelDetails = technicians.filter(
@@ -854,16 +855,22 @@ export default function TicketDetailPage() {
                     <CardTitle className="font-headline text-lg flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500" /> Encuesta de Satisfacción del Servicio</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {ticket.satisfactionRating ? (
+                    {ticket.satisfactionSurveyCompleted ? (
                         <div className="text-center p-4 bg-muted rounded-lg">
                             <h4 className="font-semibold">¡Gracias por tu opinión!</h4>
-                            <p className="text-muted-foreground mt-2">Calificación registrada:</p>
-                            <div className="flex justify-center gap-1 mt-2">
-                                {[1, 2, 3, 4, 5].map(star => (
-                                    <Star key={star} className={cn("w-6 h-6", ticket.satisfactionRating && ticket.satisfactionRating >= star ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground')} />
-                                ))}
-                            </div>
-                            {ticket.satisfactionComment && <p className="text-sm italic mt-2">Comentario: "{ticket.satisfactionComment}"</p>}
+                           {ticket.satisfactionRating ? (
+                             <>
+                                <p className="text-muted-foreground mt-2">Calificación registrada:</p>
+                                <div className="flex justify-center gap-1 mt-2">
+                                    {[1, 2, 3, 4, 5].map(star => (
+                                        <Star key={star} className={cn("w-6 h-6", ticket.satisfactionRating && ticket.satisfactionRating >= star ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground')} />
+                                    ))}
+                                </div>
+                                {ticket.satisfactionComment && <p className="text-sm italic mt-2">Comentario: "{ticket.satisfactionComment}"</p>}
+                             </>
+                           ) : (
+                             <p className="text-muted-foreground mt-2">El usuario omitió la calificación.</p>
+                           )}
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -888,11 +895,11 @@ export default function TicketDetailPage() {
                         </div>
                     )}
                 </CardContent>
-                {!ticket.satisfactionRating && !canEdit && (
+                {!ticket.satisfactionSurveyCompleted && !canEdit && (
                      <CardFooter>
-                        <Button className="w-full" onClick={handleSatisfactionSubmit} disabled={isUpdating || satisfactionRating === 0}>
+                        <Button className="w-full" onClick={handleSatisfactionSubmit} disabled={isUpdating}>
                             {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Enviar Calificación
+                            {satisfactionRating === 0 ? 'Omitir y Enviar' : 'Enviar Calificación'}
                         </Button>
                     </CardFooter>
                 )}
@@ -1053,7 +1060,7 @@ export default function TicketDetailPage() {
                              <div key={log.id} className="flex gap-3">
                                 <div className="flex-shrink-0">
                                    <LogIcon action={log.action} />
-                                d_v>
+                                </div>
                                 <div className="flex-1">
                                     <p>{renderLogDescription(log)}</p>
                                     {log.details.comment && (
@@ -1078,3 +1085,4 @@ export default function TicketDetailPage() {
     </div>
   );
 }
+
