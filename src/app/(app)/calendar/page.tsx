@@ -386,7 +386,7 @@ export default function CalendarPage() {
                         const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
                         
                         if (userData.role !== 'Administrador' && userData.role !== 'Servicios Generales') {
-                            router.push('/tickets');
+                            router.push('/tickets'); // Redirect non-authorized roles
                             return;
                         }
                         
@@ -1132,5 +1132,7 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+    
 
     
