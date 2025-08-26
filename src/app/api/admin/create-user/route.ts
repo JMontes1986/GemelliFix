@@ -1,88 +1,73 @@
 
 // app/api/admin/create-user/route.ts
-export const runtime = "nodejs";
-import { NextResponse } from "next/server";
-import { getAdminApp } from "@/lib/firebaseAdmin";
-import { getAuth as getAdminAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+export const runtime = 'nodejs'; // Evita el runtime de Edge
+export const dynamic = 'force-dynamic'; // Evita el pre-renderizado en el build
 
-async function assertAdmin(request: Request) {
-  const authHeader = request.headers.get("authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) throw new Error("missing-id-token");
+import { NextResponse } from 'next/server';
 
-  const app = getAdminApp();
-  const adminAuth = getAdminAuth(app);
-  const decoded = await adminAuth.verifyIdToken(token, true);
-
-  // Política: verifica en Firestore si el usuario tiene rol Administrador
-  const db = getFirestore(app);
-  const snap = await db.collection("users").doc(decoded.uid).get();
-  if (!snap.exists() || snap.get("role") !== "Administrador") {
-    throw new Error("forbidden-not-admin");
-  }
-  return decoded.uid;
-}
-
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    await assertAdmin(request);
+    // Importaciones perezosas para que no se evalúen durante el build:
+    const [{ getAdminApp }, { getAuth }, { getFirestore }] = await Promise.all([
+      import('@/lib/firebaseAdmin'),
+      import('firebase-admin/auth'),
+      import('firebase-admin/firestore'),
+    ]);
 
-    const body = await request.json();
-    const { name, email, password, role, avatar } = body || {};
-    if (!name || !email || !password || !role) {
-      return NextResponse.json({ error: "missing-fields" }, { status: 400 });
+    const { name, email, password, role, avatar } = await req.json();
+
+    // Validar token del que llama
+    const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!idToken) {
+        return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
     }
 
-    const app = getAdminApp();
-    const adminAuth = getAdminAuth(app);
-    const db = getFirestore(app);
+    const adminApp = getAdminApp();
+    const auth = getAuth(adminApp);
+    const db = getFirestore(adminApp);
 
-    const userRecord = await adminAuth.createUser({
+    const decodedToken = await auth.verifyIdToken(idToken);
+    
+    // Se verifica el rol usando el custom claim del token, que es más seguro.
+    const userClaims = (await auth.getUser(decodedToken.uid)).customClaims;
+    if (userClaims?.role !== 'Administrador') {
+        return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
+    }
+
+    const userRec = await auth.createUser({
       email,
       password,
       displayName: name,
       photoURL: avatar || undefined,
-      emailVerified: false,
-      disabled: false,
     });
 
-    // Crea doc en Firestore, asegurando que id y uid se guarden correctamente.
-    await db.collection("users").doc(userRecord.uid).set({
-      id: userRecord.uid,
-      uid: userRecord.uid,
+    // La Cloud Function `onUserCreated` se encargará de poner el custom claim del rol.
+    // Aquí solo guardamos el documento en Firestore.
+    await db.collection('users').doc(userRec.uid).set({
+      id: userRec.uid,
+      uid: userRec.uid,
       name,
       email,
       role,
-      avatar: avatar || "https://placehold.co/100x100.png",
+      avatar: avatar || null,
       createdAt: new Date(),
     });
 
-    return NextResponse.json({ uid: userRecord.uid }, { status: 200 });
+    return NextResponse.json({ ok: true, uid: userRec.uid });
   } catch (err: any) {
-    let status = 500;
-    let msg = "Unknown error";
-
-    if (err.message === "missing-id-token") {
-      status = 401;
-      msg = "Missing Authorization Bearer token.";
-    } else if (err.message === "forbidden-not-admin") {
-      status = 403;
-      msg = "User is not an Administrator.";
-    } else if (
-      /FIREBASE_ADMIN_B64/i.test(err.message) ||
-      /private key/i.test(err.message) ||
-      /PEM/i.test(err.message)
-    ) {
-      status = 500;
-      msg =
-        "Server-side Firebase Admin credentials are not formatted correctly. Check FB_PROJECT_ID, FB_CLIENT_EMAIL and FB_PRIVATE_KEY.";
-    } else if (err.errorInfo?.message) {
-      msg = err.errorInfo.message;
+    console.error('create-user error:', err);
+    let message = 'An unknown error occurred.';
+    if (err.code === 'auth/email-already-exists') {
+        message = 'The email address is already in use by another account.';
+    } else if (err.code === 'auth/invalid-password') {
+        message = 'The password must be a string with at least 6 characters.';
     } else if (err.message) {
-      msg = err.message;
+        message = err.message;
     }
-
-    return NextResponse.json({ error: msg }, { status });
+    
+    return NextResponse.json(
+      { error: message },
+      { status: 500 }
+    );
   }
 }
