@@ -22,10 +22,10 @@ export async function POST(req: Request) {
     const db = getFirestore(adminApp);
 
     // Verify the admin's token first. If this fails, it will throw an error.
+    // This is the most secure way to check for admin privileges.
     const decodedToken = await auth.verifyIdToken(idToken);
     
-    const userClaims = (await auth.getUser(decodedToken.uid)).customClaims;
-    if (userClaims?.role !== 'Administrador') {
+    if (decodedToken.role !== 'Administrador') {
       return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
     }
 
@@ -56,17 +56,21 @@ export async function POST(req: Request) {
     let message = 'An unknown error occurred.';
     let status = 500;
 
-    if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error') {
+    if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error' || err.code === 'auth/id-token-revoked') {
         message = 'Admin session is invalid or expired. Please log out and log in again.';
         status = 401;
     } else if (err.message?.includes('Firebase Admin environment variables are not set')) {
         message = 'Server-side Firebase Admin credentials are not configured. Check your environment variables.';
+        status = 500;
     } else if (err.message?.includes('Failed to parse Firebase private key')) {
         message = 'Server-side Firebase Admin credentials are not formatted correctly.';
+        status = 500;
     } else if (err.code === 'auth/email-already-exists') {
         message = 'The email address is already in use by another account.';
+        status = 409;
     } else if (err.code === 'auth/invalid-password') {
         message = 'The password must be a string with at least 6 characters.';
+        status = 400;
     } else if (err.message) {
         message = err.message;
     }
