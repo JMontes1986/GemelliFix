@@ -17,14 +17,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
     }
 
-    const adminApp = getAdminApp();
+    const adminApp = getAdminApp(); // Use the robust, centralized getAdminApp function
     const auth = getAuth(adminApp);
     const db = getFirestore(adminApp);
 
     const decodedToken = await auth.verifyIdToken(idToken);
-    const userClaims = (await auth.getUser(decodedToken.uid)).customClaims;
     
-    if (userClaims?.role !== 'Administrador') {
+    // Check custom claims from the decoded token for the 'Administrador' role.
+    // This is more secure and efficient than a DB lookup.
+    if (decodedToken.role !== 'Administrador') {
       return NextResponse.json({ error: 'Only administrators can create users.' }, { status: 403 });
     }
 
@@ -35,6 +36,8 @@ export async function POST(req: Request) {
       photoURL: avatar || undefined,
     });
 
+    // The onUserCreated Cloud Function will automatically set the custom claim for the role.
+    // This API route is only responsible for creating the user and their Firestore document.
     await db.collection('users').doc(userRec.uid).set({
       id: userRec.uid,
       uid: userRec.uid,
@@ -44,8 +47,6 @@ export async function POST(req: Request) {
       avatar: avatar || null,
       createdAt: new Date(),
     });
-    
-    // The onUserCreated Cloud Function will automatically set the custom claim.
 
     return NextResponse.json({ ok: true, uid: userRec.uid });
 
@@ -55,15 +56,15 @@ export async function POST(req: Request) {
     let message = 'An unknown error occurred.';
     let status = 500;
 
-    if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error' || err.code === 'auth/id-token-revoked') {
-        message = 'Admin session is invalid or expired. Please log out and log in again.';
-        status = 401;
-    } else if (err.message?.includes('Firebase Admin environment variables are not set')) {
-        message = 'Server-side Firebase Admin credentials are not configured. Check your environment variables.';
+    if (err.message?.includes('Firebase Admin environment variables are not set')) {
+        message = 'Server-side Firebase Admin credentials are not configured. Check your environment variables (FB_PROJECT_ID, FB_CLIENT_EMAIL, FB_PRIVATE_KEY_B64).';
         status = 500;
     } else if (err.message?.includes('Failed to parse Firebase private key')) {
-        message = 'Server-side Firebase Admin credentials are not formatted correctly. Ensure the private key is stored correctly.';
+        message = 'Server-side Firebase Admin credentials are not formatted correctly. Ensure the FB_PRIVATE_KEY_B64 is a valid Base64 string.';
         status = 500;
+    } else if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error' || err.code === 'auth/id-token-revoked') {
+        message = 'Admin session is invalid or expired. Please log out and log in again.';
+        status = 401;
     } else if (err.code === 'auth/email-already-exists') {
         message = 'The email address is already in use by another account.';
         status = 409;

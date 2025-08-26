@@ -2,19 +2,14 @@
 import { cert, getApps, initializeApp, getApp, App } from 'firebase-admin/app';
 
 /**
- * Ensures that the Firebase Admin SDK is initialized only once.
- * This is the central function for accessing the Admin App instance.
+ * Initializes the Firebase Admin SDK, ensuring it's only done once.
+ * This is the central and robust function for accessing the Admin App instance.
  * @returns {App} The initialized Firebase Admin App.
  */
-export function getAdminApp(): App {
-  // If the default app is already initialized, return it.
-  if (getApps().length > 0) {
-    return getApp();
-  }
-
+function createAdminApp(): App {
   const projectId = process.env.FB_PROJECT_ID;
   const clientEmail = process.env.FB_CLIENT_EMAIL;
-  // Prioritize the new Base64 encoded key
+  // The Base64 encoded key is the most reliable way to handle private keys in env variables.
   const privateKeyB64 = process.env.FB_PRIVATE_KEY_B64;
 
   if (!projectId || !clientEmail || !privateKeyB64) {
@@ -24,7 +19,7 @@ export function getAdminApp(): App {
   }
 
   try {
-    // Decode the Base64 private key
+    // Decode the Base64 private key to its original format.
     const privateKey = Buffer.from(privateKeyB64, 'base64').toString('utf-8');
     
     return initializeApp({
@@ -37,4 +32,19 @@ export function getAdminApp(): App {
     }
     throw error;
   }
+}
+
+/**
+ * Retrieves the singleton instance of the Firebase Admin App.
+ * If it's not already initialized, it will be created.
+ * @returns {App} The initialized Firebase Admin App.
+ */
+export function getAdminApp(): App {
+  // getApps() returns an array of all initialized apps. If it's not empty,
+  // we can safely get the default app instance.
+  if (getApps().length > 0) {
+    return getApp();
+  }
+  // Otherwise, we create a new app instance.
+  return createAdminApp();
 }
