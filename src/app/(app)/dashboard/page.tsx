@@ -14,6 +14,7 @@ import {
   Users,
   LineChart,
   Grid,
+  TrendingUp,
 } from 'lucide-react';
 import {
   Bar,
@@ -71,6 +72,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { startOfWeek, format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 
 function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
@@ -127,6 +129,7 @@ const formatHours = (hours: number): string => {
 
 export default function DashboardPage() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
+  const [technicians, setTechnicians] = React.useState<User[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isAnalysisOpen, setAnalysisOpen] = React.useState(false);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
@@ -135,8 +138,10 @@ export default function DashboardPage() {
 
   React.useEffect(() => {
     setIsLoading(true);
-    const q = query(collection(db, 'tickets'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    
+    // Fetch Tickets
+    const qTickets = query(collection(db, 'tickets'));
+    const unsubscribeTickets = onSnapshot(qTickets, (querySnapshot) => {
       const ticketsData: Ticket[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
@@ -147,7 +152,7 @@ export default function DashboardPage() {
         ticketsData.push({ ...data, id: doc.id, createdAt, dueDate, resolvedAt } as Ticket);
       });
       setTickets(ticketsData);
-      setIsLoading(false);
+      if (technicians.length > 0) setIsLoading(false);
     }, (error) => {
       console.error("Error fetching tickets for dashboard: ", error);
       toast({
@@ -157,9 +162,24 @@ export default function DashboardPage() {
       });
       setIsLoading(false);
     });
+
+    // Fetch Technicians
+    const qTechnicians = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
+    const unsubscribeTechnicians = onSnapshot(qTechnicians, (querySnapshot) => {
+        const techData: User[] = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        setTechnicians(techData);
+        if (tickets.length > 0) setIsLoading(false);
+    }, (error) => {
+        console.error("Error fetching technicians:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal de Servicios Generales.' });
+        setIsLoading(false);
+    });
     
-    return () => unsubscribe();
-  }, [toast]);
+    return () => {
+        unsubscribeTickets();
+        unsubscribeTechnicians();
+    };
+  }, [toast, tickets.length, technicians.length]);
 
   const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto' && t.status !== 'Cancelado').length;
   const overdueTickets = tickets.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Cerrado' && t.status !== 'Resuelto' && t.status !== 'Cancelado').length;
@@ -327,6 +347,31 @@ export default function DashboardPage() {
       { name: 'En Progreso → Resuelto', time: getAverage(durations.toResolved) },
     ];
   }, [tickets]);
+
+  const productivityData = React.useMemo(() => {
+    const techStats: { [id: string]: { name: string, avatar: string, resolvedCount: number, totalTime: number } } = {};
+
+    technicians.forEach(tech => {
+        techStats[tech.id] = { name: tech.name, avatar: tech.avatar, resolvedCount: 0, totalTime: 0 };
+    });
+
+    closedTickets.forEach(ticket => {
+        if (ticket.assignedToIds && ticket.resolvedAt) {
+            const resolutionTime = new Date(ticket.resolvedAt).getTime() - new Date(ticket.createdAt).getTime();
+            ticket.assignedToIds.forEach(techId => {
+                if (techStats[techId]) {
+                    techStats[techId].resolvedCount++;
+                    techStats[techId].totalTime += resolutionTime;
+                }
+            });
+        }
+    });
+
+    return Object.values(techStats).map(stat => ({
+        ...stat,
+        avgTime: stat.resolvedCount > 0 ? Math.round((stat.totalTime / stat.resolvedCount) / (1000 * 3600)) : 0
+    })).sort((a, b) => b.resolvedCount - a.resolvedCount);
+  }, [closedTickets, technicians]);
 
 
   const handleAnalysis = async () => {
@@ -600,35 +645,61 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-            <CardTitle className="font-headline">Tendencias de Tickets</CardTitle>
-            <CardDescription>Evolución semanal del número de tickets creados, cerrados y vencidos.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
-            <ResponsiveContainer width="100%" height={300}>
-                <RechartsLineChart data={ticketTrendsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <Tooltip
-                         contentStyle={{
-                            backgroundColor: 'hsl(var(--background))',
-                            borderColor: 'hsl(var(--border))',
-                            borderRadius: 'var(--radius)'
-                        }}
-                    />
-                    <Legend />
-                    <RechartsLine type="monotone" dataKey="created" name="Creados" stroke="#0088FE" strokeWidth={2} />
-                    <RechartsLine type="monotone" dataKey="closed" name="Cerrados" stroke="#00C49F" strokeWidth={2} />
-                    <RechartsLine type="monotone" dataKey="overdue" name="Vencidos" stroke="#FF8042" strokeWidth={2} />
-                </RechartsLineChart>
-            </ResponsiveContainer>
-            )}
-        </CardContent>
-      </Card>
-
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="md:col-span-2">
+            <CardHeader>
+                <CardTitle className="font-headline">Tendencias de Tickets</CardTitle>
+                <CardDescription>Evolución semanal del número de tickets creados, cerrados y vencidos.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
+                <ResponsiveContainer width="100%" height={300}>
+                    <RechartsLineChart data={ticketTrendsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                        <Tooltip
+                             contentStyle={{
+                                backgroundColor: 'hsl(var(--background))',
+                                borderColor: 'hsl(var(--border))',
+                                borderRadius: 'var(--radius)'
+                            }}
+                        />
+                        <Legend />
+                        <RechartsLine type="monotone" dataKey="created" name="Creados" stroke="#0088FE" strokeWidth={2} />
+                        <RechartsLine type="monotone" dataKey="closed" name="Cerrados" stroke="#00C49F" strokeWidth={2} />
+                        <RechartsLine type="monotone" dataKey="overdue" name="Vencidos" stroke="#FF8042" strokeWidth={2} />
+                    </RechartsLineChart>
+                </ResponsiveContainer>
+                )}
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader>
+                <CardTitle className="font-headline flex items-center gap-2"><TrendingUp className="h-5 w-5" />Productividad de Equipo</CardTitle>
+                <CardDescription>Tickets resueltos y tiempo promedio por técnico.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
+                    <div className="space-y-4">
+                        {productivityData.map(tech => (
+                             <div key={tech.name} className="flex items-center">
+                                <Avatar className="h-9 w-9">
+                                    <AvatarImage src={tech.avatar} />
+                                    <AvatarFallback>{tech.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div className="ml-4 space-y-1">
+                                    <p className="text-sm font-medium leading-none">{tech.name}</p>
+                                    <p className="text-sm text-muted-foreground">{tech.resolvedCount} resueltos - {tech.avgTime}h prom.</p>
+                                </div>
+                                <div className="ml-auto font-medium">{tech.resolvedCount}</div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+      </div>
 
        <Card>
         <CardHeader>
@@ -688,4 +759,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

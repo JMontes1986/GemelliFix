@@ -8,6 +8,7 @@ export type User = {
   avatar: string;
   role: 'Administrador' | 'Servicios Generales' | 'Docentes' | 'Coordinadores' | 'Administrativos' | 'SST';
   createdAt?: any;
+  ticketsResolved?: number;
 };
 
 export type Zone = {
@@ -99,7 +100,6 @@ export type Log = {
         field?: 'status' | 'priority' | 'assignedTo';
         oldValue?: any;
         newValue?: any;
-        description: string;
         comment?: string;
     }
 }
@@ -113,5 +113,6 @@ export type Log = {
     
 
     
+
 
 
