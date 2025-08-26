@@ -1,6 +1,4 @@
-
 // src/lib/firebaseAdmin.ts
-import 'dotenv/config'; // Asegura que las variables de entorno se carguen primero
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 
 // Esta función ahora es la única fuente de verdad para obtener la app de admin.

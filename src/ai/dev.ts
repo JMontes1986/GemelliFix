@@ -1,6 +1,9 @@
 
 import { config } from 'dotenv';
-config();
+config(); // Carga las variables de entorno primero
+
+import 'next/dist/server/lib/server-ipc/init';
+import { defineNextjsDevHandler } from '@genkit-ai/next/dev';
 
 import '@/ai/flows/suggest-technician-assignment.ts';
 import '@/ai/flows/diagnose-firebase-connection.ts';
@@ -13,4 +16,7 @@ import '@/ai/flows/create-calendar-event.ts';
 import '@/ai/flows/ask-ai-assistant.ts';
 import '@/ai/flows/diagnose-requester-access.ts';
 import '@/ai/flows/suggest-ticket-title.ts';
-    
+
+export default defineNextjsDevHandler({
+    port: 9002
+});
