@@ -1,88 +1,89 @@
 rules_version = '2';
 
+// deny public access by default
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check user roles
-    function isOneOfRoles(roles) {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
+  
+    // =============================================================
+    // Helper Functions
+    // =============================================================
+    function isAuth() {
+      return request.auth != null;
     }
 
-    // Rules for USERS collection
+    function isAdmin() {
+      // Custom claims are more secure than checking a document field,
+      // as they are verified on the backend with the user's token.
+      return isAuth() && request.auth.token.role == 'Administrador';
+    }
+
+    function isSST() {
+      return isAuth() && request.auth.token.role == 'SST';
+    }
+    
+    function isGeneralServices() {
+       return isAuth() && request.auth.token.role == 'Servicios Generales';
+    }
+
+    // =============================================================
+    // Security Rules for Collections
+    // =============================================================
+
+    // Users can read their own profile, Admins can read any profile.
     match /users/{userId} {
-      // Any authenticated user can read their own profile.
-      allow read: if request.auth != null && request.auth.uid == userId;
-      // Only the user themselves or an admin can update their profile.
-      allow update: if request.auth != null && (request.auth.uid == userId || isOneOfRoles(['Administrador']));
-      // Only admins can create or delete users.
-      allow create, delete: if isOneOfRoles(['Administrador']);
+      allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+      // Only Admins can create or update users through a secure backend endpoint.
+      allow create, update, delete: if isAdmin();
     }
     
-    // Rules for TICKETS collection
+    // Tickets can be created by any authenticated user.
+    // They can be read by their requester or by support staff (Admin/SST/General Services).
+    // They can only be updated by Admins or assigned technicians.
     match /tickets/{ticketId} {
-      // Read access is granted if:
-      // 1. You are the requester.
-      // 2. You are an Admin or SST.
-      // 3. You are assigned to the ticket.
-      allow read: if request.auth != null && (
-          request.auth.uid == resource.data.requesterId ||
-          isOneOfRoles(['Administrador', 'SST']) ||
-          request.auth.uid in resource.data.assignedToIds
-      );
-      
-      // Any authenticated user can create a ticket.
-      allow create: if request.auth != null;
-      
-      // Updates are allowed if you are an Admin or assigned to the ticket.
-      allow update: if request.auth != null && (
-          isOneOfRoles(['Administrador']) ||
-          request.auth.uid in resource.data.assignedToIds
-      );
-      
-      // Only Admins can delete tickets.
-      allow delete: if isOneOfRoles(['Administrador']);
+      allow create: if isAuth();
+      allow read: if (isAuth() && request.auth.uid == resource.data.requesterId) || isAdmin() || isSST() || isGeneralServices();
+      allow update: if isAdmin() || (isGeneralServices() && request.auth.uid in resource.data.assignedToIds);
+      allow delete: if isAdmin();
     }
 
-    // Rules for MASTER DATA collections (zones, sites, categories)
-    match /{collectionName}/{docId} where collectionName in ['zones', 'sites', 'categories'] {
-      // Anyone authenticated can read master data.
-      allow read: if request.auth != null;
-      // Only admins can create, update, or delete master data.
-      allow write: if isOneOfRoles(['Administrador']);
-    }
-
-    // Rules for NOTIFICATIONS collection
-    match /notifications/{notificationId} {
-      // A user can read or update their own notifications.
-      allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
-      // Notifications are created by server-side logic (Cloud Functions), not directly by clients.
-      allow create: if isOneOfRoles(['Administrador']); // Admins can create for testing, but typically server-side
-    }
-
-    // Rules for SCHEDULE EVENTS collection
+    // Schedule events can be created and managed by Admins.
+    // Technicians can read their own events.
     match /scheduleEvents/{eventId} {
-       // Any authenticated user can view calendar events
-       allow read: if request.auth != null;
-       // Only Admins and Service Staff can create, update or delete events.
-       allow write: if isOneOfRoles(['Administrador', 'Servicios Generales']);
+      allow read: if isAdmin() || (isGeneralServices() && request.auth.uid == resource.data.technicianId);
+      allow create, update, delete: if isAdmin();
     }
     
-    // Rules for LOGS collection
+    // Notifications are private to each user.
+    match /notifications/{notificationId} {
+      allow read, update: if isAuth() && request.auth.uid == resource.data.userId;
+      // Notifications are created server-side by Cloud Functions.
+      allow create, delete: if false; 
+    }
+
+    // Master data (zones, sites, categories) is read-only for authenticated users.
+    // Only Admins can modify them.
+    match /zones/{zoneId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isAdmin();
+    }
+    
+    match /sites/{siteId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isAdmin();
+    }
+    
+    match /categories/{categoryId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Logs can only be created by the backend. No client-side access is allowed.
     match /logs/{logId} {
-        // Only Admins and SST can read logs for auditing.
-        allow read: if isOneOfRoles(['Administrador', 'SST']);
-        // Logs are created by server-side logic. No client should write directly.
-        // Allowing Admin to create for potential manual log entries or testing.
-        allow create: if isOneOfRoles(['Administrador']);
-        allow update, delete: if false; // Logs should be immutable.
+        allow read, write: if false;
     }
     
-    // Rules for DIAGNOSIS LOGS (for testing connection)
     match /diagnosis_logs/{logId} {
-        // Any authenticated user can write to this collection for testing purposes.
-        allow write: if request.auth != null;
-        // Only admins should be able to read or delete test logs.
-        allow read, delete: if isOneOfRoles(['Administrador']);
+       allow read, write: if isAuth();
     }
   }
 }
