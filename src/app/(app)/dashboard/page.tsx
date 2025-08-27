@@ -69,7 +69,7 @@ import { Progress } from '@/components/ui/progress';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { startOfWeek, format, parseISO, eachWeekOfInterval, isValid } from 'date-fns';
+import { startOfWeek, format, parseISO, eachWeekOfInterval, isValid, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
@@ -193,28 +193,31 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
       return [];
     }
   
-    const weeklyData: { [week: string]: { created: number; closed: number; overdue: number } } = {};
     const getWeekKey = (date: Date) => format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd');
   
     // 1. Find the absolute date range of all ticket activity
     const allRelevantDates = tickets.flatMap(t => {
-        const dates: Date[] = [];
-        const createdAt = parseISO(t.createdAt);
-        if (isValid(createdAt)) dates.push(createdAt);
-        
-        if (t.resolvedAt) {
-            const resolvedAt = parseISO(t.resolvedAt);
-            if (isValid(resolvedAt)) dates.push(resolvedAt);
+      const dates: Date[] = [];
+      const createdAt = parseISO(t.createdAt);
+      if (isValid(createdAt)) {
+        dates.push(createdAt);
+      }
+      if (t.resolvedAt) {
+        const resolvedAt = parseISO(t.resolvedAt);
+        if (isValid(resolvedAt)) {
+          dates.push(resolvedAt);
         }
-        return dates;
+      }
+      return dates;
     }).filter(d => isValid(d));
-
+  
     if (allRelevantDates.length === 0) return [];
-
+  
     const minDate = new Date(Math.min(...allRelevantDates.map(d => d.getTime())));
     const maxDate = new Date(Math.max(...allRelevantDates.map(d => d.getTime())));
   
     // 2. Initialize all weeks within the entire date range
+    const weeklyData: { [week: string]: { created: number; closed: number; overdue: number } } = {};
     if (isValid(minDate) && isValid(maxDate) && minDate <= maxDate) {
       const weeksInRange = eachWeekOfInterval(
         { start: minDate, end: maxDate },
@@ -228,16 +231,18 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
   
     // 3. Populate the data by iterating through tickets
     tickets.forEach(ticket => {
-      // Handle created tickets
       const creationDate = parseISO(ticket.createdAt);
       if (isValid(creationDate)) {
         const creationWeekKey = getWeekKey(creationDate);
         if (weeklyData[creationWeekKey]) {
           weeklyData[creationWeekKey].created++;
+  
+          if (new Date() > new Date(ticket.dueDate) && !['Cerrado', 'Resuelto', 'Cancelado'].includes(ticket.status)) {
+            weeklyData[creationWeekKey].overdue++;
+          }
         }
       }
   
-      // Handle closed tickets
       if (ticket.resolvedAt) {
         const resolvedDate = parseISO(ticket.resolvedAt);
         if (isValid(resolvedDate)) {
@@ -245,16 +250,6 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
           if (weeklyData[resolvedWeekKey]) {
             weeklyData[resolvedWeekKey].closed++;
           }
-        }
-      }
-  
-      // Handle overdue tickets
-      if (new Date() > new Date(ticket.dueDate) && !['Cerrado', 'Resuelto', 'Cancelado'].includes(ticket.status)) {
-        if (isValid(creationDate)) {
-            const creationWeekKey = getWeekKey(creationDate);
-            if (weeklyData[creationWeekKey]) {
-                weeklyData[creationWeekKey].overdue++;
-            }
         }
       }
     });
