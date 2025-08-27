@@ -120,22 +120,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       role: 'Docentes',
                   };
                   await setDoc(userDocRef, { ...newUser, createdAt: serverTimestamp() });
-                  // Re-fetch after creation to ensure we have fresh data
                   const freshSnap = await getDoc(userDocRef);
                    if (!freshSnap.exists()) throw new Error("Failed to create and fetch user document.");
                    setCurrentUser({ id: freshSnap.id, ...freshSnap.data() } as User);
 
               } else {
                  const firestoreData = userDocSnap.data() as Omit<User, 'id'>;
-                 const idTokenResult = await firebaseUser.getIdTokenResult(true);
-                 const tokenRole = idTokenResult.claims.role as User['role'] | undefined;
-
                  const userData: User = { 
                      id: userDocSnap.id, 
                      ...firestoreData, 
-                     // The token is the source of truth for the role.
-                     // The Firestore role is a fallback.
-                     role: tokenRole || firestoreData.role
+                     role: firestoreData.role 
                  };
                  setCurrentUser(userData);
               }
