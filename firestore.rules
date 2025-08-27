@@ -1,89 +1,82 @@
 rules_version = '2';
 
-// deny public access by default
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // =============================================================
-    // Helper Functions
-    // =============================================================
-    function isAuth() {
+
+    // Helper functions
+    function isSignedIn() {
       return request.auth != null;
     }
-
+    
+    function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function getRole() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
     function isAdmin() {
-      // Custom claims are more secure than checking a document field,
-      // as they are verified on the backend with the user's token.
-      return isAuth() && request.auth.token.role == 'Administrador';
+        return isSignedIn() && getRole() in ['Administrador'];
     }
-
+    
     function isSST() {
-      return isAuth() && request.auth.token.role == 'SST';
+        return isSignedIn() && getRole() in ['SST'];
     }
     
-    function isGeneralServices() {
-       return isAuth() && request.auth.token.role == 'Servicios Generales';
+    function isServiceUser() {
+        return isSignedIn() && getRole() in ['Servicios Generales'];
     }
 
-    // =============================================================
-    // Security Rules for Collections
-    // =============================================================
-
-    // Users can read their own profile, Admins can read any profile.
+    // Collection: users
     match /users/{userId} {
-      allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
-      // Only Admins can create or update users through a secure backend endpoint.
-      allow create, update, delete: if isAdmin();
+      allow read: if isOwner(userId) || isAdmin() || isSST();
+      allow list: if isAdmin();
+      allow create: if isSignedIn(); // Allow self-registration
+      allow update: if isOwner(userId) || isAdmin();
     }
-    
-    // Tickets can be created by any authenticated user.
-    // They can be read by their requester or by support staff (Admin/SST/General Services).
-    // They can only be updated by Admins or assigned technicians.
+
+    // Collection: tickets
     match /tickets/{ticketId} {
-      allow create: if isAuth();
-      allow read: if (isAuth() && request.auth.uid == resource.data.requesterId) || isAdmin() || isSST() || isGeneralServices();
-      allow update: if isAdmin() || (isGeneralServices() && request.auth.uid in resource.data.assignedToIds);
+      allow read: if (isOwner(resource.data.requesterId) || isAdmin() || isSST() || isServiceUser());
+      allow list: if (isAdmin() || isSST() || request.query.where.requesterId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if (isAdmin() || (isServiceUser() && request.auth.uid in resource.data.assignedToIds)) || 
+                       (isOwner(resource.data.requesterId) && resource.data.status != 'Cerrado' && resource.data.status != 'Cancelado');
       allow delete: if isAdmin();
     }
 
-    // Schedule events can be created and managed by Admins.
-    // Technicians can read their own events.
-    match /scheduleEvents/{eventId} {
-      allow read: if isAdmin() || (isGeneralServices() && request.auth.uid == resource.data.technicianId);
-      allow create, update, delete: if isAdmin();
-    }
-    
-    // Notifications are private to each user.
+    // Collection: notifications
     match /notifications/{notificationId} {
-      allow read, update: if isAuth() && request.auth.uid == resource.data.userId;
-      // Notifications are created server-side by Cloud Functions.
-      allow create, delete: if false; 
+      allow read, list, update: if isOwner(resource.data.userId);
+      allow create: if isSignedIn(); // Allows server-side processes to create notifications
     }
 
-    // Master data (zones, sites, categories) is read-only for authenticated users.
-    // Only Admins can modify them.
+    // Collection: scheduleEvents
+    match /scheduleEvents/{eventId} {
+      allow read, list: if isSignedIn();
+      allow create: if isAdmin() || isServiceUser();
+      allow update, delete: if isAdmin() || (isServiceUser() && isOwner(resource.data.technicianId));
+    }
+    
+    // Collections: zones, sites, categories (Master Data)
     match /zones/{zoneId} {
-      allow read: if isAuth();
-      allow create, update, delete: if isAdmin();
+        allow read: if isSignedIn();
+        allow list, create, update, delete: if isAdmin();
+    }
+     match /sites/{siteId} {
+        allow read: if isSignedIn();
+        allow list, create, update, delete: if isAdmin();
+    }
+     match /categories/{categoryId} {
+        allow read: if isSignedIn();
+        allow list, create, update, delete: if isAdmin();
     }
     
-    match /sites/{siteId} {
-      allow read: if isAuth();
-      allow create, update, delete: if isAdmin();
-    }
-    
-    match /categories/{categoryId} {
-      allow read: if isAuth();
-      allow create, update, delete: if isAdmin();
-    }
-    
-    // Logs can only be created by the backend. No client-side access is allowed.
+    // Collection: logs
     match /logs/{logId} {
-        allow read, write: if false;
-    }
-    
-    match /diagnosis_logs/{logId} {
-       allow read, write: if isAuth();
+        allow read, list: if isAdmin() || isSST();
+        allow create: if isSignedIn(); // Allow server-side processes to create logs
     }
   }
 }
