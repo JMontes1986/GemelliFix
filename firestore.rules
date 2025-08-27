@@ -2,65 +2,77 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     function isAdmin() {
+      // Check for the custom claim. It's more secure.
       return request.auth != null && request.auth.token.role == 'Administrador';
     }
     
     function isSST() {
-      return request.auth != null && request.auth.token.role == 'SST';
+        return request.auth != null && request.auth.token.role == 'SST';
     }
 
     match /users/{userId} {
-      allow read: if request.auth.uid == userId || isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if request.auth.uid == userId || isAdmin();
-    }
-
-    match /tickets/{ticketId} {
-      allow read: if request.auth.uid == resource.data.requesterId || isAdmin() || isSST();
-      allow list: if isAdmin() || isSST() || (request.query.get("requesterId") == request.auth.uid);
+      allow read, write: if request.auth.uid == userId || isAdmin();
       allow create: if request.auth != null;
-      allow update: if isAdmin() || (request.auth.uid == resource.data.requesterId) || (request.auth.uid in resource.data.assignedToIds);
-      allow delete: if isAdmin();
+      // Admin can list users
+      allow list: if isAdmin();
     }
-
-    match /notifications/{notificationId} {
-      allow read, list: if request.auth.uid == resource.data.userId;
-      allow update: if request.auth.uid == resource.data.userId;
+    
+    match /tickets/{ticketId} {
+      allow create: if request.auth != null;
+      // Read is allowed if user is the requester OR an admin/SST.
+      allow read: if request.auth.uid == resource.data.requesterId || isAdmin() || isSST();
+      // List is allowed for admins/SST OR if a user is querying for their own tickets.
+      allow list: if isAdmin() || isSST() || (request.query.filters.requesterId == request.auth.uid);
+      // Update is allowed if user is an admin OR the assigned tech.
+      allow update: if isAdmin() || (request.auth.uid in resource.data.assignedToIds);
+      allow delete: if isAdmin();
     }
     
     match /zones/{zoneId} {
         allow read: if request.auth != null;
-        allow list: if request.auth != null;
-        allow create, update, delete: if isAdmin();
+        allow write: if isAdmin();
     }
     
     match /sites/{siteId} {
         allow read: if request.auth != null;
-        allow list: if request.auth != null;
-        allow create, update, delete: if isAdmin();
+        allow write: if isAdmin();
     }
 
     match /categories/{categoryId} {
         allow read: if request.auth != null;
-        allow list: if request.auth != null;
-        allow create, update, delete: if isAdmin();
+        allow write: if isAdmin();
     }
-
+    
     match /scheduleEvents/{eventId} {
-      allow read, list: if request.auth != null;
-      allow create, update, delete: if isAdmin() || request.auth.uid == resource.data.technicianId;
+        // Any authenticated user can create/read events.
+        // This is broad; could be restricted to Admin/Tech roles if needed.
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        // Only the assigned tech or an admin can update/delete an event.
+        allow update, delete: if isAdmin() || request.auth.uid == resource.data.technicianId;
+    }
+    
+    match /notifications/{notificationId} {
+      // A user can only read/update their own notifications
+      allow read, update: if request.auth.uid == resource.data.userId;
+      // Notifications are created by the system (server-side), not clients
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
     }
     
     match /logs/{logId} {
-        allow list, read: if isAdmin() || isSST();
-        allow create: if request.auth != null;
+        // Only admins/SST can read logs.
+        allow read: if isAdmin() || isSST();
+        // Logs are created server-side (via createLog function), not directly by clients.
+        // Allow create for admins for testing/manual entries if needed.
+        allow create: if isAdmin();
     }
     
-    match /diagnosis_logs/{logId} {
-      allow create: if request.auth != null;
+    // For diagnosis tests
+    match /diagnosis_logs/{docId} {
+      allow write: if request.auth != null;
     }
   }
 }
