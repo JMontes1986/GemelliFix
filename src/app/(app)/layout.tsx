@@ -92,90 +92,6 @@ function CollapseToggle() {
     )
 }
 
-function SatisfactionSurveyModal({
-  ticket,
-  isOpen,
-  onClose,
-}: {
-  ticket: Ticket | null;
-  isOpen: boolean;
-  onClose: () => void;
-}) {
-  const { toast } = useToast();
-  const [rating, setRating] = React.useState(0);
-  const [comment, setComment] = React.useState('');
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-  React.useEffect(() => {
-    if (ticket) {
-      setRating(0);
-      setComment('');
-    }
-  }, [ticket]);
-
-  if (!ticket) return null;
-
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    try {
-      const docRef = doc(db, 'tickets', ticket.id);
-      await updateDoc(docRef, {
-        satisfactionRating: rating > 0 ? rating : null,
-        satisfactionComment: comment,
-        satisfactionSurveyCompleted: true,
-      });
-      toast({ title: '¡Gracias por tus comentarios!', description: 'Tu opinión ha sido registrada.' });
-      onClose(); // Cierra el modal y permite que el layout busque la siguiente encuesta
-    } catch (error) {
-      console.error('Error submitting survey:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar tu calificación.' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="font-headline text-lg flex items-center gap-2">
-            <Star className="w-5 h-5 text-yellow-500" />
-            Encuesta de Satisfacción
-          </DialogTitle>
-          <DialogDescription>
-            Por favor, califica el servicio recibido para el ticket: <strong>{ticket.code} - {ticket.title}</strong>
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-4 space-y-4">
-          <p className="text-muted-foreground text-sm">Tu opinión es muy importante para nosotros. Califica de 1 a 5 estrellas la calidad del servicio recibido, donde 5 es excelente.</p>
-          <div className="flex justify-center gap-2">
-            {[1, 2, 3, 4, 5].map(star => (
-              <Button key={star} variant={rating === star ? 'default' : 'outline'} size="icon" onClick={() => setRating(star)} disabled={isSubmitting}>
-                {star}
-              </Button>
-            ))}
-          </div>
-          <div>
-            <Label htmlFor="satisfaction-comment-modal">Comentarios Adicionales (Opcional)</Label>
-            <Textarea
-              id="satisfaction-comment-modal"
-              placeholder="Tu opinión nos ayuda a mejorar..."
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              disabled={isSubmitting}
-            />
-          </div>
-        </div>
-        <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting}>
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {rating === 0 ? 'Omitir y Enviar' : 'Enviar Calificación'}
-        </Button>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -183,42 +99,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const [isLoadingUser, setIsLoadingUser] = React.useState(true);
   
-  // State for satisfaction survey modal
-  const [pendingSurveyTicket, setPendingSurveyTicket] = React.useState<Ticket | null>(null);
-
-  const fetchAndSetPendingSurvey = React.useCallback(async (user: User) => {
-    if (user.role === 'Administrador' || user.role === 'SST' || user.role === 'Servicios Generales') return;
-
-    // Simplified query to avoid complex index requirements.
-    // Filtering will happen on the client.
-    const q = query(
-        collection(db, 'tickets'),
-        where('requesterId', '==', user.uid),
-        orderBy('createdAt', 'desc') // Order to get recent ones first
-    );
-    
-    try {
-        const querySnapshot = await getDocs(q);
-        
-        // Client-side filtering
-        const firstPendingSurvey = querySnapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as Ticket))
-            .find(ticket => 
-                ticket.status === 'Cerrado' &&
-                ticket.satisfactionSurveyCompleted === false
-            );
-            
-        if (firstPendingSurvey) {
-            setPendingSurveyTicket(firstPendingSurvey);
-        } else {
-            setPendingSurveyTicket(null);
-        }
-    } catch (error) {
-        console.error("Error fetching tickets for survey check:", error);
-        // Do not block user login if this fails
-        setPendingSurveyTicket(null);
-    }
-  }, []);
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -258,7 +138,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                      role: tokenRole || firestoreData.role
                  };
                  setCurrentUser(userData);
-                 await fetchAndSetPendingSurvey(userData);
               }
 
             } catch (error) {
@@ -273,7 +152,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [router, fetchAndSetPendingSurvey]);
+  }, [router]);
   
   const isActive = (path: string) => pathname === path;
   const showFab = isMounted && pathname !== '/tickets/create';
@@ -292,14 +171,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={false}>
-      <SatisfactionSurveyModal 
-        isOpen={!!pendingSurveyTicket}
-        ticket={pendingSurveyTicket}
-        onClose={() => {
-            setPendingSurveyTicket(null);
-            if(currentUser) fetchAndSetPendingSurvey(currentUser); // Check for the next one
-        }}
-      />
       <Sidebar collapsible="icon">
         <SidebarHeader className="p-4 flex items-center justify-center">
         </SidebarHeader>
