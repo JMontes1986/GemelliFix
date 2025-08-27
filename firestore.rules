@@ -3,64 +3,73 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
     // Helper functions
-    function isAuth() {
-      return request.auth != null;
-    }
-    
     function isAdmin() {
-      // Admin role is checked via custom claims set by a Cloud Function.
-      return isAuth() && request.auth.token.role == 'Administrador';
+      return request.auth != null && request.auth.token.role == 'Administrador';
     }
     
     function isSST() {
-      return isAuth() && request.auth.token.role == 'SST';
+      return request.auth != null && request.auth.token.role == 'SST';
     }
-    
+
     function isServiceUser() {
-        return isAuth() && request.auth.token.role == 'Servicios Generales';
+      return request.auth != null && request.auth.token.role == 'Servicios Generales';
     }
 
-    // USERS
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Unprotected collection for diagnostics
+    match /diagnosis_logs/{logId} {
+      allow read, write: if request.auth != null;
+    }
+
     match /users/{userId} {
-      allow read: if isAuth(); // Anyone logged in can read user profiles (for names, avatars, etc.)
-      allow create: if isAuth() && !exists(/databases/$(database)/documents/users/$(request.auth.uid)); // Allow a user to create their own doc if it doesn't exist
-      allow update: if isAdmin() || request.auth.uid == userId; // Admins or the user themselves can update.
-    }
-    
-    // NOTIFICATIONS
-    match /notifications/{notificationId} {
-      allow read, update, create: if isAuth(); // Users can manage their own notifications, simplistic rule
-    }
-    
-    // LOGS
-    match /logs/{logId} {
-        // Only Admins and SST can read logs for auditing purposes.
-      allow read: if isAdmin() || isSST();
-      // Only authenticated users can create logs (client-side logging).
-      allow create: if isAuth();
+      allow read: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
-    // TICKETS
     match /tickets/{ticketId} {
-      // Allow read access if the user is an admin, SST, or the original requester.
-      allow read: if isAdmin() || isSST() || (isAuth() && request.auth.uid == resource.data.requesterId);
-      allow create: if isAuth(); // Any authenticated user can create a ticket.
-      allow update: if isAdmin() || (isServiceUser() && request.auth.uid in resource.data.assignedToIds); // Admins or assigned technicians can update.
+      allow create: if request.auth != null;
+      allow read: if request.auth.uid == resource.data.requesterId || isAdmin() || isSST();
+      // Allow users to list tickets if they are the requester, or if they are an admin/SST.
+      allow list: if isAdmin() || isSST() || (request.query.where.requesterId == request.auth.uid);
+      allow update: if isServiceUser() || isAdmin();
+      allow delete: if isAdmin();
     }
     
-    // MASTER DATA (Categories, Zones, Sites)
-    match /{collectionName}/{docId} where collectionName in ['categories', 'zones', 'sites'] {
-        allow read: if isAuth(); // All authenticated users can read master data
-        allow write: if isAdmin(); // Only admins can modify master data
+    match /zones/{zoneId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
     }
     
-    // SCHEDULE EVENTS
+     match /sites/{siteId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+
     match /scheduleEvents/{eventId} {
-      allow read: if isAuth(); // All authenticated users can see calendar events
-      // Only Admins or the assigned service user can create/update/delete events
-      allow write: if isAdmin() || (isServiceUser() && request.auth.uid == request.resource.data.technicianId);
+      allow read: if request.auth != null;
+      allow create, update, delete: if isServiceUser() || isAdmin();
+    }
+    
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null;
+    }
+    
+    match /notifications/{notificationId} {
+        allow read, update: if request.auth.uid == resource.data.userId;
+        allow create: if request.auth != null;
     }
   }
 }
