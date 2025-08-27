@@ -69,7 +69,7 @@ import { Progress } from '@/components/ui/progress';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { startOfWeek, format, parseISO } from 'date-fns';
+import { startOfWeek, format, parseISO, eachWeekOfInterval, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
@@ -189,29 +189,68 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
   const slaByPriority = { Urgente: calculateSlaByPriority('Urgente'), Alta: calculateSlaByPriority('Alta'), Media: calculateSlaByPriority('Media'), Baja: calculateSlaByPriority('Baja') };
 
   const ticketTrendsData = React.useMemo(() => {
-    const weeklyData: { [week: string]: { created: number, closed: number, overdue: number } } = {};
-
-    const getWeekKey = (date: Date) => {
-        return format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    if (tickets.length === 0) {
+      return [];
     }
 
-    tickets.forEach(ticket => {
-        // Process created tickets
-        const creationWeekKey = getWeekKey(parseISO(ticket.createdAt));
-        if (!weeklyData[creationWeekKey]) weeklyData[creationWeekKey] = { created: 0, closed: 0, overdue: 0 };
-        weeklyData[creationWeekKey].created++;
+    const weeklyData: { [week: string]: { created: number; closed: number; overdue: number } } = {};
+    const getWeekKey = (date: Date) => format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
-        // Process closed tickets
-        if (ticket.resolvedAt) {
-            const resolvedWeekKey = getWeekKey(parseISO(ticket.resolvedAt));
-            if (!weeklyData[resolvedWeekKey]) weeklyData[resolvedWeekKey] = { created: 0, closed: 0, overdue: 0 };
-            weeklyData[resolvedWeekKey].closed++;
+    // 1. Find the date range of all tickets
+    const allDates = tickets.flatMap(t => {
+      const dates = [parseISO(t.createdAt)];
+      if (t.resolvedAt) {
+        const resolvedDate = parseISO(t.resolvedAt);
+        if (isValid(resolvedDate)) {
+          dates.push(resolvedDate);
+        }
+      }
+      return dates;
+    });
+
+    const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+    
+    // 2. Initialize all weeks in the range
+    if (isValid(minDate) && isValid(maxDate) && minDate <= maxDate) {
+      const weeksInRange = eachWeekOfInterval(
+        { start: minDate, end: maxDate },
+        { weekStartsOn: 1 }
+      );
+      weeksInRange.forEach(weekStart => {
+        const weekKey = getWeekKey(weekStart);
+        weeklyData[weekKey] = { created: 0, closed: 0, overdue: 0 };
+      });
+    }
+
+
+    // 3. Populate the data
+    tickets.forEach(ticket => {
+        const creationDate = parseISO(ticket.createdAt);
+        if (isValid(creationDate)) {
+          const creationWeekKey = getWeekKey(creationDate);
+          if (weeklyData[creationWeekKey]) {
+              weeklyData[creationWeekKey].created++;
+          }
         }
 
-        // Process overdue tickets (still groups by creation week, but this is a reasonable approach)
+        if (ticket.resolvedAt) {
+          const resolvedDate = parseISO(ticket.resolvedAt);
+          if (isValid(resolvedDate)) {
+            const resolvedWeekKey = getWeekKey(resolvedDate);
+            if (weeklyData[resolvedWeekKey]) {
+                weeklyData[resolvedWeekKey].closed++;
+            }
+          }
+        }
+
         if (new Date() > new Date(ticket.dueDate) && !['Cerrado', 'Resuelto', 'Cancelado'].includes(ticket.status)) {
-            if (!weeklyData[creationWeekKey]) weeklyData[creationWeekKey] = { created: 0, closed: 0, overdue: 0 };
-            weeklyData[creationWeekKey].overdue++;
+          if (isValid(creationDate)) {
+            const creationWeekKey = getWeekKey(creationDate);
+            if (weeklyData[creationWeekKey]) {
+              weeklyData[creationWeekKey].overdue++;
+            }
+          }
         }
     });
 
