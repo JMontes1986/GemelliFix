@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -47,8 +48,8 @@ service cloud.firestore {
         (resource.data.requesterId == request.auth.uid) // Docentes/Coordinadores/Administrativos leen los suyos
       );
 
-      // Habilita queries; cada doc de la query además validará el read anterior
-      allow list: if isSignedIn();
+      // Solo Admins y SST pueden listar la colección completa. Otros roles deben usar queries filtradas que se validan con la regla 'read'.
+      allow list: if isRole("Administrador") || isRole("SST");
 
       // Todos los roles autenticados pueden crear
       allow create: if isSignedIn() && (

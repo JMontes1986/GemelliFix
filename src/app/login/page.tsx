@@ -2,7 +2,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
@@ -55,16 +54,9 @@ export default function LoginPage() {
       const userDocRef = doc(db, 'users', userCredential.user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
-      let redirectPath = '/tickets'; // Default redirect for most users
-
       if (userDocSnap.exists()) {
           const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
           await createLog(userData, 'login');
-          
-          // Redirect admins and SST to dashboard, others to tickets
-          if (userData.role === 'Administrador' || userData.role === 'SST') {
-            redirectPath = '/dashboard';
-          }
       }
 
       toast({
@@ -72,7 +64,7 @@ export default function LoginPage() {
         description: 'Has iniciado sesión correctamente.',
       });
       
-      router.push(redirectPath);
+      router.push('/dashboard');
 
     } catch (error: any) {
       console.error("Error de inicio de sesión:", error);
