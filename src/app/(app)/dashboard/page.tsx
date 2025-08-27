@@ -192,26 +192,29 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
     if (tickets.length === 0) {
       return [];
     }
-
+  
     const weeklyData: { [week: string]: { created: number; closed: number; overdue: number } } = {};
     const getWeekKey = (date: Date) => format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-
-    // 1. Find the date range of all tickets
-    const allDates = tickets.flatMap(t => {
-      const dates = [parseISO(t.createdAt)];
-      if (t.resolvedAt) {
-        const resolvedDate = parseISO(t.resolvedAt);
-        if (isValid(resolvedDate)) {
-          dates.push(resolvedDate);
+  
+    // 1. Find the absolute date range of all ticket activity
+    const allRelevantDates = tickets.flatMap(t => {
+        const dates: Date[] = [];
+        const createdAt = parseISO(t.createdAt);
+        if (isValid(createdAt)) dates.push(createdAt);
+        
+        if (t.resolvedAt) {
+            const resolvedAt = parseISO(t.resolvedAt);
+            if (isValid(resolvedAt)) dates.push(resolvedAt);
         }
-      }
-      return dates;
-    });
+        return dates;
+    }).filter(d => isValid(d));
 
-    const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
-    const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
-    
-    // 2. Initialize all weeks in the range
+    if (allRelevantDates.length === 0) return [];
+
+    const minDate = new Date(Math.min(...allRelevantDates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...allRelevantDates.map(d => d.getTime())));
+  
+    // 2. Initialize all weeks within the entire date range
     if (isValid(minDate) && isValid(maxDate) && minDate <= maxDate) {
       const weeksInRange = eachWeekOfInterval(
         { start: minDate, end: maxDate },
@@ -222,43 +225,46 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
         weeklyData[weekKey] = { created: 0, closed: 0, overdue: 0 };
       });
     }
-
-
-    // 3. Populate the data
+  
+    // 3. Populate the data by iterating through tickets
     tickets.forEach(ticket => {
-        const creationDate = parseISO(ticket.createdAt);
+      // Handle created tickets
+      const creationDate = parseISO(ticket.createdAt);
+      if (isValid(creationDate)) {
+        const creationWeekKey = getWeekKey(creationDate);
+        if (weeklyData[creationWeekKey]) {
+          weeklyData[creationWeekKey].created++;
+        }
+      }
+  
+      // Handle closed tickets
+      if (ticket.resolvedAt) {
+        const resolvedDate = parseISO(ticket.resolvedAt);
+        if (isValid(resolvedDate)) {
+          const resolvedWeekKey = getWeekKey(resolvedDate);
+          if (weeklyData[resolvedWeekKey]) {
+            weeklyData[resolvedWeekKey].closed++;
+          }
+        }
+      }
+  
+      // Handle overdue tickets
+      if (new Date() > new Date(ticket.dueDate) && !['Cerrado', 'Resuelto', 'Cancelado'].includes(ticket.status)) {
         if (isValid(creationDate)) {
-          const creationWeekKey = getWeekKey(creationDate);
-          if (weeklyData[creationWeekKey]) {
-              weeklyData[creationWeekKey].created++;
-          }
-        }
-
-        if (ticket.resolvedAt) {
-          const resolvedDate = parseISO(ticket.resolvedAt);
-          if (isValid(resolvedDate)) {
-            const resolvedWeekKey = getWeekKey(resolvedDate);
-            if (weeklyData[resolvedWeekKey]) {
-                weeklyData[resolvedWeekKey].closed++;
-            }
-          }
-        }
-
-        if (new Date() > new Date(ticket.dueDate) && !['Cerrado', 'Resuelto', 'Cancelado'].includes(ticket.status)) {
-          if (isValid(creationDate)) {
             const creationWeekKey = getWeekKey(creationDate);
             if (weeklyData[creationWeekKey]) {
-              weeklyData[creationWeekKey].overdue++;
+                weeklyData[creationWeekKey].overdue++;
             }
-          }
         }
+      }
     });
-
-    const sortedWeeks = Object.keys(weeklyData).sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
-
+  
+    // 4. Format for the chart
+    const sortedWeeks = Object.keys(weeklyData).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  
     return sortedWeeks.map(week => ({
-        week: format(parseISO(week), "dd LLL", { locale: es }),
-        ...weeklyData[week]
+      week: format(parseISO(week), "dd LLL", { locale: es }),
+      ...weeklyData[week]
     }));
   }, [tickets]);
 
