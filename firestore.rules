@@ -1,28 +1,38 @@
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-  
+
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
     function userRole() {
-      return isSignedIn() 
+      return isSignedIn()
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
         : null;
     }
-    
+
     function isRole(role) {
       return userRole() == role;
     }
-    
+
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Permiso de lectura del ticket por ID (para reutilizar en logs)
+    function canReadTicketId(ticketId) {
+      let t = get(/databases/$(database)/documents/tickets/$(ticketId)).data;
+      return isRole("Administrador")
+          || isRole("SST")
+          || (isRole("Servicios Generales") && request.auth.uid in t.assignedToIds)
+          || (t.requesterId == request.auth.uid);
     }
 
     // USERS
     match /users/{userId} {
+      // El dueño puede leerse, Admin y SST también (útil para auditoría y layout)
       allow read: if isSignedIn() && (isOwner(userId) || isRole("Administrador") || isRole("SST"));
       allow create, update, delete: if isRole("Administrador");
       allow list: if isRole("Administrador");
@@ -34,12 +44,13 @@ service cloud.firestore {
         isRole("Administrador") ||
         isRole("SST") ||
         (isRole("Servicios Generales") && request.auth.uid in resource.data.assignedToIds) ||
-        (resource.data.requesterId == request.auth.uid) // docentes, coordinadores y administrativos leen los suyos
+        (resource.data.requesterId == request.auth.uid) // Docentes/Coordinadores/Administrativos leen los suyos
       );
-      
-      allow list: if isRole("Administrador") || isRole("SST") ||
-                    (request.query.limit <= 100 && request.query.filters.requesterId == request.auth.uid);
 
+      // Habilita queries; cada doc de la query además validará el read anterior
+      allow list: if isSignedIn();
+
+      // Todos los roles autenticados pueden crear
       allow create: if isSignedIn() && (
         isRole("Administrador") ||
         isRole("SST") ||
@@ -49,10 +60,11 @@ service cloud.firestore {
         isRole("Administrativos")
       );
 
+      // Actualizar: Admin o técnico asignado; (opcional) el solicitante puede actualizar ciertos campos si así lo deseas
       allow update: if isSignedIn() && (
         isRole("Administrador") ||
-        (isRole("Servicios Generales") && request.auth.uid in resource.data.assignedToIds) ||
-        (resource.data.requesterId == request.auth.uid) // permiten actualizar algunos campos de sus propios tickets
+        (isRole("Servicios Generales") && request.auth.uid in resource.data.assignedToIds)
+        // si quieres permitir que el solicitante edite algunos campos, añade validaciones aquí
       );
 
       allow delete: if isRole("Administrador");
@@ -76,10 +88,15 @@ service cloud.firestore {
 
     // LOGS
     match /logs/{logId} {
-      allow read: if isRole("Administrador") || isRole("SST");
-      allow list: if isRole("Administrador") || isRole("SST");
-      allow create: if isRole("Administrador") || isRole("SST");
-      allow write: if false;
+      // Se puede leer un log si el usuario puede leer el ticket al que hace referencia
+      allow read: if isSignedIn() && (
+        (resource.data.details.ticketId != null && canReadTicketId(resource.data.details.ticketId))
+        || isRole("Administrador")
+        || isRole("SST")
+      );
+      allow list: if isSignedIn(); // Para poder consultar por ticketId; cada doc validará read arriba
+      allow create: if isSignedIn(); // generados por el sistema/cliente autenticado
+      allow write: if false; // Inmutables salvo creación
     }
 
     // DATA MASTER

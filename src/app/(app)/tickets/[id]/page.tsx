@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, getDoc, arrayUnion, orderBy } from 'firebase/firestore';
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -200,6 +200,7 @@ const isStateChangeAllowed = (currentStatus: Ticket['status'], nextStatus: Ticke
 
 export default function TicketDetailPage() {
   const params = useParams();
+  const router = useRouter(); // NUEVO
   const ticketId = params.id as string;
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -315,7 +316,14 @@ export default function TicketDetailPage() {
         setIsLoading(false);
     }, (err) => {
         console.error("Error fetching ticket:", err);
-        setError("Error al cargar el ticket. Verifique su conexión y permisos.");
+        // Manejo específico de permisos
+        if (err?.code === 'permission-denied') {
+          setError("No tienes permisos para ver este ticket. Serás redirigido a tu bandeja de solicitudes.");
+          // redirección suave para evitar quedarse “bloqueado” en una vista no permitida
+          setTimeout(() => router.push('/tickets'), 1200);
+        } else {
+          setError("Error al cargar el ticket. Verifica tu conexión y permisos.");
+        }
         setIsLoading(false);
     });
     
@@ -350,7 +358,7 @@ export default function TicketDetailPage() {
         unsubscribe();
         unsubscribeLogs();
     };
-}, [ticketId]);
+}, [ticketId, router]);
 
 
   const canEdit = currentUser?.role === 'Administrador';
