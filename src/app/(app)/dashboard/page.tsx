@@ -190,14 +190,37 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
 
   const ticketTrendsData = React.useMemo(() => {
     const weeklyData: { [week: string]: { created: number, closed: number, overdue: number } } = {};
+
+    const getWeekKey = (date: Date) => {
+        return format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    }
+
     tickets.forEach(ticket => {
-        const weekKey = format(startOfWeek(parseISO(ticket.createdAt), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-        if (!weeklyData[weekKey]) weeklyData[weekKey] = { created: 0, closed: 0, overdue: 0 };
-        weeklyData[weekKey].created++;
-        if (ticket.resolvedAt) weeklyData[weekKey].closed++;
-        if (new Date() > new Date(ticket.dueDate) && !['Cerrado', 'Resuelto', 'Cancelado'].includes(ticket.status)) weeklyData[weekKey].overdue++;
+        // Process created tickets
+        const creationWeekKey = getWeekKey(parseISO(ticket.createdAt));
+        if (!weeklyData[creationWeekKey]) weeklyData[creationWeekKey] = { created: 0, closed: 0, overdue: 0 };
+        weeklyData[creationWeekKey].created++;
+
+        // Process closed tickets
+        if (ticket.resolvedAt) {
+            const resolvedWeekKey = getWeekKey(parseISO(ticket.resolvedAt));
+            if (!weeklyData[resolvedWeekKey]) weeklyData[resolvedWeekKey] = { created: 0, closed: 0, overdue: 0 };
+            weeklyData[resolvedWeekKey].closed++;
+        }
+
+        // Process overdue tickets (still groups by creation week, but this is a reasonable approach)
+        if (new Date() > new Date(ticket.dueDate) && !['Cerrado', 'Resuelto', 'Cancelado'].includes(ticket.status)) {
+            if (!weeklyData[creationWeekKey]) weeklyData[creationWeekKey] = { created: 0, closed: 0, overdue: 0 };
+            weeklyData[creationWeekKey].overdue++;
+        }
     });
-    return Object.entries(weeklyData).map(([week, data]) => ({ week: format(parseISO(week), "dd LLL", { locale: es }), ...data })).sort((a, b) => new Date(a.week).getTime() - new Date(b.week).getTime());
+
+    const sortedWeeks = Object.keys(weeklyData).sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+
+    return sortedWeeks.map(week => ({
+        week: format(parseISO(week), "dd LLL", { locale: es }),
+        ...weeklyData[week]
+    }));
   }, [tickets]);
 
   const lifecycleData = React.useMemo(() => {
