@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -331,7 +332,9 @@ export default function TicketsPage() {
         case 'Docentes':
         case 'Coordinadores':
         case 'Administrativos':
-            ticketsQuery = query(collection(db, 'tickets'), where('requesterId', '==', currentUser.id), orderBy('createdAt', 'desc'));
+            // FIX: Removed orderBy from the query to avoid needing a composite index.
+            // Sorting will now be handled on the client-side after fetching.
+            ticketsQuery = query(collection(db, 'tickets'), where('requesterId', '==', currentUser.id));
             break;
         default:
             setTickets([]);
@@ -340,7 +343,7 @@ export default function TicketsPage() {
     }
     
     const unsubscribeTickets = onSnapshot(ticketsQuery, (querySnapshot) => {
-      const ticketsData: Ticket[] = querySnapshot.docs.map(doc => {
+      let ticketsData: Ticket[] = querySnapshot.docs.map(doc => {
           const data = doc.data();
           const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
           const dueDate = data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString();
@@ -351,6 +354,12 @@ export default function TicketsPage() {
               dueDate,
           } as Ticket;
       });
+
+      // Client-side sorting for requester roles
+      if (['Docentes', 'Coordinadores', 'Administrativos'].includes(currentUser.role)) {
+          ticketsData = ticketsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+      
       setTickets(ticketsData);
       setIsLoading(false);
       setError(null);
