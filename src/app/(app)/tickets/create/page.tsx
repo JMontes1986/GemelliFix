@@ -46,7 +46,7 @@ import type { User as FirebaseUser } from 'firebase/auth';
 
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
+const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf", "video/mp4", "video/webm", "video/quicktime"];
 
 
 const ticketSchema = z.object({
@@ -516,7 +516,7 @@ export default function CreateTicketPage() {
                                 </label>
                                 <p className="pl-1">o arrastra y suelta</p>
                             </div>
-                            <p className="text-xs text-muted-foreground">Imágenes o PDF hasta 10MB</p>
+                            <p className="text-xs text-muted-foreground">Imágenes, Videos o PDF, hasta 10MB</p>
                         </div>
                       </div>
                     </FormControl>
