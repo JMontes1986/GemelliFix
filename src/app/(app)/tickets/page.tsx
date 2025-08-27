@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -399,6 +400,11 @@ export default function TicketsPage() {
         }
         updates.dueDate = newDueDate;
         logDetails.newValue = `${value} (vence: ${newDueDate.toLocaleDateString()})`;
+    }
+    
+    // If status is being updated to a final state, set the resolvedAt timestamp
+    if (field === 'status' && (value === 'Cerrado' || value === 'Resuelto')) {
+        updates.resolvedAt = new Date().toISOString();
     }
 
     try {

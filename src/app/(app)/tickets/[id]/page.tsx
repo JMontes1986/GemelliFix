@@ -443,6 +443,9 @@ export default function TicketDetailPage() {
         const newStatus = field === 'status' ? value : updates.status;
         const statusKey = `statusHistory.${newStatus}`;
         updates[statusKey] = new Date().toISOString();
+        if (['Cerrado', 'Resuelto'].includes(newStatus) && !ticket.resolvedAt) {
+            updates.resolvedAt = new Date().toISOString();
+        }
     }
     
     if (field === 'priority' || (field === 'multiple' && 'priority' in updates)) {
