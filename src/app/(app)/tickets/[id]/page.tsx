@@ -72,7 +72,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
+const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf", "video/mp4", "video/webm", "video/quicktime"];
 
 
 const getPriorityBadgeVariant = (priority: Ticket['priority']) => {
@@ -382,7 +382,7 @@ export default function TicketDetailPage() {
                 continue;
             }
             if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
-                toast({ variant: 'destructive', title: 'Tipo de archivo no permitido', description: `El archivo ${file.name} no es una imagen o PDF.` });
+                toast({ variant: 'destructive', title: 'Tipo de archivo no permitido', description: `El archivo ${file.name} no es una imagen, video o PDF.` });
                 continue;
             }
             validFiles.push(file);
@@ -1013,7 +1013,7 @@ export default function TicketDetailPage() {
                                         </label>
                                         <p className="pl-1">o arrastra y suelta</p>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">Imágenes o PDF, hasta 10MB</p>
+                                    <p className="text-xs text-muted-foreground">Imágenes, videos o PDF, hasta 10MB</p>
                                 </div>
                             </div>
                             {filesToUpload.length > 0 && (
@@ -1093,4 +1093,3 @@ export default function TicketDetailPage() {
     </div>
   );
 }
-
