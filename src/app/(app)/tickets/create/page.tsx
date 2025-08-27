@@ -153,18 +153,18 @@ export default function CreateTicketPage() {
 
 
   React.useEffect(() => {
-      const description = form.watch('description');
-      // Debounce logic
-      const handler = setTimeout(() => {
-          if (description) {
-            handleGenerateTitle();
-          }
-      }, 1000); // 1 second delay
+    const description = form.watch('description');
+    // Debounce logic
+    const handler = setTimeout(() => {
+        if (description) {
+          handleGenerateTitle();
+        }
+    }, 1000); // 1 second delay
 
-      return () => {
-          clearTimeout(handler);
-      };
-  }, [form.watch('description'), handleGenerateTitle]);
+    return () => {
+        clearTimeout(handler);
+    };
+  }, [ticketDescription, handleGenerateTitle, form]);
   
   const handleAiSuggestions = async () => {
     if (!ticketTitle || !ticketDescription) {
