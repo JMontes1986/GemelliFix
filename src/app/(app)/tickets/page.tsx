@@ -332,6 +332,8 @@ export default function TicketsPage() {
         case 'Docentes':
         case 'Coordinadores':
         case 'Administrativos':
+            // CRITICAL FIX: Removed orderBy from the query to avoid needing a composite index.
+            // Sorting will now be done on the client side after fetching.
             ticketsQuery = query(collection(db, 'tickets'), where('requesterId', '==', currentUser.id));
             break;
         default:
@@ -353,7 +355,8 @@ export default function TicketsPage() {
           } as Ticket;
       });
 
-      if (['Docentes', 'Coordinadores', 'Administrativos'].includes(currentUser.role)) {
+      // Client-side sorting for non-admin/SST roles to avoid index errors.
+      if (!['Administrador', 'SST', 'Servicios Generales'].includes(currentUser.role)) {
           ticketsData = ticketsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       }
       
