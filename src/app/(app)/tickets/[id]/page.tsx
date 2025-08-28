@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, getDoc, arrayUnion, orderBy } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, getDoc, arrayUnion, orderBy, limit } from 'firebase/firestore';
 import { db, auth, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
@@ -333,7 +333,8 @@ export default function TicketDetailPage() {
     const logsQuery = query(
       collection(db, 'logs'), 
       where('details.ticketId', '==', ticketId),
-      orderBy('timestamp', 'asc') // Fetch in ascending order
+      orderBy('timestamp', 'asc'),
+      limit(50) // Good practice: limit the number of logs fetched
     );
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
         const fetchedLogs: Log[] = [];

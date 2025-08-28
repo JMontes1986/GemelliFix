@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -8,60 +7,50 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // OJO: Estos helpers usan get() sobre /users; no los uses para leer /users/{userId}
     function userRole(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data.role;
     }
+
     function isAdmin() { return isSignedIn() && userRole(request.auth.uid) == 'Administrador'; }
     function isSST()   { return isSignedIn() && userRole(request.auth.uid) == 'SST'; }
     function isTech()  { return isSignedIn() && userRole(request.auth.uid) == 'Servicios Generales'; }
 
-
-    // ÚSALA SOLO PARA OTROS DOCUMENTOS (no el que se está leyendo)
     function canReadTicketById(ticketId) {
-      let t = get(/databases/$(database)/documents/tickets/$(ticketId)).data;
+      let ticketData = get(/databases/$(database)/documents/tickets/$(ticketId)).data;
+      let assignedIds = ticketData.assignedToIds != null ? ticketData.assignedToIds : [];
+      
       return isAdmin() || isSST()
-        || (isTech() && request.auth.uid in (t.assignedToIds || []))
-        || (isSignedIn() && request.auth.uid == t.requesterId);
+        || (isTech() && request.auth.uid in assignedIds)
+        || (isSignedIn() && request.auth.uid == ticketData.requesterId);
     }
-
-    /* -------- USERS (sin recursión) --------
-       - Cualquier usuario autenticado puede LEER perfiles (evita la recursión).
-       - Listar/crear/editar solo admin (si quieres que cada uno edite su avatar/nombre, añade or de owner en update).
-    */
+    
+    // USERS
     match /users/{userId} {
-      // get/stream de un perfil: permitir a cualquiera que esté logueado
-      allow get, read: if isSignedIn();
-
-      // list (consultas): solo admin (esto habilita tu tabla en Settings)
+      allow get: if isSignedIn() && (isAdmin() || request.auth.uid == userId);
       allow list: if isAdmin();
-
-      // escrituras: solo admin (o añade || request.auth.uid == userId si quieres self-update)
-      allow create, delete: if isAdmin();
+      allow create: if isSignedIn()
+                    && request.auth.uid == userId
+                    && !exists(/databases/$(database)/documents/users/$(userId))
+                    && request.resource.data.keys().hasOnly(["uid", "name", "email", "avatar", "role", "createdAt", "id"])
+                    && request.resource.data.role in ["Docentes", "Coordinadores", "Administrativos"]
+                    && request.resource.data.uid == request.auth.uid;
       allow update: if isAdmin() || request.auth.uid == userId;
+      allow delete: if isAdmin();
     }
-
 
     // TICKETS
     match /tickets/{ticketId} {
-      // Lectura de UN doc (get / onSnapshot(doc))
-      allow get: if isAdmin() || isSST()
-        || (isTech() && request.auth.uid in (resource.data.assignedToIds || []))
-        || (isSignedIn() && request.auth.uid == resource.data.requesterId);
-
-      // Consultas y lecturas de colección
-      allow list: if
+      allow get: if canReadTicketById(ticketId);
+      
+      allow list: if 
         isAdmin() || isSST() ||
-        // Solicitantes/Coordinaciones/Administrativos: la query DEBE filtrar por su uid
-        (isSignedIn()
-          && request.query.where('requesterId', '==', request.auth.uid));
+        (isTech() && request.query.where('assignedToIds', 'array-contains', request.auth.uid)) ||
+        (isSignedIn() && request.query.where('requesterId', '==', request.auth.uid));
 
       allow create: if isSignedIn();
-
+      
       allow update: if isAdmin()
         || (isTech() && request.auth.uid in (resource.data.assignedToIds || []));
-      // (delete solo si quieres que admin pueda)
-      // allow delete: if isAdmin();
     }
 
     // SCHEDULE EVENTS
@@ -71,28 +60,26 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // NOTIFICATIONS (cada usuario solo ve las suyas)
+    // NOTIFICATIONS
     match /notifications/{notificationId} {
-      allow get, update, delete: if isSignedIn()
-        && request.auth.uid == resource.data.userId;
-      allow list: if isSignedIn()
-        && request.query.where('userId', '==', request.auth.uid);
+      allow get, update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow list: if isSignedIn() && request.query.where('userId', '==', request.auth.uid);
       allow create: if isSignedIn();
     }
 
-    // LOGS (auditoría)
+    // LOGS
     match /logs/{logId} {
-      // Un log es legible si puedes leer el ticket relacionado o eres Admin/SST
-      allow get: if isAdmin() || isSST()
-        || (resource.data.details.ticketId != null
-            && canReadTicketById(resource.data.details.ticketId));
-      // En consultas, al menos pide logs del ticket que sí puedes leer
-      allow list: if isAdmin() || isSST()
-        || (request.query.where('details.ticketId', '==', request.resource.data.details.ticketId)
-            && canReadTicketById(request.resource.data.details.ticketId)); // Firestore ignora partes no evaluables; lo importante: admin/sst ok.
-      allow create: if isSignedIn();
-      allow update, delete: if false;
+        allow get: if isAdmin() || isSST()
+            || (resource.data.details.ticketId != null
+                && canReadTicketById(resource.data.details.ticketId));
+
+        allow list: if isAdmin() || isSST()
+            || (isSignedIn() && request.query.where('details.ticketId', 'in', get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accessibleTicketIds || []));
+            
+        allow create: if isSignedIn();
+        allow update, delete: if false;
     }
+
 
     // DATA MASTER
     match /zones/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
