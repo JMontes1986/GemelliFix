@@ -135,7 +135,13 @@ const TicketsTable: React.FC<TicketsTableProps> = ({
     }
 
     if (tickets.length === 0) {
-        return <div className="h-24 text-center flex items-center justify-center">No hay solicitudes en este estado.</div>;
+        return (
+            <div className="h-24 text-center flex flex-col items-center justify-center gap-1 text-muted-foreground">
+                <p>No tienes solicitudes en este estado.</p>
+                <Link href="/tickets/create" className="text-primary hover:underline font-semibold">Crea una nueva solicitud</Link>
+                 para ver tu historial aquí.
+            </div>
+        );
     }
 
     const groupedTickets = tickets.reduce((acc, ticket) => {
