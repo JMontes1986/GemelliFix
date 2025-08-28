@@ -188,73 +188,68 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
 
   const slaByPriority = { Urgente: calculateSlaByPriority('Urgente'), Alta: calculateSlaByPriority('Alta'), Media: calculateSlaByPriority('Media'), Baja: calculateSlaByPriority('Baja') };
 
-    // --- START: Logic for Trends Chart ---
     const buildWeeklyTrends = React.useCallback((allTickets: Ticket[]) => {
-        // Helpers
-        const startOfMondayWeek = (d: Date) => startOfWeek(d, { weekStartsOn: 1 });
-        const endOfMondayWeek = (d: Date) => {
-          const s = startOfMondayWeek(d);
-          // Go to next sunday 23:59:59
-          return new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6, 23, 59, 59, 999);
-        };
-        const inRange = (d: Date, from: Date, to: Date) => d >= from && d <= to;
-    
-        // Normalize dates from tickets
-        const norm = allTickets.map(t => {
-          const created = parseISO(t.createdAt);
+      // Helpers
+      const startOfMondayWeek = (d: Date) => startOfWeek(d, { weekStartsOn: 1 });
+      const endOfMondayWeek = (d: Date) => endOfWeek(d, { weekStartsOn: 1 });
+      const inRange = (d: Date, from: Date, to: Date) => d >= from && d <= to;
+
+      // Normalize dates from tickets
+      const norm = allTickets.map(t => {
+          const created = new Date(t.createdAt);
           if (!isValid(created)) return null;
+
+          const due = new Date(t.dueDate);
+
+          // Attempt to get a valid closing date from multiple sources
+          const closedRaw = (t.resolvedAt ? new Date(t.resolvedAt) : null) ||
+                            (t.statusHistory?.['Cerrado'] ? new Date(t.statusHistory['Cerrado']) : null) ||
+                            (t.statusHistory?.['Resuelto'] ? new Date(t.statusHistory['Resuelto']) : null);
           
-          const due = parseISO(t.dueDate);
-          const closedRaw = (t.resolvedAt ? parseISO(t.resolvedAt) : null) ||
-                            (t.statusHistory?.['Cerrado'] ? parseISO(t.statusHistory['Cerrado']) : null) ||
-                            (t.statusHistory?.['Resuelto'] ? parseISO(t.statusHistory['Resuelto']) : null);
           const closedAt = closedRaw && isValid(closedRaw) ? closedRaw : null;
           
           return { ...t, _created: created, _due: due, _closed: closedAt };
-        }).filter((t): t is NonNullable<typeof t> => t !== null);
-    
-        const weeks: { week: string; created: number; closed: number; overdue: number }[] = [];
-        const today = new Date();
-        
-        // Generate last 12 weeks including the current one
-        for (let i = 11; i >= 0; i--) {
-          const weekStart = startOfMondayWeek(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i * 7));
-          const weekEnd = endOfMondayWeek(weekStart);
-    
-          const created = norm.filter(t => inRange(t._created, weekStart, weekEnd)).length;
-          const closed = norm.filter(t => t._closed && inRange(t._closed, weekStart, weekEnd)).length;
-    
-          // Overdue at the end of this specific week
-          const overdue = norm.filter(t => {
-              if (!isValid(t._due)) return false; // Skip if due date is invalid
-              const wasDueByThen = t._due <= weekEnd;
-              // Was not closed by the end of this week
-              const notClosedByThen = !t._closed || t._closed > weekEnd;
-              return wasDueByThen && notClosedByThen;
-          }).length;
-    
-          weeks.push({
-            week: format(weekStart, "dd LLL", { locale: es }),
-            created,
-            closed,
-            overdue,
-          });
-        }
-    
-        return weeks;
-      }, []);
+      }).filter((t): t is NonNullable<typeof t> => t !== null && isValid(t._created));
 
+      const weeks: { week: string; created: number; closed: number; overdue: number }[] = [];
+      const today = new Date();
+      
+      // Generate last 12 weeks including the current one
+      for (let i = 11; i >= 0; i--) {
+        const weekStart = startOfMondayWeek(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i * 7));
+        const weekEnd = endOfMondayWeek(weekStart);
+
+        const created = norm.filter(t => inRange(t._created, weekStart, weekEnd)).length;
+        const closed = norm.filter(t => t._closed && inRange(t._closed, weekStart, weekEnd)).length;
+
+        // Overdue at the end of this specific week
+        const overdue = norm.filter(t => {
+            if (!isValid(t._due)) return false;
+            // It was due by the end of the week...
+            const wasDueByThen = t._due <= weekEnd;
+            // ...and it was NOT closed by the end of that week.
+            const notClosedByThen = !t._closed || t._closed > weekEnd;
+            return wasDueByThen && notClosedByThen;
+        }).length;
+
+        weeks.push({
+          week: format(weekStart, "dd LLL", { locale: es }),
+          created,
+          closed,
+          overdue,
+        });
+      }
+
+      return weeks;
+    }, []);
+    
     const ticketTrendsData = React.useMemo(() => {
-        // Filter out historical tickets before calculating trends.
-        // A ticket is historical if it does not have a "Abierto" status in its history.
         const nonHistoricalTickets = tickets.filter(t => t.statusHistory && t.statusHistory['Abierto']);
         return buildWeeklyTrends(nonHistoricalTickets);
     }, [tickets, buildWeeklyTrends]);
-    // --- END: Logic for Trends Chart ---
 
 
     const lifecycleData = React.useMemo(() => {
-        // Filter out historical tickets
         const nonHistoricalTickets = tickets.filter(t => t.statusHistory && t.statusHistory['Abierto']);
 
         const durations = { toAssignment: [] as number[], toInProgress: [] as number[], toResolved: [] as number[] };
@@ -454,10 +449,14 @@ export default function DashboardPage() {
                 }
             } catch (error) {
                  console.error("Error fetching user data:", error);
-                 router.push('/login');
+                 // Robust error handling: don't boot the user, maybe show an error UI
+                 setCurrentUser(null);
+            } finally {
+                setIsLoading(false);
             }
         } else {
             router.push('/login');
+            setIsLoading(false);
         }
     });
     return () => unsubscribeAuth();
@@ -465,7 +464,6 @@ export default function DashboardPage() {
 
   React.useEffect(() => {
     if (!currentUser) return;
-    setIsLoading(true);
 
     let ticketsQuery;
     // Admins and SST see all tickets
@@ -492,21 +490,30 @@ export default function DashboardPage() {
         } as Ticket;
       });
       setTickets(ticketsData.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-      setIsLoading(false);
     }, (error) => {
       console.error("Error fetching tickets for dashboard: ", error);
-      setIsLoading(false);
     });
 
     return () => unsubscribeTickets();
   }, [currentUser]);
   
-  if (isLoading || !currentUser) {
+  if (isLoading) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
         </div>
     );
+  }
+  
+  if (!currentUser) {
+      return (
+          <div className="flex h-screen w-full items-center justify-center flex-col gap-4">
+              <AlertTriangle className="h-8 w-8 text-destructive" />
+              <h2 className="text-xl font-semibold">Error de Permisos</h2>
+              <p className="text-muted-foreground">No se pudo cargar tu perfil. Intenta recargar la página.</p>
+              <Button onClick={() => window.location.reload()}>Recargar</Button>
+          </div>
+      )
   }
 
   // Render the correct dashboard based on user role
