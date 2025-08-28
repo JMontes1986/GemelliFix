@@ -69,7 +69,7 @@ import { Progress } from '@/components/ui/progress';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { startOfWeek, format, parseISO, eachWeekOfInterval, isValid, endOfWeek } from 'date-fns';
+import { startOfWeek, format, parseISO, isValid, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
@@ -188,110 +188,95 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
 
   const slaByPriority = { Urgente: calculateSlaByPriority('Urgente'), Alta: calculateSlaByPriority('Alta'), Media: calculateSlaByPriority('Media'), Baja: calculateSlaByPriority('Baja') };
 
+    // --- START: Logic for Trends Chart ---
+    const buildWeeklyTrends = React.useCallback((allTickets: Ticket[]) => {
+        // Helpers
+        const startOfMondayWeek = (d: Date) => startOfWeek(d, { weekStartsOn: 1 });
+        const endOfMondayWeek = (d: Date) => {
+          const s = startOfMondayWeek(d);
+          // Go to next sunday 23:59:59
+          return new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6, 23, 59, 59, 999);
+        };
+        const inRange = (d: Date, from: Date, to: Date) => d >= from && d <= to;
+    
+        // Normalize dates from tickets
+        const norm = allTickets.map(t => {
+          const created = parseISO(t.createdAt);
+          if (!isValid(created)) return null;
+          
+          const due = parseISO(t.dueDate);
+          const closedRaw = (t.resolvedAt ? parseISO(t.resolvedAt) : null) ||
+                            (t.statusHistory?.['Cerrado'] ? parseISO(t.statusHistory['Cerrado']) : null) ||
+                            (t.statusHistory?.['Resuelto'] ? parseISO(t.statusHistory['Resuelto']) : null);
+          const closedAt = closedRaw && isValid(closedRaw) ? closedRaw : null;
+          
+          return { ...t, _created: created, _due: due, _closed: closedAt };
+        }).filter((t): t is NonNullable<typeof t> => t !== null);
+    
+        const weeks: { week: string; created: number; closed: number; overdue: number }[] = [];
+        const today = new Date();
+        
+        // Generate last 12 weeks including the current one
+        for (let i = 11; i >= 0; i--) {
+          const weekStart = startOfMondayWeek(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i * 7));
+          const weekEnd = endOfMondayWeek(weekStart);
+    
+          const created = norm.filter(t => inRange(t._created, weekStart, weekEnd)).length;
+          const closed = norm.filter(t => t._closed && inRange(t._closed, weekStart, weekEnd)).length;
+    
+          // Overdue at the end of this specific week
+          const overdue = norm.filter(t => {
+              if (!isValid(t._due)) return false; // Skip if due date is invalid
+              const wasDueByThen = t._due <= weekEnd;
+              // Was not closed by the end of this week
+              const notClosedByThen = !t._closed || t._closed > weekEnd;
+              return wasDueByThen && notClosedByThen;
+          }).length;
+    
+          weeks.push({
+            week: format(weekStart, "dd LLL", { locale: es }),
+            created,
+            closed,
+            overdue,
+          });
+        }
+    
+        return weeks;
+      }, []);
+
     const ticketTrendsData = React.useMemo(() => {
-      const startOfMondayWeek = (d: Date) => startOfWeek(d, { weekStartsOn: 1 });
-  
-      const allRelevantDates = tickets.flatMap(t => {
-          const dates = [];
-          const createdAt = parseISO(t.createdAt);
-          if (isValid(createdAt)) dates.push(createdAt);
-  
-          if (t.resolvedAt) {
-              const resolvedAt = parseISO(t.resolvedAt);
-              if (isValid(resolvedAt)) dates.push(resolvedAt);
-          }
-          return dates;
-      });
-  
-      if (allRelevantDates.length === 0) return [];
-  
-      const minDate = new Date(Math.min(...allRelevantDates.map(d => d.getTime())));
-      const maxDate = new Date(Math.max(...allRelevantDates.map(d => d.getTime())));
-  
-      const weeks = eachWeekOfInterval({
-          start: startOfMondayWeek(minDate),
-          end: startOfMondayWeek(maxDate)
-      }, { weekStartsOn: 1 });
-  
-      const weeklyData: Record<string, { week: string; created: number; closed: number; overdue: number }> = {};
-  
-      weeks.forEach(weekStart => {
-          const weekKey = format(weekStart, 'yyyy-MM-dd');
-          weeklyData[weekKey] = {
-              week: format(weekStart, "dd LLL", { locale: es }),
-              created: 0,
-              closed: 0,
-              overdue: 0,
-          };
-      });
-  
-      tickets.forEach(ticket => {
-          const createdAt = parseISO(ticket.createdAt);
-          if (isValid(createdAt)) {
-              const creationWeekStart = startOfMondayWeek(createdAt);
-              const creationWeekKey = format(creationWeekStart, 'yyyy-MM-dd');
-              if (weeklyData[creationWeekKey]) {
-                  weeklyData[creationWeekKey].created++;
-              }
-          }
-  
-          if (ticket.resolvedAt) {
-              const resolvedAt = parseISO(ticket.resolvedAt);
-              if (isValid(resolvedAt)) {
-                  const resolutionWeekStart = startOfMondayWeek(resolvedAt);
-                  const resolutionWeekKey = format(resolutionWeekStart, 'yyyy-MM-dd');
-                  if (weeklyData[resolutionWeekKey]) {
-                      weeklyData[resolutionWeekKey].closed++;
-                  }
-              }
-          }
-      });
+        // Filter out historical tickets before calculating trends.
+        // A ticket is historical if it does not have a "Abierto" status in its history.
+        const nonHistoricalTickets = tickets.filter(t => t.statusHistory && t.statusHistory['Abierto']);
+        return buildWeeklyTrends(nonHistoricalTickets);
+    }, [tickets, buildWeeklyTrends]);
+    // --- END: Logic for Trends Chart ---
 
-      // Calculate overdue tickets for each week
-      Object.keys(weeklyData).forEach(weekKey => {
-        const weekStart = parseISO(weekKey);
-        const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+
+    const lifecycleData = React.useMemo(() => {
+        // Filter out historical tickets
+        const nonHistoricalTickets = tickets.filter(t => t.statusHistory && t.statusHistory['Abierto']);
+
+        const durations = { toAssignment: [] as number[], toInProgress: [] as number[], toResolved: [] as number[] };
         
-        const overdueInWeek = tickets.filter(t => {
-            const dueDate = parseISO(t.dueDate);
-            if (!isValid(dueDate) || dueDate > weekEnd) {
-                return false; // Not due yet in this week
-            }
-            // Ticket is overdue if it was not closed by the end of the week
-            if (!t.resolvedAt) {
-                return true; // Still open, so it's overdue
-            }
-            const resolvedAt = parseISO(t.resolvedAt);
-            return isValid(resolvedAt) && resolvedAt > weekEnd;
-        }).length;
-        
-        weeklyData[weekKey].overdue = overdueInWeek;
-      });
-  
-      return Object.values(weeklyData).sort((a, b) => new Date(a.week).getTime() - new Date(b.week));
-  }, [tickets]);
-
-
-  const lifecycleData = React.useMemo(() => {
-    const durations = { toAssignment: [] as number[], toInProgress: [] as number[], toResolved: [] as number[] };
-    tickets.forEach(ticket => {
-      const history = ticket.statusHistory;
-      if (!history) return;
-      const createdAt = new Date(ticket.createdAt).getTime();
-      const assignedAt = history.Asignado ? new Date(history.Asignado).getTime() : null;
-      const inProgressAt = history['En Progreso'] ? new Date(history['En Progreso']).getTime() : null;
-      const resolvedAt = history.Resuelto ? new Date(history.Resuelto).getTime() : null;
-      if (assignedAt) durations.toAssignment.push((assignedAt - createdAt) / 3600000);
-      if (inProgressAt && assignedAt) durations.toInProgress.push((inProgressAt - assignedAt) / 3600000);
-      if (resolvedAt && inProgressAt) durations.toResolved.push((resolvedAt - inProgressAt) / 3600000);
-    });
-    const getAverage = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-    return [
-      { name: 'Abierto → Asignado', time: getAverage(durations.toAssignment) },
-      { name: 'Asignado → En Progreso', time: getAverage(durations.toInProgress) },
-      { name: 'En Progreso → Resuelto', time: getAverage(durations.toResolved) },
-    ];
-  }, [tickets]);
+        nonHistoricalTickets.forEach(ticket => {
+          const history = ticket.statusHistory;
+          if (!history) return;
+          const createdAt = new Date(ticket.createdAt).getTime();
+          const assignedAt = history.Asignado ? new Date(history.Asignado).getTime() : null;
+          const inProgressAt = history['En Progreso'] ? new Date(history['En Progreso']).getTime() : null;
+          const resolvedAt = history.Resuelto ? new Date(history.Resuelto).getTime() : null;
+          if (assignedAt) durations.toAssignment.push((assignedAt - createdAt) / 3600000);
+          if (inProgressAt && assignedAt) durations.toInProgress.push((inProgressAt - assignedAt) / 3600000);
+          if (resolvedAt && inProgressAt) durations.toResolved.push((resolvedAt - inProgressAt) / 3600000);
+        });
+        const getAverage = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        return [
+          { name: 'Abierto → Asignado', time: getAverage(durations.toAssignment) },
+          { name: 'Asignado → En Progreso', time: getAverage(durations.toInProgress) },
+          { name: 'En Progreso → Resuelto', time: getAverage(durations.toResolved) },
+        ];
+      }, [tickets]);
 
   const productivityData = React.useMemo(() => {
     const techStats: { [id: string]: { name: string, avatar: string, resolvedCount: number, totalTime: number } } = {};
@@ -503,6 +488,7 @@ export default function DashboardPage() {
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
             dueDate: data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString(),
             resolvedAt: data.resolvedAt?.toDate ? data.resolvedAt.toDate().toISOString() : undefined,
+            statusHistory: data.statusHistory || {},
         } as Ticket;
       });
       setTickets(ticketsData.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
