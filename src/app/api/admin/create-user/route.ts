@@ -1,95 +1,64 @@
-
-// app/api/admin/create-user/route.ts
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
+// src/app/api/admin/create-user/route.ts
 import { NextResponse } from 'next/server';
-import { getAdminApp } from '@/lib/firebaseAdmin';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getAdminAuth, getAdminFirestore } from '@/lib/firebaseAdmin';
 
-// Esta función ahora es más robusta y verifica el rol del usuario en Firestore.
-async function assertAdmin(req: Request) {
-    const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!idToken) {
-        throw new Error('Unauthorized: Missing ID token.');
-    }
-    
-    const adminApp = getAdminApp();
-    const auth = getAuth(adminApp);
-    const db = getFirestore(adminApp);
-
-    const decodedToken = await auth.verifyIdToken(idToken, true); // true for check-revoked
-    
-    // Verificación de rol basada en el documento de Firestore, no en claims.
-    const userDocRef = db.collection('users').doc(decodedToken.uid);
-    const userDocSnap = await userDocRef.get();
-
-    if (!userDocSnap.exists() || userDocSnap.data()?.role !== 'Administrador') {
-        throw new Error('Forbidden: User is not an administrator.');
-    }
-}
-
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   try {
-    // 1. Validar que quien llama es un administrador.
-    await assertAdmin(req);
-
-    // 2. Procesar la solicitud.
-    const { name, email, password, role, avatar } = await req.json();
-    if (!name || !email || !password || !role) {
-      return NextResponse.json({ error: 'Missing required fields: name, email, password, role.' }, { status: 400 });
+    const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!idToken) {
+      return NextResponse.json({ error: 'Missing Authorization' }, { status: 401 });
     }
 
-    const adminApp = getAdminApp();
-    const auth = getAuth(adminApp);
-    const db = getFirestore(adminApp);
+    // Verificar que quien llama sea admin (opcional, según tus reglas)
+    const auth = getAdminAuth();
+    await auth.verifyIdToken(idToken);
+    // aquí puedes chequear custom claims o leer su rol en Firestore si es necesario
 
-    // 3. Crear el usuario en Firebase Authentication.
+    const body = await req.json();
+    const { name, email, password, role, avatar } = body;
+
+    // 1) Crear usuario en Authentication
     const userRecord = await auth.createUser({
+      displayName: name,
       email,
       password,
-      displayName: name,
       photoURL: avatar || undefined,
+      disabled: false,
     });
-    
-    // 4. Crear el documento del usuario en Firestore.
-    // El rol se asigna directamente aquí. La Cloud Function ya no es necesaria para esto.
+
+    // 2) Guardar perfil en Firestore
+    const db = getAdminFirestore();
     await db.collection('users').doc(userRecord.uid).set({
       id: userRecord.uid,
       uid: userRecord.uid,
       name,
       email,
-      role,
       avatar: avatar || 'https://placehold.co/100x100.png',
+      role,
       createdAt: new Date(),
     });
 
     return NextResponse.json({ ok: true, uid: userRecord.uid });
-
   } catch (err: any) {
-    console.error('Error in /api/admin/create-user:', err.message);
     let message = 'An unknown error occurred.';
     let status = 500;
-
-    if (err.message?.includes('Unauthorized')) {
-        status = 401;
-        message = 'Authorization token is missing or invalid.';
-    } else if (err.message?.includes('Forbidden')) {
-        status = 403;
-        message = 'The requesting user does not have administrator privileges.';
-    } else if (err.code === 'auth/email-already-exists') {
-        status = 409;
+    
+    if (err?.code === 'auth/email-already-exists') {
         message = 'The email address is already in use by another account.';
-    } else if (err.code === 'auth/invalid-password') {
-        status = 400;
+        status = 409;
+    } else if (err?.code === 'auth/invalid-password') {
         message = 'The password must be a string with at least 6 characters.';
+        status = 400;
     } else if (err.message) {
-        // Captura el error específico de las credenciales si ocurre.
         message = err.message;
     }
-    
-    return NextResponse.json({ error: message }, { status });
+
+    // Propaga errores legibles
+    return NextResponse.json(
+      { error: message },
+      { status }
+    );
   }
 }

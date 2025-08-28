@@ -1,46 +1,73 @@
 // src/lib/firebaseAdmin.ts
-import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
+import * as admin from 'firebase-admin';
 
-// Esta función ahora es la única fuente de verdad para obtener la app de admin.
-// Garantiza que solo se inicialice una vez.
-function createAdminApp(): App {
-    const projectId = process.env.FB_PROJECT_ID;
-    const clientEmail = process.env.FB_CLIENT_EMAIL;
-    const privateKey = process.env.FB_PRIVATE_KEY;
+let app: admin.app.App | undefined;
 
-    // Validación estricta de las variables de entorno.
-    if (!projectId || !clientEmail || !privateKey) {
-        throw new Error(
-            'Firebase Admin environment variables not set. Ensure FB_PROJECT_ID, FB_CLIENT_EMAIL, and FB_PRIVATE_KEY are correctly configured in your .env file.'
-        );
+function fromBase64() {
+  const b64 = process.env.FIREBASE_ADMIN_B64;
+  if (!b64) return null;
+
+  try {
+    const json = Buffer.from(b64, 'base64').toString('utf8');
+    const parsed = JSON.parse(json);
+
+    // En algunos entornos la key llega con \\n
+    if (parsed.private_key?.includes('\\n')) {
+      parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
     }
-    
-    try {
-        // Reemplaza los \\n literales por saltos de línea reales.
-        // Esto es crucial para que la clave privada sea válida.
-        const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
-        
-        return initializeApp({
-            credential: cert({
-                projectId,
-                clientEmail,
-                privateKey: formattedPrivateKey
-            }),
-        });
-    } catch (error: any) {
-        console.error("Firebase Admin SDK initialization error:", error.message);
-        if (error.code === 'app/invalid-credential' || error.message?.includes('PEM') || error.message?.includes('parse')) {
-            throw new Error('Failed to parse Firebase private key. Ensure it is correctly formatted in your environment variable.');
-        }
-        throw error;
-    }
+
+    return admin.credential.cert(parsed as admin.ServiceAccount);
+  } catch (e) {
+    throw new Error(
+      'Failed to parse FIREBASE_ADMIN_B64. Asegúrate de que es el JSON completo en base64 (sin comillas).'
+    );
+  }
 }
 
-export function getAdminApp(): App {
-  // Si ya hay apps inicializadas, devuelve la primera (la por defecto).
-  // Si no, la crea. Esto evita errores de "app ya existe".
-  if (getApps().length > 0) {
-    return getApps()[0];
+function fromFields() {
+  const projectId = process.env.FB_PROJECT_ID;
+  const clientEmail = process.env.FB_CLIENT_EMAIL;
+  let privateKey = process.env.FB_PRIVATE_KEY;
+
+  if (!projectId || !clientEmail || !privateKey) return null;
+
+  // Corregir saltos de línea escapados
+  if (privateKey.includes('\\n')) privateKey = privateKey.replace(/\\n/g, '\n');
+
+  if (!privateKey.includes('BEGIN PRIVATE KEY')) {
+    throw new Error('FB_PRIVATE_KEY no parece una clave válida (BEGIN PRIVATE KEY).');
   }
-  return createAdminApp();
+
+  return admin.credential.cert({
+    projectId,
+    clientEmail,
+    privateKey,
+  });
+}
+
+export function getAdminApp() {
+  if (app) return app;
+
+  const cred =
+    fromBase64() ??
+    fromFields() ??
+    (() => {
+      throw new Error(
+        'No hay credenciales de Firebase Admin. Define FIREBASE_ADMIN_B64 o (FB_PROJECT_ID, FB_CLIENT_EMAIL, FB_PRIVATE_KEY).'
+      );
+    })();
+
+  app = admin.apps.length
+    ? admin.app()
+    : admin.initializeApp({ credential: cred });
+
+  return app;
+}
+
+export function getAdminAuth() {
+  return getAdminApp().auth();
+}
+
+export function getAdminFirestore() {
+  return getAdminApp().firestore();
 }

@@ -12,9 +12,6 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 
-// Inicializa la aplicación de administrador a través de la función centralizada.
-const adminApp = getAdminApp();
-
 /**
  * Triggered when a new document is created in the 'users' collection.
  * La lógica de claims ha sido removida. Esta función se puede usar para otras automatizaciones,
@@ -55,6 +52,8 @@ export const onUserUpdated = onDocumentUpdated('users/{userId}', (event) => {
  * This function can be called via its URL to send a message to the 'test' topic.
  */
 export const sendTestNotification = onRequest(async (req, res) => {
+    // Inicializa la aplicación de administrador a través de la función centralizada.
+    const adminApp = getAdminApp();
     const message = {
         notification: {
             title: '¡Notificación de Prueba!',
