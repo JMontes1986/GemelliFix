@@ -222,7 +222,6 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
         const created = norm.filter(t => inRange(t._created, weekStart, weekEnd)).length;
         const closed = norm.filter(t => t._closed && inRange(t._closed, weekStart, weekEnd)).length;
 
-        // Overdue at the end of this specific week
         const overdue = norm.filter(t => {
             if (!isValid(t._due)) return false;
             // It was due by the end of the week...
@@ -449,10 +448,8 @@ export default function DashboardPage() {
                 }
             } catch (error) {
                  console.error("Error fetching user data:", error);
-                 // Robust error handling: don't boot the user, maybe show an error UI
                  setCurrentUser(null);
-            } finally {
-                setIsLoading(false);
+                 setIsLoading(false);
             }
         } else {
             router.push('/login');
@@ -490,8 +487,10 @@ export default function DashboardPage() {
         } as Ticket;
       });
       setTickets(ticketsData.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      setIsLoading(false);
     }, (error) => {
       console.error("Error fetching tickets for dashboard: ", error);
+      setIsLoading(false);
     });
 
     return () => unsubscribeTickets();

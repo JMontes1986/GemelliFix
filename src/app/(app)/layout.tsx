@@ -132,7 +132,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           }
         } catch (err: any) {
           // ⛑️ No hagas logout si el usuario SÍ está autenticado.
-          console.error('No se pudo leer/crear el perfil. Continuando con mínimos:', err);
+          console.error('No se pudo leer/crear el perfil. Continuando con fallback:', err);
           setCurrentUser({
             id: firebaseUser.uid,
             uid: firebaseUser.uid,
