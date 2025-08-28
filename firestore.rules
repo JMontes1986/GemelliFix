@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -7,14 +8,14 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function myRole() {
-      // Lee el rol desde los custom claims del token de autenticación.
-      // Es más seguro y eficiente que leer desde Firestore en cada regla.
+    // El rol ahora se lee desde los Custom Claims del token de autenticación.
+    // Es más rápido, seguro y evita lecturas innecesarias a la base de datos.
+    function userRole() {
       return request.auth.token.role;
     }
 
     function isRole(role) {
-      return isSignedIn() && myRole() == role;
+      return isSignedIn() && userRole() == role;
     }
 
     function isOwner(userId) {
@@ -23,53 +24,47 @@ service cloud.firestore {
 
     // USERS
     match /users/{userId} {
-      // Leer: dueño, Admin o SST.
+      // Leer: El propio usuario, un Admin, o un SST.
       allow read: if isSignedIn() && (isOwner(userId) || isRole('Administrador') || isRole('SST'));
 
-      // Listar: solo Admin.
+      // Listar: Solo un Admin puede listar todos los usuarios.
       allow list: if isRole('Administrador');
 
-      // Crear: permitir una auto-inicialización segura (una sola vez) por el dueño.
+      // Crear: Permite que un usuario cree su propio perfil una sola vez (auto-inicialización).
       allow create: if isSignedIn()
                     && isOwner(userId)
                     && !exists(/databases/$(database)/documents/users/$(userId))
+                    // Define los únicos campos permitidos en la creación.
                     && request.resource.data.keys().hasOnly(
                         ["uid", "name", "email", "avatar", "role", "createdAt"]
                       )
-                    // Rol inicial permitido (nunca Admin/SST/SG por el cliente).
+                    // Solo permite crear usuarios con roles base desde el cliente.
                     && request.resource.data.role in ["Docentes", "Coordinadores", "Administrativos"]
                     && request.resource.data.uid == request.auth.uid;
 
-      // Actualizar/Eliminar: solo Admin.
-      allow update, delete: if isRole('Administrador');
+      // Actualizar: Solo un Admin puede modificar un perfil.
+      allow update: if isRole('Administrador');
+      
+      // Eliminar: Solo un Admin puede eliminar un perfil.
+      allow delete: if isRole('Administrador');
     }
 
     // TICKETS
     match /tickets/{ticketId} {
-      // Regla de lectura corregida:
-      // - No usa get(), que falla en operaciones de 'list'.
-      // - Usa 'resource.data' para acceder a los campos del documento que se está evaluando.
-      // - Añade defensas para campos que podrían ser nulos.
+      // Leer: Admin, SST, el solicitante, o un técnico asignado al ticket.
       allow read: if isRole('Administrador')
                   || isRole('SST')
-                  || (isOwner(resource.data.requesterId))
-                  || (
-                       isRole('Servicios Generales') &&
-                       resource.data.assignedToIds != null && // Chequeo de nulidad
-                       request.auth.uid in resource.data.assignedToIds
-                     );
+                  || isOwner(resource.data.requesterId)
+                  || (isRole('Servicios Generales') && request.auth.uid in resource.data.assignedToIds);
 
-      // 'list' concede permiso a la consulta, pero 'read' se evalúa en cada doc.
-      // La seguridad se delega a las queries de la app (where clauses).
+      // Crear: Cualquier usuario autenticado puede crear un ticket.
+      allow create: if isSignedIn();
+      
+      // Listar: Cualquier usuario autenticado puede listar tickets (la seguridad se aplica en la consulta).
       allow list: if isSignedIn();
 
-      allow create: if isSignedIn();
-
-      allow update: if isRole('Administrador')
-                    || (
-                         isRole('Servicios Generales') &&
-                         request.auth.uid in resource.data.assignedToIds
-                       );
+      // Actualizar: Un Admin, o un técnico asignado al ticket.
+      allow update: if isRole('Administrador') || (isRole('Servicios Generales') && request.auth.uid in resource.data.assignedToIds);
     }
 
     // SCHEDULE EVENTS
@@ -82,17 +77,14 @@ service cloud.firestore {
     // NOTIFICATIONS
     match /notifications/{notificationId} {
       allow read, update, delete: if isOwner(resource.data.userId);
-      allow create: if isSignedIn();
-      allow list: if isSignedIn();
+      allow create: if isSignedIn(); // El servidor crea notificaciones en nombre del sistema.
     }
 
     // LOGS
     match /logs/{logId} {
-      // La lectura de logs es solo para roles de supervisión.
-      // Los usuarios normales no deberían poder leer el historial completo.
-      allow read: if isRole('Administrador') || isRole('SST');
-      allow list: if isRole('Administrador') || isRole('SST');
-      allow create: if isSignedIn(); // Cualquiera puede escribir su propio log.
+      allow read: if isRole('Administrador') || isRole('SST'); // Simplificado: solo roles de auditoría leen logs.
+      allow create: if isSignedIn(); // El servidor crea los logs.
+      allow write: if false; // Nadie puede modificar o borrar logs.
     }
 
     // ZONES / SITES / CATEGORIES (Datos Maestros)

@@ -1,3 +1,4 @@
+
 // app/api/admin/create-user/route.ts
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,9 +22,8 @@ async function assertAdmin(req: Request) {
 
     const decodedToken = await auth.verifyIdToken(idToken, true); // true for check-revoked
     
-    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-
-    if (!userDoc.exists || userDoc.data()?.role !== 'Administrador') {
+    // Verificación de rol basada en Custom Claims, que es más segura y eficiente.
+    if (decodedToken.role !== 'Administrador') {
         throw new Error('Forbidden: User is not an administrator.');
     }
 }
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       photoURL: avatar || undefined,
     });
     
-    // El custom claim se establecerá automáticamente por la Cloud Function `onUserCreated`.
+    // La Cloud Function `onUserCreated` se encargará de poner el custom claim del rol.
     // 4. Crear el documento del usuario en Firestore.
     await db.collection('users').doc(userRecord.uid).set({
       id: userRecord.uid, // Guardamos el ID para consistencia.
