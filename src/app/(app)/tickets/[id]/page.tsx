@@ -568,10 +568,17 @@ export default function TicketDetailPage() {
       return;
     }
 
-    const selectedPersonnel = technicians.filter(t => selectedPersonnelIds.includes(t.id));
+    const selectedTechnicians = technicians.filter(t => selectedPersonnelIds.includes(t.id));
+    
+    let personnelIds = selectedTechnicians.map(p => p.id);
+    let personnelNames = selectedTechnicians.map(p => p.name);
+
+    if (selectedPersonnelIds.includes('contractor')) {
+        personnelIds.push('contractor');
+        personnelNames.push('Contratista Externo');
+    }
+    
     const oldValue = ticket.assignedTo || [];
-    const personnelIds = selectedPersonnel.map(p => p.id);
-    const personnelNames = selectedPersonnel.map(p => p.name);
     
     setIsUpdating(true);
     const docRef = doc(db, "tickets", ticket.id);
@@ -587,8 +594,9 @@ export default function TicketDetailPage() {
 
     await createLog(currentUser, 'update_assignment', { ticket, oldValue, newValue: personnelNames });
     
-    if (personnelIds.length > 0) {
-        await createNotification(ticket, personnelIds);
+    const internalTechIds = selectedTechnicians.map(t => t.id);
+    if (internalTechIds.length > 0) {
+        await createNotification(ticket, internalTechIds);
     }
 
     toast({
@@ -677,6 +685,16 @@ export default function TicketDetailPage() {
   const assignedPersonnelDetails = technicians.filter(
     (tech) => ticket.assignedToIds?.includes(tech.id)
   );
+
+  if (ticket.assignedTo?.includes('Contratista Externo') && !assignedPersonnelDetails.some(p => p.id === 'contractor')) {
+      const contractorPlaceholder = {
+          id: 'contractor',
+          name: 'Contratista Externo',
+          avatar: '', // no avatar
+      };
+      // A temporary fix to display contractor info. This is not a real user object.
+      assignedPersonnelDetails.push(contractorPlaceholder as any);
+  }
   
 
   return (
@@ -958,6 +976,25 @@ export default function TicketDetailPage() {
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                             <div className="grid gap-2 max-h-60 overflow-y-auto pr-2">
+                                <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
+                                    <Checkbox 
+                                        id='tech-assign-contractor'
+                                        checked={selectedPersonnelIds.includes('contractor')}
+                                        onCheckedChange={(checked) => {
+                                            setSelectedPersonnelIds(prev => 
+                                                checked 
+                                                    ? [...prev, 'contractor']
+                                                    : prev.filter(id => id !== 'contractor')
+                                            );
+                                        }}
+                                    />
+                                    <Label htmlFor='tech-assign-contractor' className="flex items-center gap-2 font-normal w-full cursor-pointer">
+                                        <Avatar className="h-9 w-9 bg-muted">
+                                            <Briefcase className="h-5 w-5 m-auto text-muted-foreground" />
+                                        </Avatar>
+                                        Contratista Externo
+                                    </Label>
+                                </div>
                                 {technicians.map(tech => (
                                     <div key={tech.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
                                         <Checkbox 
