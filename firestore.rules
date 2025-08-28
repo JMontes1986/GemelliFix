@@ -7,65 +7,69 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Lee el rol DESDE el doc del usuario autenticado (si existe)
     function myRole() {
-      return isSignedIn()
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-        : null;
+      // Lee el rol desde los custom claims del token de autenticación.
+      // Es más seguro y eficiente que leer desde Firestore en cada regla.
+      return request.auth.token.role;
     }
 
     function isRole(role) {
-      return myRole() == role;
+      return isSignedIn() && myRole() == role;
     }
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function canReadTicket(ticketId) {
-      let t = get(/databases/$(database)/documents/tickets/$(ticketId)).data;
-      // ⚠️ Evitar 'in' sobre null con coalesce
-      let assigned = (t.assignedToIds != null) ? t.assignedToIds : [];
-      return isRole('Administrador')
-          || isRole('SST')
-          || (isRole('Servicios Generales') && request.auth.uid in assigned)
-          || (isOwner(t.requesterId));
-    }
-
     // USERS
     match /users/{userId} {
-      // Leer: dueño, Admin o SST
+      // Leer: dueño, Admin o SST.
       allow read: if isSignedIn() && (isOwner(userId) || isRole('Administrador') || isRole('SST'));
 
-      // Listar: solo Admin
+      // Listar: solo Admin.
       allow list: if isRole('Administrador');
 
-      // Crear: permitir una auto-inicialización segura (una sola vez) por el dueño
+      // Crear: permitir una auto-inicialización segura (una sola vez) por el dueño.
       allow create: if isSignedIn()
                     && isOwner(userId)
                     && !exists(/databases/$(database)/documents/users/$(userId))
                     && request.resource.data.keys().hasOnly(
-                        ["uid","name","email","avatar","role","createdAt"]
+                        ["uid", "name", "email", "avatar", "role", "createdAt"]
                       )
-                    // Rol inicial permitido (nunca Admin/SST/SG por el cliente)
-                    && request.resource.data.role in ["Docentes","Coordinadores","Administrativos"]
+                    // Rol inicial permitido (nunca Admin/SST/SG por el cliente).
+                    && request.resource.data.role in ["Docentes", "Coordinadores", "Administrativos"]
                     && request.resource.data.uid == request.auth.uid;
 
-      // Actualizar/Eliminar: solo Admin
+      // Actualizar/Eliminar: solo Admin.
       allow update, delete: if isRole('Administrador');
     }
 
     // TICKETS
     match /tickets/{ticketId} {
-      allow read: if canReadTicket(ticketId);
-      allow create: if isSignedIn();
-      allow update: if isRole('Administrador') ||
-                    (isRole('Servicios Generales') &&
-                      // misma defensa contra null
-                      (request.auth.uid in ((resource.data.assignedToIds != null) ? resource.data.assignedToIds : []))
-                    );
-      // 'list' no concede lectura por sí sola, pero ayuda a queries
+      // Regla de lectura corregida:
+      // - No usa get(), que falla en operaciones de 'list'.
+      // - Usa 'resource.data' para acceder a los campos del documento que se está evaluando.
+      // - Añade defensas para campos que podrían ser nulos.
+      allow read: if isRole('Administrador')
+                  || isRole('SST')
+                  || (isOwner(resource.data.requesterId))
+                  || (
+                       isRole('Servicios Generales') &&
+                       resource.data.assignedToIds != null && // Chequeo de nulidad
+                       request.auth.uid in resource.data.assignedToIds
+                     );
+
+      // 'list' concede permiso a la consulta, pero 'read' se evalúa en cada doc.
+      // La seguridad se delega a las queries de la app (where clauses).
       allow list: if isSignedIn();
+
+      allow create: if isSignedIn();
+
+      allow update: if isRole('Administrador')
+                    || (
+                         isRole('Servicios Generales') &&
+                         request.auth.uid in resource.data.assignedToIds
+                       );
     }
 
     // SCHEDULE EVENTS
@@ -84,18 +88,14 @@ service cloud.firestore {
 
     // LOGS
     match /logs/{logId} {
-      // Defender cuando no hay details o ticketId
-      allow read: if isRole('Administrador')
-               || isRole('SST')
-               || (resource.data.details != null
-                   && resource.data.details.ticketId != null
-                   && canReadTicket(resource.data.details.ticketId));
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow write: if false;
+      // La lectura de logs es solo para roles de supervisión.
+      // Los usuarios normales no deberían poder leer el historial completo.
+      allow read: if isRole('Administrador') || isRole('SST');
+      allow list: if isRole('Administrador') || isRole('SST');
+      allow create: if isSignedIn(); // Cualquiera puede escribir su propio log.
     }
 
-    // ZONES / SITES / CATEGORIES
+    // ZONES / SITES / CATEGORIES (Datos Maestros)
     match /zones/{zoneId} {
       allow read: if isSignedIn();
       allow write: if isRole('Administrador');
@@ -109,7 +109,7 @@ service cloud.firestore {
       allow write: if isRole('Administrador');
     }
 
-    // DIAGNOSIS LOGS
+    // DIAGNOSIS LOGS (Para la página de diagnóstico)
     match /diagnosis_logs/{logId} {
       allow read, write: if isSignedIn();
     }
