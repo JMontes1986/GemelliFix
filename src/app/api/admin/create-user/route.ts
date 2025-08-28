@@ -4,13 +4,12 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { getAdminApp } from '@/lib/firebaseAdmin';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // Esta función ahora es más robusta y verifica el rol del usuario en Firestore.
 async function assertAdmin(req: Request) {
-    const { getAdminApp } = await import('@/lib/firebaseAdmin');
-    const { getAuth } = await import('firebase-admin/auth');
-    const { getFirestore } = await import('firebase-admin/firestore');
-
     const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
     if (!idToken) {
         throw new Error('Unauthorized: Missing ID token.');
@@ -34,11 +33,6 @@ async function assertAdmin(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    // Las importaciones se hacen dentro del handler para asegurar que el entorno está listo.
-    const { getAdminApp } = await import('@/lib/firebaseAdmin');
-    const { getAuth } = await import('firebase-admin/auth');
-    const { getFirestore } = await import('firebase-admin/firestore');
-
     // 1. Validar que quien llama es un administrador.
     await assertAdmin(req);
 
