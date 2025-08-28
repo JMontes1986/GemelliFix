@@ -102,52 +102,51 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     setIsMounted(true);
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-        setIsLoadingUser(true);
-        if (firebaseUser) {
-            try {
-              const userDocRef = doc(db, 'users', firebaseUser.uid);
-              const userDocSnap = await getDoc(userDocRef);
-
-              if (!userDocSnap.exists()) {
-                  // Auto-initialization (allowed by new rules)
-                  const newUser: Omit<User, 'id'> = {
-                      uid: firebaseUser.uid,
-                      name: firebaseUser.displayName || firebaseUser.email || 'Usuario',
-                      email: firebaseUser.email || '',
-                      avatar: firebaseUser.photoURL || 'https://placehold.co/100x100.png',
-                      role: 'Docentes', // Secure base role
-                      // @ts-ignore: serverTimestamp is correctly typed at runtime
-                      createdAt: serverTimestamp(),
-                  };
-                  await setDoc(userDocRef, newUser);
-                  const freshSnap = await getDoc(userDocRef);
-                   if (!freshSnap.exists()) throw new Error("Failed to create and fetch user document.");
-                   setCurrentUser({ id: freshSnap.id, ...freshSnap.data() } as User);
-
-              } else {
-                 const firestoreData = userDocSnap.data() as Omit<User, 'id'>;
-                 const userData: User = { 
-                     id: userDocSnap.id, 
-                     ...firestoreData, 
-                     role: firestoreData.role 
-                 };
-                 setCurrentUser(userData);
-              }
-
-            } catch (error) {
-              console.error("Error verifying user session or getting data. Logging out.", error);
-              // Avoid auto-logout on intermittent errors
-              // await auth.signOut();
-              // router.push('/login');
-            }
-        } else {
-            router.push('/login');
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (!firebaseUser) {
+          setCurrentUser(null);
+          setIsLoadingUser(false);
+          router.push('/login');
+          return;
         }
-        setIsLoadingUser(false);
-    });
+    
+        try {
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          const snap = await getDoc(userRef);
+    
+          if (!snap.exists()) {
+            // Crear perfil básico (permitido por reglas nuevas)
+            await setDoc(userRef, {
+              id: firebaseUser.uid,
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || firebaseUser.email || 'Nuevo Usuario',
+              email: firebaseUser.email || '',
+              avatar: firebaseUser.photoURL || 'https://placehold.co/100x100.png',
+              role: 'Docentes',              // o el que quieras por defecto
+              createdAt: serverTimestamp(),
+            });
+            const fresh = await getDoc(userRef);
+            setCurrentUser({ id: fresh.id, ...fresh.data() } as User);
+          } else {
+            setCurrentUser({ id: snap.id, ...snap.data() } as User);
+          }
+        } catch (err: any) {
+          // ⛑️ No hagas logout si el usuario SÍ está autenticado.
+          console.error('No se pudo leer/crear el perfil. Continuando con mínimos:', err);
+          setCurrentUser({
+            id: firebaseUser.uid,
+            uid: firebaseUser.uid,
+            name: firebaseUser.displayName || firebaseUser.email || 'Usuario',
+            email: firebaseUser.email || '',
+            avatar: firebaseUser.photoURL || 'https://placehold.co/100x100.png',
+            role: 'Docentes', // fallback
+          } as User);
+        } finally {
+          setIsLoadingUser(false);
+        }
+      });
 
-    return () => unsubscribe();
+    return () => unsub();
   }, [router]);
   
   const isActive = (path: string) => pathname === path;
