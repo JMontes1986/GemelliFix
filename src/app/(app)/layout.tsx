@@ -118,34 +118,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
       try {
         const snap = await getDoc(ref);
-  
-        // Datos base
-        const base = {
-          id: fbUser.uid,
-          uid: fbUser.uid,
-          name: fbUser.displayName || fbUser.email || 'Usuario',
-          email: fbUser.email || '',
-          avatar: fbUser.photoURL || 'https://placehold.co/100x100.png',
-          role: 'Docentes',
-          createdAt: serverTimestamp(),
-        };
-  
-        // Usa setDoc(..., { merge: true }) SIEMPRE.
-        // Si no existe => crea; si existe => actualiza campos faltantes.
-        await setDoc(ref, base, { merge: true });
-  
-        // Una sola lectura para estado
-        const fresh = await getDoc(ref);
-        setCurrentUser({ id: fresh.id, ...fresh.data() } as User);
+        
+        if (!snap.exists()) {
+          // User is new, create their profile with default role
+          const newUserProfile = {
+            id: fbUser.uid,
+            uid: fbUser.uid,
+            name: fbUser.displayName || fbUser.email || 'Usuario',
+            email: fbUser.email || '',
+            avatar: fbUser.photoURL || 'https://placehold.co/100x100.png',
+            role: 'Docentes' as const, // Default role for new users
+            createdAt: serverTimestamp(),
+          };
+          await setDoc(ref, newUserProfile);
+          setCurrentUser(newUserProfile as User);
+
+        } else {
+          // User exists, just set their data
+          setCurrentUser({ id: snap.id, ...snap.data() } as User);
+        }
+
       } catch (e: any) {
         console.error('No se pudo leer/crear el perfil. Continuando con fallback:', (e as any)?.message || e);
+        // Fallback for UI rendering, but preserves user identity.
         setCurrentUser({
           id: fbUser.uid,
           uid: fbUser.uid,
           name: fbUser.displayName || fbUser.email || 'Usuario',
           email: fbUser.email || '',
           avatar: fbUser.photoURL || 'https://placehold.co/100x100.png',
-          role: 'Docentes',
+          role: 'Docentes', // Fallback role if Firestore read fails
         } as User);
       } finally {
         setIsLoadingUser(false);
@@ -361,5 +363,3 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    
