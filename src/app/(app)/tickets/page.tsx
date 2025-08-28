@@ -138,8 +138,7 @@ const TicketsTable: React.FC<TicketsTableProps> = ({
         return (
             <div className="h-24 text-center flex flex-col items-center justify-center gap-1 text-muted-foreground">
                 <p>No tienes solicitudes en este estado.</p>
-                <Link href="/tickets/create" className="text-primary hover:underline font-semibold">Crea una nueva solicitud</Link>
-                 para ver tu historial aquí.
+                <Link href="/tickets/create" className="text-primary hover:underline font-semibold">Crea una nueva solicitud</Link> para ver tu historial aquí.
             </div>
         );
     }
@@ -369,12 +368,25 @@ export default function TicketsPage() {
       setError(null);
     }, (err) => {
       console.error("Error fetching tickets: ", err);
-      setError("No se pudieron cargar las solicitudes. Por favor, revisa la conexión y los permisos de Firestore.");
       setIsLoading(false);
+      if (err.code === 'failed-precondition') {
+        setTickets([]);
+        if (currentUser.role === 'Administrador') {
+            toast({
+                title: 'Falta un índice en Firestore',
+                description: 'La consulta de tickets falló. Abre la consola de Firebase y crea el índice sugerido por el error en la consola del navegador. Luego recarga la página.',
+                variant: 'destructive',
+                duration: 15000,
+            });
+        }
+        setError("Error de configuración de la base de datos. Contacta al administrador.");
+        return;
+      }
+      setError("No se pudieron cargar las solicitudes. Por favor, revisa la conexión y los permisos de Firestore.");
     });
 
     return () => unsubscribeTickets();
-  }, [currentUser]);
+  }, [currentUser, toast]);
 
   const handleUpdate = async (ticketId: string, field: keyof Ticket, value: any) => {
     if (!currentUser) return;
