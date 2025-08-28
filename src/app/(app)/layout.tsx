@@ -102,51 +102,66 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     setIsMounted(true);
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (!firebaseUser) {
-          setCurrentUser(null);
-          setIsLoadingUser(false);
-          router.push('/login');
-          return;
-        }
-    
-        try {
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const snap = await getDoc(userRef);
-    
-          if (!snap.exists()) {
-            // Crear perfil básico (permitido por reglas nuevas)
-            await setDoc(userRef, {
-              id: firebaseUser.uid,
-              uid: firebaseUser.uid,
-              name: firebaseUser.displayName || firebaseUser.email || 'Nuevo Usuario',
-              email: firebaseUser.email || '',
-              avatar: firebaseUser.photoURL || 'https://placehold.co/100x100.png',
-              role: 'Docentes',              // o el que quieras por defecto
-              createdAt: serverTimestamp(),
-            });
-            const fresh = await getDoc(userRef);
-            setCurrentUser({ id: fresh.id, ...fresh.data() } as User);
-          } else {
-            setCurrentUser({ id: snap.id, ...snap.data() } as User);
-          }
-        } catch (err: any) {
-          // ⛑️ No hagas logout si el usuario SÍ está autenticado.
-          console.error('No se pudo leer/crear el perfil. Continuando con fallback:', err);
-          setCurrentUser({
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      setIsLoadingUser(true);
+  
+      if (!firebaseUser) {
+        setCurrentUser(null);
+        setIsLoadingUser(false);
+        router.push('/login');
+        return;
+      }
+  
+      const ref = doc(db, 'users', firebaseUser.uid);
+  
+      try {
+        // 1) Intentar leer el perfil
+        const snap = await getDoc(ref);
+  
+        // 2) Si no existe, crearlo (PERMITIDO por reglas nuevas)
+        if (!snap.exists()) {
+          await setDoc(ref, {
             id: firebaseUser.uid,
             uid: firebaseUser.uid,
-            name: firebaseUser.displayName || firebaseUser.email || 'Usuario',
+            name: firebaseUser.displayName || firebaseUser.email || 'Nuevo Usuario',
             email: firebaseUser.email || '',
             avatar: firebaseUser.photoURL || 'https://placehold.co/100x100.png',
-            role: 'Docentes', // fallback
-          } as User);
-        } finally {
-          setIsLoadingUser(false);
+            role: 'Docentes',
+            createdAt: serverTimestamp(),
+          });
         }
-      });
-
-    return () => unsub();
+  
+        // 3) Leer (o releer) y setear estado
+        const fresh = await getDoc(ref);
+        setCurrentUser({ id: fresh.id, ...fresh.data() } as User);
+      } catch (e: any) {
+        console.error('No se pudo leer/crear el perfil. Continuando con fallback:', e?.message || e);
+  
+        // ⚠️ NO cerrar sesión aquí. Usa un fallback para que el layout monte y el routing funcione.
+        setCurrentUser({
+          id: firebaseUser.uid,
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName || firebaseUser.email || 'Usuario',
+          email: firebaseUser.email || '',
+          avatar: firebaseUser.photoURL || 'https://placehold.co/100x100.png',
+          role: 'Docentes', // rol por defecto mientras Firestore responde
+        } as User);
+  
+        // Si quieres, haz un reintento silencioso una sola vez:
+        setTimeout(async () => {
+          try {
+            const again = await getDoc(ref);
+            if (again.exists()) {
+              setCurrentUser({ id: again.id, ...again.data() } as User);
+            }
+          } catch {}
+        }, 800);
+      } finally {
+        setIsLoadingUser(false);
+      }
+    });
+  
+    return () => unsubscribe();
   }, [router]);
   
   const isActive = (path: string) => pathname === path;
