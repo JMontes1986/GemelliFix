@@ -98,6 +98,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const [isLoadingUser, setIsLoadingUser] = React.useState(true);
   
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
@@ -128,10 +131,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
         // Usa setDoc(..., { merge: true }) SIEMPRE.
         // Si no existe => crea; si existe => actualiza campos faltantes.
-        // Las nuevas reglas permiten esta operación para el propio usuario.
-        if (!snap.exists()) {
-            await setDoc(ref, base, { merge: true });
-        }
+        await setDoc(ref, base, { merge: true });
   
         // Una sola lectura para estado
         const fresh = await getDoc(ref);
