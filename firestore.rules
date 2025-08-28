@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -8,112 +7,106 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function userRole() {
+    // Lee el rol DESDE el doc del usuario autenticado (si existe)
+    function myRole() {
       return isSignedIn()
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
         : null;
     }
 
     function isRole(role) {
-      return userRole() == role;
+      return myRole() == role;
     }
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Permiso de lectura del ticket por ID (para reutilizar en logs)
-    function canReadTicketId(ticketId) {
+    function canReadTicket(ticketId) {
       let t = get(/databases/$(database)/documents/tickets/$(ticketId)).data;
-      return isRole("Administrador")
-          || isRole("SST")
-          || (isRole("Servicios Generales") && request.auth.uid in t.assignedToIds)
-          || (t.requesterId == request.auth.uid);
+      // ⚠️ Evitar 'in' sobre null con coalesce
+      let assigned = (t.assignedToIds != null) ? t.assignedToIds : [];
+      return isRole('Administrador')
+          || isRole('SST')
+          || (isRole('Servicios Generales') && request.auth.uid in assigned)
+          || (isOwner(t.requesterId));
     }
 
     // USERS
     match /users/{userId} {
-      // El dueño puede leerse, Admin y SST también (útil para auditoría y layout)
-      allow read: if isSignedIn() && (isOwner(userId) || isRole("Administrador") || isRole("SST"));
-      allow create, update, delete: if isRole("Administrador");
-      allow list: if isRole("Administrador");
+      // Leer: dueño, Admin o SST
+      allow read: if isSignedIn() && (isOwner(userId) || isRole('Administrador') || isRole('SST'));
+
+      // Listar: solo Admin
+      allow list: if isRole('Administrador');
+
+      // Crear: permitir una auto-inicialización segura (una sola vez) por el dueño
+      allow create: if isSignedIn()
+                    && isOwner(userId)
+                    && !exists(/databases/$(database)/documents/users/$(userId))
+                    && request.resource.data.keys().hasOnly(
+                        ["uid","name","email","avatar","role","createdAt"]
+                      )
+                    // Rol inicial permitido (nunca Admin/SST/SG por el cliente)
+                    && request.resource.data.role in ["Docentes","Coordinadores","Administrativos"]
+                    && request.resource.data.uid == request.auth.uid;
+
+      // Actualizar/Eliminar: solo Admin
+      allow update, delete: if isRole('Administrador');
     }
 
     // TICKETS
     match /tickets/{ticketId} {
-      allow read: if isSignedIn() && (
-        isRole("Administrador") ||
-        isRole("SST") ||
-        (isRole("Servicios Generales") && request.auth.uid in resource.data.assignedToIds) ||
-        (resource.data.requesterId == request.auth.uid) // Docentes/Coordinadores/Administrativos leen los suyos
-      );
-
-      // Solo Admins y SST pueden listar la colección completa. Otros roles deben usar queries filtradas que se validan con la regla 'read'.
-      allow list: if isRole("Administrador") || isRole("SST");
-
-      // Todos los roles autenticados pueden crear
-      allow create: if isSignedIn() && (
-        isRole("Administrador") ||
-        isRole("SST") ||
-        isRole("Servicios Generales") ||
-        isRole("Docentes") ||
-        isRole("Coordinadores") ||
-        isRole("Administrativos")
-      );
-
-      // Actualizar: Admin o técnico asignado; (opcional) el solicitante puede actualizar ciertos campos si así lo deseas
-      allow update: if isSignedIn() && (
-        isRole("Administrador") ||
-        (isRole("Servicios Generales") && request.auth.uid in resource.data.assignedToIds)
-        // si quieres permitir que el solicitante edite algunos campos, añade validaciones aquí
-      );
-
-      allow delete: if isRole("Administrador");
+      allow read: if canReadTicket(ticketId);
+      allow create: if isSignedIn();
+      allow update: if isRole('Administrador') ||
+                    (isRole('Servicios Generales') &&
+                      // misma defensa contra null
+                      (request.auth.uid in ((resource.data.assignedToIds != null) ? resource.data.assignedToIds : []))
+                    );
+      // 'list' no concede lectura por sí sola, pero ayuda a queries
+      allow list: if isSignedIn();
     }
 
     // SCHEDULE EVENTS
     match /scheduleEvents/{eventId} {
-      allow read: if isSignedIn() && (
-        isRole("Administrador") || isRole("SST") || isRole("Servicios Generales")
-      );
-      allow create: if isRole("Administrador") || isRole("Servicios Generales");
-      allow update, delete: if isRole("Administrador");
+      allow read: if isSignedIn();
+      allow create: if isRole('Administrador') || isRole('Servicios Generales');
+      allow update, delete: if isRole('Administrador');
     }
 
     // NOTIFICATIONS
     match /notifications/{notificationId} {
-      allow read, update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isOwner(resource.data.userId);
       allow create: if isSignedIn();
       allow list: if isSignedIn();
     }
 
     // LOGS
     match /logs/{logId} {
-      // Se puede leer un log si el usuario puede leer el ticket al que hace referencia
-      allow read: if isSignedIn() && (
-        (resource.data.details.ticketId != null && canReadTicketId(resource.data.details.ticketId))
-        || isRole("Administrador")
-        || isRole("SST")
-      );
-      allow list: if isSignedIn(); // Para poder consultar por ticketId; cada doc validará read arriba
-      allow create: if isSignedIn(); // generados por el sistema/cliente autenticado
-      allow write: if false; // Inmutables salvo creación
+      // Defender cuando no hay details o ticketId
+      allow read: if isRole('Administrador')
+               || isRole('SST')
+               || (resource.data.details != null
+                   && resource.data.details.ticketId != null
+                   && canReadTicket(resource.data.details.ticketId));
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow write: if false;
     }
 
-    // DATA MASTER
+    // ZONES / SITES / CATEGORIES
     match /zones/{zoneId} {
       allow read: if isSignedIn();
-      allow write: if isRole("Administrador");
+      allow write: if isRole('Administrador');
     }
-    
     match /sites/{siteId} {
       allow read: if isSignedIn();
-      allow write: if isRole("Administrador");
+      allow write: if isRole('Administrador');
     }
-    
     match /categories/{categoryId} {
       allow read: if isSignedIn();
-      allow write: if isRole("Administrador");
+      allow write: if isRole('Administrador');
     }
 
     // DIAGNOSIS LOGS

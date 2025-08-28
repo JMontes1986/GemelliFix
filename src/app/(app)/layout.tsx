@@ -110,16 +110,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               const userDocSnap = await getDoc(userDocRef);
 
               if (!userDocSnap.exists()) {
-                  console.warn(`User document not found for UID: ${firebaseUser.uid}. Creating a new profile.`);
-                  const newUser: User = {
-                      id: firebaseUser.uid,
+                  // Auto-initialization (allowed by new rules)
+                  const newUser: Omit<User, 'id'> = {
                       uid: firebaseUser.uid,
-                      name: firebaseUser.displayName || firebaseUser.email || 'Nuevo Usuario',
+                      name: firebaseUser.displayName || firebaseUser.email || 'Usuario',
                       email: firebaseUser.email || '',
-                      avatar: firebaseUser.photoURL || `https://placehold.co/100x100.png`,
-                      role: 'Docentes',
+                      avatar: firebaseUser.photoURL || 'https://placehold.co/100x100.png',
+                      role: 'Docentes', // Secure base role
+                      // @ts-ignore: serverTimestamp is correctly typed at runtime
+                      createdAt: serverTimestamp(),
                   };
-                  await setDoc(userDocRef, { ...newUser, createdAt: serverTimestamp() });
+                  await setDoc(userDocRef, newUser);
                   const freshSnap = await getDoc(userDocRef);
                    if (!freshSnap.exists()) throw new Error("Failed to create and fetch user document.");
                    setCurrentUser({ id: freshSnap.id, ...freshSnap.data() } as User);
