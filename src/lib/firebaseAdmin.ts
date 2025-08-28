@@ -31,11 +31,13 @@ function fromFields() {
 
   if (!projectId || !clientEmail || !privateKey) return null;
 
-  // Corregir saltos de línea escapados
-  if (privateKey.includes('\\n')) privateKey = privateKey.replace(/\\n/g, '\n');
+  // Corregir saltos de línea escapados. Es la causa más común de errores de "parseo".
+  if (privateKey.includes('\\n')) {
+    privateKey = privateKey.replace(/\\n/g, '\n');
+  }
 
   if (!privateKey.includes('BEGIN PRIVATE KEY')) {
-    throw new Error('FB_PRIVATE_KEY no parece una clave válida (BEGIN PRIVATE KEY).');
+    throw new Error('FB_PRIVATE_KEY no parece una clave válida (no contiene "BEGIN PRIVATE KEY").');
   }
 
   return admin.credential.cert({
