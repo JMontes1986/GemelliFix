@@ -478,7 +478,7 @@ export default function DashboardPage() {
 
     let ticketsQuery;
     // Admins and SST see all tickets
-    if (currentUser.role === 'Administrador' || currentUser.role === 'SST') {
+    if (currentUser.role === 'Administrador' || currentUser.role === 'SST' || currentUser.email === 'sistemas@colgemelli.edu.co') {
         ticketsQuery = query(collection(db, 'tickets'));
         const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
         onSnapshot(techQuery, (snapshot) => {
@@ -530,11 +530,9 @@ export default function DashboardPage() {
   }
 
   // Render the correct dashboard based on user role
-  if (currentUser.role === 'Administrador' || currentUser.role === 'SST') {
+  if (currentUser.role === 'Administrador' || currentUser.role === 'SST' || currentUser.email === 'sistemas@colgemelli.edu.co') {
       return <AdminDashboard tickets={tickets} technicians={technicians} currentUser={currentUser} />;
   } else {
       return <RequesterDashboard tickets={tickets} currentUser={currentUser} />;
   }
 }
-
-    

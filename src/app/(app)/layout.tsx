@@ -119,23 +119,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       try {
         const snap = await getDoc(ref);
         
-        if (!snap.exists()) {
-          // User is new, create their profile with default role
-          const newUserProfile = {
-            id: fbUser.uid,
-            uid: fbUser.uid,
-            name: fbUser.displayName || fbUser.email || 'Usuario',
-            email: fbUser.email || '',
-            avatar: fbUser.photoURL || 'https://placehold.co/100x100.png',
-            role: 'Docentes' as const, // Default role for new users
-            createdAt: serverTimestamp(),
-          };
-          await setDoc(ref, newUserProfile);
-          setCurrentUser(newUserProfile as User);
-
+        if (snap.exists()) {
+            const userData = snap.data() as Omit<User, 'id'>;
+            // Super-admin override
+            if (fbUser.email === 'sistemas@colgemelli.edu.co' && userData.role !== 'Administrador') {
+                 await setDoc(ref, { role: 'Administrador' }, { merge: true });
+                 setCurrentUser({ id: snap.id, ...userData, role: 'Administrador' });
+            } else {
+                 setCurrentUser({ id: snap.id, ...userData });
+            }
         } else {
-          // User exists, just set their data
-          setCurrentUser({ id: snap.id, ...snap.data() } as User);
+            // User is new, create their profile with default role
+            const newUserProfile: Omit<User, 'id'> = {
+                uid: fbUser.uid,
+                name: fbUser.displayName || fbUser.email || 'Usuario',
+                email: fbUser.email!,
+                avatar: fbUser.photoURL || 'https://placehold.co/100x100.png',
+                role: 'Docentes', // Default role for new users
+                createdAt: serverTimestamp(),
+            };
+            await setDoc(ref, newUserProfile);
+            setCurrentUser({ id: fbUser.uid, ...newUserProfile } as User);
         }
 
       } catch (e: any) {
@@ -168,7 +172,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
   
-  const isAdmin = currentUser?.role === 'Administrador';
+  const isAdmin = currentUser?.role === 'Administrador' || currentUser?.email === 'sistemas@colgemelli.edu.co';
   const isServiceUser = currentUser?.role === 'Servicios Generales';
   const isSST = currentUser?.role === 'SST';
 
