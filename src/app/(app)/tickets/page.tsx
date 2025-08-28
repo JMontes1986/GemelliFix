@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -333,9 +332,12 @@ export default function TicketsPage() {
         case 'Docentes':
         case 'Coordinadores':
         case 'Administrativos':
-            // CRITICAL FIX: Removed orderBy from the query to avoid needing a composite index.
-            // Sorting will now be done on the client side after fetching.
-            ticketsQuery = query(collection(db, 'tickets'), where('requesterId', '==', currentUser.id));
+            // CORRECTED: The query now includes the orderBy clause, which matches the required index.
+            ticketsQuery = query(
+                collection(db, 'tickets'), 
+                where('requesterId', '==', currentUser.id),
+                orderBy('createdAt', 'desc')
+            );
             break;
         default:
             setTickets([]);
@@ -355,11 +357,6 @@ export default function TicketsPage() {
               dueDate,
           } as Ticket;
       });
-
-      // Client-side sorting for non-admin/SST roles to avoid index errors.
-      if (!['Administrador', 'SST', 'Servicios Generales'].includes(currentUser.role)) {
-          ticketsData = ticketsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      }
       
       setTickets(ticketsData);
       setIsLoading(false);
@@ -402,8 +399,7 @@ export default function TicketsPage() {
         logDetails.newValue = `${value} (vence: ${newDueDate.toLocaleDateString()})`;
     }
     
-    // If status is being updated to a final state, set the resolvedAt timestamp
-    if (field === 'status' && (value === 'Cerrado' || value === 'Resuelto')) {
+    if (field === 'status' && (value === 'Cerrado' || value === 'Resuelto') && !ticketToUpdate.resolvedAt) {
         updates.resolvedAt = new Date().toISOString();
     }
 
