@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -189,19 +190,16 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
   const slaByPriority = { Urgente: calculateSlaByPriority('Urgente'), Alta: calculateSlaByPriority('Alta'), Media: calculateSlaByPriority('Media'), Baja: calculateSlaByPriority('Baja') };
 
     const buildWeeklyTrends = React.useCallback((allTickets: Ticket[]) => {
-      // Helpers
       const startOfMondayWeek = (d: Date) => startOfWeek(d, { weekStartsOn: 1 });
       const endOfMondayWeek = (d: Date) => endOfWeek(d, { weekStartsOn: 1 });
       const inRange = (d: Date, from: Date, to: Date) => d >= from && d <= to;
 
-      // Normalize dates from tickets
       const norm = allTickets.map(t => {
           const created = new Date(t.createdAt);
           if (!isValid(created)) return null;
 
           const due = new Date(t.dueDate);
 
-          // Attempt to get a valid closing date from multiple sources
           const closedRaw = (t.resolvedAt ? new Date(t.resolvedAt) : null) ||
                             (t.statusHistory?.['Cerrado'] ? new Date(t.statusHistory['Cerrado']) : null) ||
                             (t.statusHistory?.['Resuelto'] ? new Date(t.statusHistory['Resuelto']) : null);
@@ -214,19 +212,16 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
       const weeks: { week: string; created: number; closed: number; overdue: number }[] = [];
       const today = new Date();
       
-      // Generate last 12 weeks including the current one
       for (let i = 11; i >= 0; i--) {
         const weekStart = startOfMondayWeek(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i * 7));
         const weekEnd = endOfMondayWeek(weekStart);
 
         const created = norm.filter(t => inRange(t._created, weekStart, weekEnd)).length;
         const closed = norm.filter(t => t._closed && inRange(t._closed, weekStart, weekEnd)).length;
-
+        
         const overdue = norm.filter(t => {
             if (!isValid(t._due)) return false;
-            // It was due by the end of the week...
             const wasDueByThen = t._due <= weekEnd;
-            // ...and it was NOT closed by the end of that week.
             const notClosedByThen = !t._closed || t._closed > weekEnd;
             return wasDueByThen && notClosedByThen;
         }).length;
