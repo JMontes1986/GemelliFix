@@ -129,9 +129,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
         // Usa setDoc(..., { merge: true }) SIEMPRE.
         // Si no existe => crea; si existe => actualiza campos faltantes.
-        await setDoc(ref, base, { merge: true });
+        // Las nuevas reglas permiten esta operación para el propio usuario.
+        if (!snap.exists()) {
+            await setDoc(ref, base, { merge: true });
+        }
   
-        // Una sola lectura para estado (puedes omitirla y usar "base" si quieres)
+        // Una sola lectura para estado
         const fresh = await getDoc(ref);
         setCurrentUser({ id: fresh.id, ...fresh.data() } as User);
       } catch (e) {

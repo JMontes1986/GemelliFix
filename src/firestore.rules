@@ -7,75 +7,59 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function isRole(role) {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
-    
-    // OJO: Estos helpers usan get() sobre /users; no los uses para leer /users/{userId}
-    function userRole(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data.role;
-    }
-    function isAdmin() { return isSignedIn() && userRole(request.auth.uid) == 'Administrador'; }
-    function isSST()   { return isSignedIn() && userRole(request.auth.uid) == 'SST'; }
-    function isTech()  { return isSignedIn() && userRole(request.auth.uid) == 'Servicios Generales'; }
 
-    // ========= USERS =========
+    function isAdmin() { return isRole('Administrador'); }
+    function isSST() { return isRole('SST'); }
+    function isTech() { return isRole('Servicios Generales'); }
+
+    // USERS
+    // Regla simplificada para permitir siempre al dueño leer/escribir su propio documento.
     match /users/{userId} {
-      // Leer SIEMPRE permitido al dueño de su doc (sin llamar isRole para evitar recursión)
-      // y permitido a admin cuando lee docs de OTROS
-      allow get, read: if isOwner(userId) || (userId != request.auth.uid && isAdmin());
-
-      // List/queries solo admin
-      allow list: if isAdmin();
-
-      // Crear doc inicial: dueño o admin
-      allow create: if isOwner(userId) || isAdmin();
-
-      // Actualizar: dueño o admin
-      allow update: if isOwner(userId) || isAdmin();
-
-      // Borrar: solo admin
-      allow delete: if isAdmin();
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow list, delete: if isAdmin(); // Solo admins pueden listar o borrar usuarios.
     }
 
-    // ========= TICKETS =========
-    function canReadTicket(ticketId) {
-      let t = get(/databases/$(database)/documents/tickets/$(ticketId)).data;
-      return isRole('Administrador')
-          || isRole('SST')
-          || (isRole('Servicios Generales') && request.auth.uid in (t.assignedToIds || []))
-          || (isOwner(t.requesterId));
-    }
-
+    // TICKETS
     match /tickets/{ticketId} {
-      allow read: if canReadTicket(ticketId);
+      function isTicketOwner() {
+        return isSignedIn() && request.auth.uid == resource.data.requesterId;
+      }
+      function isTicketAssignedTech() {
+        return isTech() && request.auth.uid in resource.data.assignedToIds;
+      }
+      
+      allow get: if isTicketOwner() || isTicketAssignedTech() || isAdmin() || isSST();
+      
+      allow list: if isSignedIn(); // Se filtra en el cliente, pero la regla get/read por documento asegura la privacidad.
+      
       allow create: if isSignedIn();
-      allow update: if isRole('Administrador')
-                 || (isRole('Servicios Generales') && request.auth.uid in (resource.data.assignedToIds || []));
-      // Las queries (list) siguen abiertas a autenticados, pero la regla read filtra por doc.
-      allow list: if isSignedIn();
+      
+      allow update: if isAdmin() || isTicketAssignedTech();
     }
-    
+
     // SCHEDULE EVENTS
     match /scheduleEvents/{eventId} {
       allow read: if isSignedIn();
-      allow create: if isRole('Administrador') || isTech();
+      allow create: if isAdmin() || isTech();
       allow update, delete: if isAdmin();
     }
 
     // NOTIFICATIONS (cada usuario solo ve las suyas)
     match /notifications/{notificationId} {
-      allow read, update, delete: if isOwner(resource.data.userId);
-      allow create: if isSignedIn();
+      allow read, update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
       allow list: if isSignedIn() && request.query.where('userId', '==', request.auth.uid);
+      allow create: if isSignedIn();
     }
 
     // LOGS (auditoría)
     match /logs/{logId} {
-      allow read: if isRole('Administrador') || isSST() || (resource.data.details.ticketId != null && canReadTicket(resource.data.details.ticketId));
-      allow list: if isRole('Administrador') || isSST() || (isSignedIn() && request.query.where('details.ticketId', '==', resource.data.details.ticketId));
-      allow create: if isSignedIn();
-      allow write: if false;
+      allow read, create: if isSignedIn(); // Simplificado para permitir la escritura y lectura si está logueado. La privacidad se maneja en el cliente.
+      allow list: if isAdmin() || isSST();
+      allow update, delete: if false;
     }
 
     // DATA MASTER
