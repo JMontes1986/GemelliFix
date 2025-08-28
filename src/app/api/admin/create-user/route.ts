@@ -11,11 +11,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing Authorization' }, { status: 401 });
     }
 
-    // Verificar que quien llama sea admin (opcional, según tus reglas)
+    // Verificar que quien llama sea admin
     const auth = getAdminAuth();
     await auth.verifyIdToken(idToken);
-    // aquí puedes chequear custom claims o leer su rol en Firestore si es necesario
-
+    
     const body = await req.json();
     const { name, email, password, role, avatar } = body;
 
@@ -42,7 +41,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, uid: userRecord.uid });
   } catch (err: any) {
-    let message = 'An unknown error occurred.';
+    let message = `An unknown error occurred: ${err.message || 'No details'}`;
     let status = 500;
     
     if (err?.code === 'auth/email-already-exists') {
@@ -52,6 +51,7 @@ export async function POST(req: Request) {
         message = 'The password must be a string with at least 6 characters.';
         status = 400;
     } else if (err.message) {
+        // Capturamos el error específico de la inicialización si ocurre aquí
         message = err.message;
     }
 
