@@ -1,94 +1,111 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
+
     function isSignedIn() {
       return request.auth != null;
     }
-    
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+
+    // Lee el rol DESDE el doc del usuario autenticado (si existe)
+    function myRole() {
+      return isSignedIn()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
     }
-    
+
     function isRole(role) {
-      return isSignedIn() && getUserRole() == role;
+      return myRole() == role;
     }
-    
+
+    function isAdmin() { return isRole('Administrador'); }
+    function isSST() { return isRole('SST'); }
+    function isTech() { return isRole('Servicios Generales'); }
+
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ÚSALA SOLO PARA OTROS DOCUMENTOS (no el que se está leyendo)
+    function canReadTicketById(ticketId) {
+      let t = get(/databases/$(database)/documents/tickets/$(ticketId)).data;
+      return isAdmin() || isSST()
+        || (isTech() && request.auth.uid in (t.assignedToIds || []))
+        || (isSignedIn() && request.auth.uid == t.requesterId);
     }
 
     // USERS
     match /users/{userId} {
-      allow read: if isSignedIn() && (isOwner(userId) || isRole("Administrador") || isRole("SST"));
-      allow create, update, delete: if isRole("Administrador");
-      allow list: if isRole("Administrador");
+      allow get: if isSignedIn() && (isAdmin() || request.auth.uid == userId);
+      allow list: if isAdmin();
+      
+      // Permitir que un usuario cree su PROPIO documento una sola vez
+      // con campos y roles limitados.
+      allow create: if isSignedIn()
+                    && isOwner(userId)
+                    && !exists(/databases/$(database)/documents/users/$(userId))
+                    && request.resource.data.keys().hasOnly(
+                        ["uid","name","email","avatar","role","createdAt", "id"]
+                      )
+                    && request.resource.data.role in ["Docentes","Coordinadores","Administrativos"]
+                    && request.resource.data.uid == request.auth.uid;
+      
+      allow update, delete: if isAdmin();
     }
 
     // TICKETS
     match /tickets/{ticketId} {
-      allow read: if isSignedIn() && (
-        isRole("Administrador") ||
-        isRole("SST") ||
-        (isRole("Servicios Generales") && request.auth.uid in resource.data.assignedToIds) ||
-        (resource.data.requesterId == request.auth.uid)
-      );
-      
-      allow list: if isSignedIn();
+      // Lectura de UN doc (get / onSnapshot(doc))
+      allow get: if isAdmin() || isSST()
+        || (isTech() && request.auth.uid in (resource.data.assignedToIds || []))
+        || (isSignedIn() && request.auth.uid == resource.data.requesterId);
+
+      // Consultas y lecturas de colección (list)
+      allow list: if
+        isAdmin() || isSST() || isTech() ||
+        (isSignedIn()
+          && request.query.where('requesterId', '==', request.auth.uid));
 
       allow create: if isSignedIn();
 
-      allow update: if isSignedIn() && (
-        isRole("Administrador") ||
-        (isRole("Servicios Generales") && request.auth.uid in resource.data.assignedToIds) ||
-        (resource.data.requesterId == request.auth.uid && request.resource.data.status == "Cerrado") // Requesters can only update to add satisfaction
-      );
-
-      allow delete: if isRole("Administrador");
+      allow update: if isAdmin()
+        || (isTech() && request.auth.uid in (resource.data.assignedToIds || []));
     }
 
     // SCHEDULE EVENTS
     match /scheduleEvents/{eventId} {
-      allow read: if isSignedIn() && (
-        isRole("Administrador") || isRole("SST") || isRole("Servicios Generales")
-      );
-      allow create: if isRole("Administrador") || isRole("Servicios Generales");
-      allow update, delete: if isRole("Administrador");
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || isTech();
+      allow update, delete: if isAdmin();
     }
 
-    // NOTIFICATIONS
+    // NOTIFICATIONS (cada usuario solo ve las suyas)
     match /notifications/{notificationId} {
-      allow read, update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get, update, delete: if isSignedIn()
+        && request.auth.uid == resource.data.userId;
+      allow list: if isSignedIn()
+        && request.query.where('userId', '==', request.auth.uid);
       allow create: if isSignedIn();
-      allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
     }
 
-    // LOGS
+    // LOGS (auditoría)
     match /logs/{logId} {
-      allow read: if isRole("Administrador") || isRole("SST");
-      allow list: if isRole("Administrador") || isRole("SST");
-      allow create: if true; // Allow server-side logging
+      allow get: if isAdmin() || isSST()
+        || (resource.data.details.ticketId != null
+            && canReadTicketById(resource.data.details.ticketId));
+      allow list: if isAdmin() || isSST();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
 
     // DATA MASTER
-    match /zones/{zoneId} {
-      allow read: if isSignedIn();
-      allow write: if isRole("Administrador");
-    }
-    
-    match /sites/{siteId} {
-      allow read: if isSignedIn();
-      allow write: if isRole("Administrador");
-    }
-    
-    match /categories/{categoryId} {
-      allow read: if isSignedIn();
-      allow write: if isRole("Administrador");
-    }
+    match /zones/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /sites/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /categories/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
 
-    // DIAGNOSIS LOGS
-    match /diagnosis_logs/{logId} {
+    // DIAGNOSIS
+    match /diagnosis_logs/{id} {
       allow read, write: if isSignedIn();
     }
   }

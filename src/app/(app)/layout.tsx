@@ -137,8 +137,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             } catch (error) {
               console.error("Error verifying user session or getting data. Logging out.", error);
-              await auth.signOut();
-              router.push('/login');
+              // Avoid auto-logout on intermittent errors
+              // await auth.signOut();
+              // router.push('/login');
             }
         } else {
             router.push('/login');
