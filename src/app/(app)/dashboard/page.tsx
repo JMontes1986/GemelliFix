@@ -188,80 +188,68 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
 
   const slaByPriority = { Urgente: calculateSlaByPriority('Urgente'), Alta: calculateSlaByPriority('Alta'), Media: calculateSlaByPriority('Media'), Baja: calculateSlaByPriority('Baja') };
 
-  const ticketTrendsData = React.useMemo(() => {
-    if (tickets.length === 0) {
-      return [];
-    }
-  
-    const getWeekKey = (date: Date) => format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-  
-    // 1. Find the absolute date range of all ticket activity
-    const allRelevantDates = tickets.flatMap(t => {
-      const dates: Date[] = [];
-      const createdAt = parseISO(t.createdAt);
-      if (isValid(createdAt)) {
-        dates.push(createdAt);
-      }
-      if (t.resolvedAt) {
-        const resolvedAt = parseISO(t.resolvedAt);
-        if (isValid(resolvedAt)) {
-          dates.push(resolvedAt);
-        }
-      }
-      return dates;
-    }).filter(d => isValid(d));
-  
-    if (allRelevantDates.length === 0) return [];
-  
-    const minDate = new Date(Math.min(...allRelevantDates.map(d => d.getTime())));
-    const maxDate = new Date(Math.max(...allRelevantDates.map(d => d.getTime())));
-  
-    // 2. Initialize all weeks within the entire date range
-    const weeklyData: { [week: string]: { created: number; closed: number; overdue: number } } = {};
-    if (isValid(minDate) && isValid(maxDate) && minDate <= maxDate) {
-      const weeksInRange = eachWeekOfInterval(
-        { start: minDate, end: maxDate },
-        { weekStartsOn: 1 }
-      );
-      weeksInRange.forEach(weekStart => {
-        const weekKey = getWeekKey(weekStart);
-        weeklyData[weekKey] = { created: 0, closed: 0, overdue: 0 };
-      });
-    }
-  
-    // 3. Populate the data by iterating through tickets
-    tickets.forEach(ticket => {
-      const creationDate = parseISO(ticket.createdAt);
-      if (isValid(creationDate)) {
-        const creationWeekKey = getWeekKey(creationDate);
-        if (weeklyData[creationWeekKey]) {
-          weeklyData[creationWeekKey].created++;
-  
-          if (new Date() > new Date(ticket.dueDate) && !['Cerrado', 'Resuelto', 'Cancelado'].includes(ticket.status)) {
-            weeklyData[creationWeekKey].overdue++;
-          }
-        }
-      }
-  
-      if (ticket.resolvedAt) {
-        const resolvedDate = parseISO(ticket.resolvedAt);
-        if (isValid(resolvedDate)) {
-          const resolvedWeekKey = getWeekKey(resolvedDate);
-          if (weeklyData[resolvedWeekKey]) {
-            weeklyData[resolvedWeekKey].closed++;
-          }
-        }
-      }
+    // Helpers
+    const startOfMondayWeek = (d: Date) => startOfWeek(d, { weekStartsOn: 1 });
+    const endOfMondayWeek = (d: Date) => {
+    const s = startOfMondayWeek(d);
+    return new Date(s.getFullYear(), s.getMonth(), s.getDate() + 7, 23, 59, 59, 999);
+    };
+    const inRange = (d: Date, from: Date, to: Date) => d >= from && d <= to;
+
+    // Construye 12 semanas (incluida la actual)
+    const buildWeeklyTrends = (allTickets: Ticket[]) => {
+    // Normaliza fechas del ticket
+    const norm = allTickets.map(t => {
+        const created = new Date(t.createdAt);
+        const due = new Date(t.dueDate);
+        // intenta obtener fecha de cierre: resolvedAt || statusHistory.Cerrado || statusHistory.Resuelto
+        const closedRaw =
+        (t.resolvedAt ? new Date(t.resolvedAt) : null) ||
+        (t.statusHistory?.['Cerrado'] ? new Date(t.statusHistory['Cerrado']) : null) ||
+        (t.statusHistory?.['Resuelto'] ? new Date(t.statusHistory['Resuelto']) : null);
+        const closedAt = closedRaw && !isNaN(closedRaw.getTime()) ? closedRaw : null;
+        return { ...t, _created: created, _due: due, _closed: closedAt };
     });
-  
-    // 4. Format for the chart
-    const sortedWeeks = Object.keys(weeklyData).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-  
-    return sortedWeeks.map(week => ({
-      week: format(parseISO(week), "dd LLL", { locale: es }),
-      ...weeklyData[week]
-    }));
-  }, [tickets]);
+
+    const weeks: { week: string; created: number; closed: number; overdue: number }[] = [];
+    const today = new Date();
+    const thisWeekStart = startOfMondayWeek(today);
+
+    for (let i = 11; i >= 0; i--) {
+        const weekStart = new Date(thisWeekStart);
+        weekStart.setDate(thisWeekStart.getDate() - i * 7);
+        const weekEnd = endOfMondayWeek(weekStart);
+
+        const created = norm.filter(t => inRange(t._created, weekStart, weekEnd)).length;
+
+        // Cerrados en esa semana (por fecha de cierre real o inferida)
+        const closed = norm.filter(t => t._closed && inRange(t._closed, weekStart, weekEnd)).length;
+
+        // Vencidos “a esa semana”: tickets cuya dueDate <= fin de la semana
+        // y que, para esa semana, aún no estaban cerrados.
+        const overdue = norm.filter(t => {
+        const wasDueByThen = t._due <= weekEnd;
+        // si tiene fecha de cierre y cerró después del fin de semana, cuenta como vencido
+        const notClosedByThen = !t._closed || t._closed > weekEnd;
+        // también excluimos cancelados cerrados antes o en la semana
+        const isClosedStatus = t.status === 'Cerrado' || t.status === 'Resuelto' || t.status === 'Cancelado';
+        const closedNotAfter = t._closed && t._closed <= weekEnd;
+        const effectivelyOpenByThen = !(isClosedStatus && closedNotAfter);
+        return wasDueByThen && notClosedByThen && effectivelyOpenByThen;
+        }).length;
+
+        weeks.push({
+        week: format(weekStart, "dd LLL", { locale: es }),
+        created,
+        closed,
+        overdue,
+        });
+    }
+
+    return weeks;
+    };
+
+    const ticketTrendsData = React.useMemo(() => buildWeeklyTrends(tickets), [tickets]);
 
   const lifecycleData = React.useMemo(() => {
     const durations = { toAssignment: [] as number[], toInProgress: [] as number[], toResolved: [] as number[] };
