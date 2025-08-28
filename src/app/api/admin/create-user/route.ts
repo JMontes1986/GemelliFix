@@ -9,7 +9,6 @@ import { NextResponse } from 'next/server';
 async function assertAdmin(req: Request) {
     const { getAdminApp } = await import('@/lib/firebaseAdmin');
     const { getAuth } = await import('firebase-admin/auth');
-    const { getFirestore } = await import('firebase-admin/firestore');
 
     const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
     if (!idToken) {
@@ -18,7 +17,6 @@ async function assertAdmin(req: Request) {
     
     const adminApp = getAdminApp();
     const auth = getAuth(adminApp);
-    const db = getFirestore(adminApp);
 
     const decodedToken = await auth.verifyIdToken(idToken, true); // true for check-revoked
     
@@ -60,7 +58,7 @@ export async function POST(req: Request) {
     // La Cloud Function `onUserCreated` se encargará de poner el custom claim del rol.
     // 4. Crear el documento del usuario en Firestore.
     await db.collection('users').doc(userRecord.uid).set({
-      id: userRecord.uid, // Guardamos el ID para consistencia.
+      id: userRecord.uid,
       uid: userRecord.uid,
       name,
       email,
