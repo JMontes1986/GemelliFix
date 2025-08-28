@@ -369,10 +369,20 @@ function RequesterDashboard({ tickets, currentUser }: { tickets: Ticket[], curre
                     Un resumen de tus solicitudes de mantenimiento.
                 </p>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                 <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total de Solicitudes</CardTitle>
+                        <Grid className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{tickets.length}</div>
+                        <p className="text-xs text-muted-foreground">Historial completo.</p>
+                    </CardContent>
+                </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Mis Solicitudes Abiertas</CardTitle>
+                        <CardTitle className="text-sm font-medium">Solicitudes Abiertas</CardTitle>
                         <Activity className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -382,12 +392,22 @@ function RequesterDashboard({ tickets, currentUser }: { tickets: Ticket[], curre
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Mis Solicitudes Vencidas</CardTitle>
+                        <CardTitle className="text-sm font-medium">Solicitudes Vencidas</CardTitle>
                         <AlertTriangle className="h-4 w-4 text-destructive" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{overdueTickets.length}</div>
-                        <p className="text-xs text-muted-foreground">Tickets abiertos fuera del tiempo de respuesta.</p>
+                        <p className="text-xs text-muted-foreground">Abiertas fuera del tiempo de respuesta.</p>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Solicitudes Cerradas</CardTitle>
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{tickets.length - openTickets.length}</div>
+                        <p className="text-xs text-muted-foreground">Tickets resueltos.</p>
                     </CardContent>
                 </Card>
             </div>
@@ -517,3 +537,5 @@ export default function DashboardPage() {
       return <RequesterDashboard tickets={tickets} currentUser={currentUser} />;
   }
 }
+
+    

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -136,7 +137,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         // Una sola lectura para estado
         const fresh = await getDoc(ref);
         setCurrentUser({ id: fresh.id, ...fresh.data() } as User);
-      } catch (e) {
+      } catch (e: any) {
         console.error('No se pudo leer/crear el perfil. Continuando con fallback:', (e as any)?.message || e);
         setCurrentUser({
           id: fbUser.uid,
@@ -176,20 +177,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {(isAdmin || isSST) && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive('/dashboard')}
-                    tooltip="Dashboard"
-                  >
-                    <Link href="/dashboard">
-                      <LayoutDashboard />
-                      <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-            )}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive('/dashboard')}
+                tooltip="Dashboard"
+              >
+                <Link href="/dashboard">
+                  <LayoutDashboard />
+                  <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             {isAdmin && (
                  <SidebarMenuItem>
                     <SidebarMenuButton
@@ -362,3 +361,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    
