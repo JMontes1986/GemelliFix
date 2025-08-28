@@ -2,93 +2,81 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- Helpers ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Helper que SÍ lee de /users. Usar solo en colecciones que NO sean /users.
-    function getRole(uid) {
+    
+    // Función de utilidad para obtener los datos de rol de un usuario desde Firestore
+    function getUserRole(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data.role;
     }
     
-    function isAdmin() {
-      return isSignedIn() && getRole(request.auth.uid) == 'Administrador';
-    }
-
-    function isTech() {
-      return isSignedIn() && getRole(request.auth.uid) == 'Servicios Generales';
-    }
-
-    function isSST() {
-      return isSignedIn() && getRole(request.auth.uid) == 'SST';
-    }
-    
-    function canReadTicket(ticketId) {
-      let ticketData = get(/databases/$(database)/documents/tickets/$(ticketId)).data;
-      return isAdmin() || isSST() || 
-             (isTech() && request.auth.uid in ticketData.assignedToIds) || 
-             isOwner(ticketData.requesterId);
-    }
-    
-    // --- Colecciones ---
-
-    // REGLA CLAVE: Simplificada para evitar recursión y permitir autocreación.
+    // Reglas para la colección 'users'
     match /users/{userId} {
-      // El dueño siempre puede leer y escribir su propio documento.
-      allow read, write: if isOwner(userId);
+      // El usuario puede leer y escribir su propio perfil
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
       
-      // Solo los administradores pueden listar todos los usuarios.
-      allow list: if isAdmin();
+      // Nadie puede crear documentos de usuario directamente, deben crearse a través de la API del backend
+      allow create: if false; 
+      
+      // El administrador puede listar, leer, actualizar y eliminar perfiles de usuario
+      allow list, read, update, delete: if request.auth != null && getUserRole(request.auth.uid) == 'Administrador';
     }
 
+    // Reglas para la colección 'tickets'
     match /tickets/{ticketId} {
-      allow read: if canReadTicket(ticketId);
-      allow create: if isSignedIn();
-      allow update: if isAdmin() || (isTech() && request.auth.uid in resource.data.assignedToIds);
-      // La consulta (list) se filtra en el cliente, y la regla 'read' protege cada documento.
-      allow list: if isSignedIn();
-    }
+      // Los usuarios autenticados pueden crear tickets
+      allow create: if request.auth != null;
+      
+      // El solicitante del ticket puede leer y actualizar su propio ticket si el estado es 'Abierto'
+      allow read, update: if request.auth != null && request.auth.uid == resource.data.requesterId && resource.data.status == 'Abierto';
+      
+      // Los usuarios asignados pueden leer y actualizar sus tickets
+      allow read, update: if request.auth != null && request.auth.uid in resource.data.assignedToIds;
 
-    match /scheduleEvents/{eventId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isAdmin() || isTech();
+      // El administrador o SST pueden leer, actualizar y eliminar cualquier ticket
+      allow read, update, delete: if request.auth != null && (getUserRole(request.auth.uid) == 'Administrador' || getUserRole(request.auth.uid) == 'SST');
     }
-
+    
+    // Reglas para la colección 'notifications'
     match /notifications/{notificationId} {
-      allow read, update, delete: if isOwner(resource.data.userId);
-      // Permitir la creación a cualquier usuario autenticado (para notificaciones del sistema)
-      allow create, list: if isSignedIn();
+        // Un usuario solo puede leer/escribir sus propias notificaciones
+        allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+        
+        // Nadie puede listar notificaciones de forma masiva
+        allow list: if false;
     }
 
+    // Reglas para la colección 'zones', 'sites', 'categories'
+    match /{collection}/{docId} where collection in ['zones', 'sites', 'categories'] {
+      // Todos los usuarios autenticados pueden leer
+      allow read: if request.auth != null;
+      
+      // Solo el administrador puede escribir
+      allow write: if request.auth != null && getUserRole(request.auth.uid) == 'Administrador';
+    }
+    
+    // Reglas para la colección 'scheduleEvents'
+    match /scheduleEvents/{eventId} {
+      // Los usuarios asignados o administradores pueden leer eventos
+      allow read: if request.auth != null && (request.auth.uid == resource.data.technicianId || getUserRole(request.auth.uid) == 'Administrador');
+      
+      // Solo el administrador puede crear, actualizar o eliminar eventos
+      allow write: if request.auth != null && getUserRole(request.auth.uid) == 'Administrador';
+    }
+    
+    // Reglas para la colección 'logs'
     match /logs/{logId} {
-      // Solo se puede leer el log si se puede leer el ticket asociado.
-      allow read: if canReadTicket(resource.data.details.ticketId);
-      allow list, create: if isSignedIn();
-      allow write: if false; // Los logs son inmutables.
+      // Solo el administrador puede leer los logs
+      allow read: if request.auth != null && getUserRole(request.auth.uid) == 'Administrador';
+      
+      // Nadie puede escribir directamente en los logs
+      allow write: if false;
     }
-
-    // --- Datos Maestros (solo Admin) ---
-    match /zones/{zoneId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-    match /sites/{siteId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-    match /categories/{categoryId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
+    
+    // Reglas para la colección 'diagnosis_logs'
     match /diagnosis_logs/{logId} {
-      allow read, write: if isSignedIn();
+        // Cualquiera puede escribir, solo para pruebas de diagnóstico
+        allow write: if true;
+        // Nadie debería poder leerlos
+        allow read: if false;
     }
   }
 }
