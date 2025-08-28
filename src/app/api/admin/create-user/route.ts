@@ -5,10 +5,11 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 
-// Esta función es ahora más robusta y verifica el rol del usuario en Firestore.
+// Esta función ahora es más robusta y verifica el rol del usuario en Firestore.
 async function assertAdmin(req: Request) {
     const { getAdminApp } = await import('@/lib/firebaseAdmin');
     const { getAuth } = await import('firebase-admin/auth');
+    const { getFirestore } = await import('firebase-admin/firestore');
 
     const idToken = req.headers.get('authorization')?.replace('Bearer ', '');
     if (!idToken) {
@@ -17,11 +18,15 @@ async function assertAdmin(req: Request) {
     
     const adminApp = getAdminApp();
     const auth = getAuth(adminApp);
+    const db = getFirestore(adminApp);
 
     const decodedToken = await auth.verifyIdToken(idToken, true); // true for check-revoked
     
-    // Verificación de rol basada en Custom Claims, que es más segura y eficiente.
-    if (decodedToken.role !== 'Administrador') {
+    // Verificación de rol basada en el documento de Firestore, no en claims.
+    const userDocRef = db.collection('users').doc(decodedToken.uid);
+    const userDocSnap = await userDocRef.get();
+
+    if (!userDocSnap.exists() || userDocSnap.data()?.role !== 'Administrador') {
         throw new Error('Forbidden: User is not an administrator.');
     }
 }
@@ -55,8 +60,8 @@ export async function POST(req: Request) {
       photoURL: avatar || undefined,
     });
     
-    // La Cloud Function `onUserCreated` se encargará de poner el custom claim del rol.
     // 4. Crear el documento del usuario en Firestore.
+    // El rol se asigna directamente aquí. La Cloud Function ya no es necesaria para esto.
     await db.collection('users').doc(userRecord.uid).set({
       id: userRecord.uid,
       uid: userRecord.uid,

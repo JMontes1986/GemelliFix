@@ -3,12 +3,11 @@
 import 'dotenv/config';
 /**
  * @fileOverview Cloud Functions for Firebase.
- * This file contains the backend logic that responds to events in Firebase,
- * such as creating or updating a user document, and performs actions like setting custom claims.
+ * Este archivo está destinado a la lógica de backend que responde a eventos de Firebase.
+ * Se ha eliminado la lógica de Custom Claims para unificar los permisos en las reglas de Firestore.
  */
 
 import { getAdminApp } from '@/lib/firebaseAdmin';
-import { getAuth } from 'firebase-admin/auth';
 import { getMessaging } from 'firebase-admin/messaging';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
@@ -17,48 +16,25 @@ import { onRequest } from 'firebase-functions/v2/https';
 const adminApp = getAdminApp();
 
 /**
- * Sets custom claims for a user based on their role in Firestore.
- * This function is triggered for both creation and updates of user documents.
- * @param {string} uid - The user's ID.
- * @param {string} role - The user's role from the Firestore document.
- */
-const setRoleClaim = async (uid: string, role: string | undefined) => {
-    if (!role) {
-        console.log(`User ${uid} has no role. Skipping claims.`);
-        return;
-    }
-    const claims: {[key: string]: any} = {
-        role: role,
-    };
-
-    try {
-        await getAuth(adminApp).setCustomUserClaims(uid, claims);
-        console.log(`Successfully set custom claims for user ${uid}:`, claims);
-    } catch (error) {
-        console.error(`Error setting custom claims for user ${uid}:`, error);
-    }
-};
-
-/**
  * Triggered when a new document is created in the 'users' collection.
- * This function reads the new user's role and sets a custom claim.
+ * La lógica de claims ha sido removida. Esta función se puede usar para otras automatizaciones,
+ * como enviar un correo de bienvenida.
  */
-export const onUserCreated = onDocumentCreated('users/{userId}', async (event) => {
+export const onUserCreated = onDocumentCreated('users/{userId}', (event) => {
     const user = event.data?.data();
     if (!user) {
         console.log('No user data found in the creation event.');
         return;
     }
-    const uid = event.params.userId;
-    const role = user.role;
-    await setRoleClaim(uid, role);
+    console.log(`New user created: ${user.email} with role ${user.role}`);
+    // Aquí se podrían añadir otras lógicas, como enviar un email de bienvenida.
 });
 
 /**
  * Triggered when a document in the 'users' collection is updated.
- * This function checks if the 'role' field has changed and updates the custom claim accordingly.
+ * La lógica de claims ha sido removida. Esta función puede usarse para auditar cambios de rol.
  */
-export const onUserUpdated = onDocumentUpdated('users/{userId}', async (event) => {
+export const onUserUpdated = onDocumentUpdated('users/{userId}', (event) => {
     const dataAfter = event.data?.after.data();
     const dataBefore = event.data?.before.data();
     
@@ -68,10 +44,8 @@ export const onUserUpdated = onDocumentUpdated('users/{userId}', async (event) =
     }
 
     if (dataAfter.role !== dataBefore.role) {
-        console.log(`Role changed for user ${event.params.userId} from ${dataBefore.role} to ${dataAfter.role}. Updating claims.`);
-        const uid = event.params.userId;
-        const newRole = dataAfter.role;
-        await setRoleClaim(uid, newRole);
+        console.log(`Role changed for user ${event.params.userId} from ${dataBefore.role} to ${dataAfter.role}.`);
+        // Aquí se podrían añadir otras lógicas, como registrar el cambio en un log de auditoría.
     }
 });
 
