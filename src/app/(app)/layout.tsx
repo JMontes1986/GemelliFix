@@ -100,7 +100,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
 
   React.useEffect(() => {
-    setIsMounted(true);
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       setIsLoadingUser(true);
   
