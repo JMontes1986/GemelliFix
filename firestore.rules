@@ -2,108 +2,105 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function userRole(uid) {
-      // This helper is safe to use in rules for OTHER collections.
-      // Avoid using it inside `match /users/{userId}` to prevent recursion.
+    // Admin por custom claims (recomendado para evitar recursión)
+    function isAdminByClaim() {
+      return isSignedIn() &&
+        (
+          request.auth.token.admin == true ||          // si configuraste un booleano admin
+          request.auth.token.role == 'Administrador'   // o un claim "role"
+        );
+    }
+
+    // SOLO para otras colecciones (no la usaremos dentro de /users)
+    function roleOf(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data.role;
     }
-    
+    function isRole(role) {
+      return isSignedIn() && roleOf(request.auth.uid) == role;
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isAdmin() {
-      return isSignedIn() && userRole(request.auth.uid) == 'Administrador';
-    }
-    
-    function isSST() {
-        return isSignedIn() && userRole(request.auth.uid) == 'SST';
-    }
-
-    function isTech() {
-        return isSignedIn() && userRole(request.auth.uid) == 'Servicios Generales';
-    }
-
-    // A helper to check another ticket's readability.
-    // Safe because it's not self-referential to the resource being read.
-    function canReadTicketById(ticketId) {
-      let ticketData = get(/databases/$(database)/documents/tickets/$(ticketId)).data;
-      let assignedIds = ticketData.assignedToIds || [];
-      return isAdmin() 
-          || isSST() 
-          || (isTech() && request.auth.uid in assignedIds)
-          || isOwner(ticketData.requesterId);
-    }
-
-    // ========= USERS (No Recursion) =========
+    // ---------- USERS ----------
     match /users/{userId} {
-      // An authenticated user can always read, create, and update their OWN profile.
-      // This is the key fix to prevent the permission denied loop on login/signup.
-      allow get, create, update: if request.auth.uid == userId;
+      // El dueño puede leer su perfil; admin (por claim) también.
+      allow get: if isOwner(userId) || isAdminByClaim();
 
-      // Only an admin can LIST all users (for the settings page).
-      allow list: if isAdmin();
-      
-      // Only an admin can delete a user.
-      allow delete: if isAdmin();
+      // Listar usuarios solo admin por claim (no uses isRole aquí para evitar recursión)
+      allow list: if isAdminByClaim();
+
+      // Crear perfil: dueño o admin por claim
+      allow create: if isOwner(userId) || isAdminByClaim();
+
+      // Actualizar: dueño o admin por claim
+      allow update: if isOwner(userId) || isAdminByClaim();
+
+      // Borrar: solo admin por claim
+      allow delete: if isAdminByClaim();
     }
 
-    // ========= TICKETS =========
+    // ---------- TICKETS ----------
+    function canReadTicket(ticketId) {
+      let t = get(/databases/$(database)/documents/tickets/$(ticketId)).data;
+      return isRole('Administrador') || isRole('SST') ||
+             (isRole('Servicios Generales') && request.auth.uid in t.assignedToIds) ||
+             (isSignedIn() && request.auth.uid == t.requesterId);
+    }
+
     match /tickets/{ticketId} {
-      // GET: Allow reading a single ticket document.
-      allow get: if canReadTicketById(ticketId);
+      // la regla de listado en la versión anterior era más segura, la restauramos
+      allow get: if canReadTicket(ticketId);
+       
+      allow list: if
+        isRole('Administrador') || isRole('SST') ||
+        (isSignedIn()
+          && request.query.where('requesterId', '==', request.auth.uid));
 
-      // LIST: Allow queries. The actual documents returned are still
-      // checked by the `get` rule, but queries must be constrained in the client.
-      allow list: if isSignedIn();
-
-      // CREATE: Any authenticated user can create a ticket.
       allow create: if isSignedIn();
-      
-      // UPDATE: Only admins or assigned technicians can update.
-      allow update: if isAdmin() || (isTech() && request.auth.uid in resource.data.get('assignedToIds', []));
+      allow update: if isRole('Administrador') ||
+                     (isRole('Servicios Generales') && request.auth.uid in resource.data.assignedToIds);
     }
 
-    // ========= SCHEDULE EVENTS =========
+    // ---------- scheduleEvents / notifications / logs / zones / sites / categories ----------
     match /scheduleEvents/{eventId} {
       allow read: if isSignedIn();
-      allow create: if isAdmin() || isTech();
-      allow update, delete: if isAdmin();
+      allow create: if isRole('Administrador') || isRole('Servicios Generales');
+      allow update, delete: if isRole('Administrador');
     }
 
-    // ========= NOTIFICATIONS =========
     match /notifications/{notificationId} {
-      // Owner can read, update, delete their own notification.
-      allow get, update, delete: if isOwner(resource.data.userId);
-      // Any signed-in user can create notifications (e.g., via backend logic).
-      // Queries must be filtered by userId on the client.
-      allow create, list: if isSignedIn();
-    }
-
-    // ========= LOGS (Audit Trail) =========
-    match /logs/{logId} {
-      // Readable if the user can read the related ticket, or is Admin/SST.
-      allow get: if isAdmin() || isSST() || (resource.data.details.ticketId != null && canReadTicketById(resource.data.details.ticketId));
-      // Queries must be filtered by the client.
-      allow list: if isSignedIn();
-      // Any authenticated user can create logs (typically via backend functions).
+      allow get, update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
       allow create: if isSignedIn();
-      // Logs are immutable.
-      allow update, delete: if false;
+      allow list: if isSignedIn() && request.query.where('userId', '==', request.auth.uid);
     }
 
-    // ========= MASTER DATA (Zones, Sites, Categories) =========
-    match /zones/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /sites/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /categories/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /logs/{logId} {
+      allow get: if canReadTicket(resource.data.details.ticketId);
+      allow list: if isSignedIn() && request.query.where('details.ticketId', '==', resource.data.details.ticketId);
+      allow create: if isSignedIn();
+      allow write: if false;
+    }
 
-    // ========= DIAGNOSIS LOGS =========
-    match /diagnosis_logs/{id} {
+    match /zones/{zoneId} {
+      allow read: if isSignedIn();
+      allow write: if isRole('Administrador');
+    }
+    match /sites/{siteId} {
+      allow read: if isSignedIn();
+      allow write: if isRole('Administrador');
+    }
+    match /categories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if isRole('Administrador');
+    }
+
+    match /diagnosis_logs/{logId} {
       allow read, write: if isSignedIn();
     }
   }
