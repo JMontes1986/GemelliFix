@@ -197,18 +197,16 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
           const created = new Date(t.createdAt);
           if (!isValid(created)) return null;
 
-          const due = new Date(t.dueDate);
-
           const closedRaw = (t.resolvedAt ? new Date(t.resolvedAt) : null) ||
                             (t.statusHistory?.['Cerrado'] ? new Date(t.statusHistory['Cerrado']) : null) ||
                             (t.statusHistory?.['Resuelto'] ? new Date(t.statusHistory['Resuelto']) : null);
           
           const closedAt = closedRaw && isValid(closedRaw) ? closedRaw : null;
           
-          return { ...t, _created: created, _due: due, _closed: closedAt };
+          return { ...t, _created: created, _closed: closedAt };
       }).filter((t): t is NonNullable<typeof t> => t !== null && isValid(t._created));
 
-      const weeks: { week: string; created: number; closed: number; overdue: number }[] = [];
+      const weeks: { week: string; created: number; closed: number; historical: number }[] = [];
       const today = new Date();
       
       for (let i = 11; i >= 0; i--) {
@@ -218,18 +216,17 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
         const created = norm.filter(t => inRange(t._created, weekStart, weekEnd)).length;
         const closed = norm.filter(t => t._closed && inRange(t._closed, weekStart, weekEnd)).length;
         
-        const overdue = norm.filter(t => {
-            if (!isValid(t._due)) return false;
-            const wasDueByThen = t._due <= weekEnd;
-            const notClosedByThen = !t._closed || t._closed > weekEnd;
-            return wasDueByThen && notClosedByThen;
+        const historical = norm.filter(t => {
+            const wasCreatedBeforeWeekEnd = t._created <= weekEnd;
+            const wasNotClosedBeforeWeekStart = !t._closed || t._closed >= weekStart;
+            return wasCreatedBeforeWeekEnd && wasNotClosedBeforeWeekStart;
         }).length;
 
         weeks.push({
           week: format(weekStart, "dd LLL", { locale: es }),
           created,
           closed,
-          overdue,
+          historical,
         });
       }
 
@@ -332,7 +329,7 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
       </div>
 
        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="md:col-span-2"><CardHeader><CardTitle className="font-headline">Tendencias de Tickets</CardTitle><CardDescription>Evolución semanal de tickets creados, cerrados y vencidos.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><RechartsLineChart data={ticketTrendsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={12} /><YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} /><Tooltip contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Legend /><RechartsLine type="monotone" dataKey="created" name="Creados" stroke="#0088FE" strokeWidth={2} /><RechartsLine type="monotone" dataKey="closed" name="Cerrados" stroke="#00C49F" strokeWidth={2} /><RechartsLine type="monotone" dataKey="overdue" name="Vencidos" stroke="#FF8042" strokeWidth={2} /></RechartsLineChart></ResponsiveContainer></CardContent></Card>
+        <Card className="md:col-span-2"><CardHeader><CardTitle className="font-headline">Tendencias de Tickets</CardTitle><CardDescription>Evolución semanal de tickets creados, cerrados y el histórico total activo.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><RechartsLineChart data={ticketTrendsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={12} /><YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} /><Tooltip contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Legend /><RechartsLine type="monotone" dataKey="created" name="Creados" stroke="#0088FE" strokeWidth={2} /><RechartsLine type="monotone" dataKey="closed" name="Cerrados" stroke="#00C49F" strokeWidth={2} /><RechartsLine type="monotone" dataKey="historical" name="Históricos" stroke="#FF8042" strokeWidth={2} /></RechartsLineChart></ResponsiveContainer></CardContent></Card>
         {currentUser?.role !== 'SST' && (<Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><TrendingUp className="h-5 w-5" />Productividad de Equipo</CardTitle><CardDescription>Tickets resueltos y tiempo promedio por técnico.</CardDescription></CardHeader><CardContent><div className="space-y-4">{productivityData.map(tech => (<div key={tech.name} className="flex items-center"><Avatar className="h-9 w-9"><AvatarImage src={tech.avatar} /><AvatarFallback>{tech.name.charAt(0)}</AvatarFallback></Avatar><div className="ml-4 space-y-1"><p className="text-sm font-medium leading-none">{tech.name}</p><p className="text-sm text-muted-foreground">{tech.resolvedCount} resueltos - {tech.avgTime}h prom.</p></div><div className="ml-auto font-medium">{tech.resolvedCount}</div></div>))}</div></CardContent></Card>)}
       </div>
 
@@ -533,3 +530,5 @@ export default function DashboardPage() {
       return <RequesterDashboard tickets={tickets} currentUser={currentUser} />;
   }
 }
+
+    
