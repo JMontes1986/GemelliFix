@@ -237,17 +237,14 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
     }, []);
     
     const ticketTrendsData = React.useMemo(() => {
-        const nonHistoricalTickets = tickets.filter(t => t.statusHistory && t.statusHistory['Abierto']);
-        return buildWeeklyTrends(nonHistoricalTickets);
+        return buildWeeklyTrends(tickets);
     }, [tickets, buildWeeklyTrends]);
 
 
     const lifecycleData = React.useMemo(() => {
-        const nonHistoricalTickets = tickets.filter(t => t.statusHistory && t.statusHistory['Abierto']);
-
         const durations = { toAssignment: [] as number[], toInProgress: [] as number[], toResolved: [] as number[] };
         
-        nonHistoricalTickets.forEach(ticket => {
+        tickets.forEach(ticket => {
           const history = ticket.statusHistory;
           if (!history) return;
           const createdAt = new Date(ticket.createdAt).getTime();
