@@ -63,7 +63,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogTrigger
+  DialogTrigger,
+  DialogFooter
 } from '@/components/ui/dialog';
 import PdfViewer from '@/components/ui/pdf-viewer';
 import { cn } from '@/lib/utils';
@@ -215,6 +216,11 @@ export default function TicketDetailPage() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [logError, setLogError] = useState<string | null>(null);
+
+  // State for Admin "Requires Approval" dialog
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+  const [approvalObservation, setApprovalObservation] = useState('');
+  const [approvalFiles, setApprovalFiles] = useState<File[]>([]);
 
 
   // State for manual assignment dialog
@@ -371,8 +377,65 @@ export default function TicketDetailPage() {
       (canEdit) 
   );
 
+  const handleStatusChange = (newStatus: Ticket['status']) => {
+    if (canEdit && newStatus === 'Requiere Aprobación') {
+        setIsApprovalDialogOpen(true);
+    } else {
+        handleUpdate('status', newStatus);
+    }
+  };
+  
+  const handleAdminRequiresApproval = async () => {
+    if (!ticket || !currentUser || !canEdit) return;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!approvalObservation.trim()) {
+        toast({
+            variant: "destructive",
+            title: "Observación Requerida",
+            description: "Debes agregar una observación para enviar a aprobación.",
+        });
+        return;
+    }
+    
+    setIsUpdating(true);
+    try {
+        let uploadedAttachments: Attachment[] = [];
+        if (approvalFiles.length > 0) {
+            toast({ title: 'Subiendo archivos...', description: 'Por favor, espera un momento.' });
+            const uploadPromises = approvalFiles.map(async (file) => {
+                const storageRef = ref(storage, `ticket-attachments/${ticket.id}/${Date.now()}-${file.name}`);
+                const snapshot = await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                return { url: downloadURL, description: file.name };
+            });
+            uploadedAttachments = await Promise.all(uploadPromises);
+        }
+
+        const docRef = doc(db, "tickets", ticket.id);
+        await updateDoc(docRef, {
+            status: 'Requiere Aprobación',
+            'statusHistory.Requiere Aprobación': new Date().toISOString(),
+            attachments: arrayUnion(...uploadedAttachments)
+        });
+        
+        await createLog(currentUser, 'update_status', { ticket, oldValue: ticket.status, newValue: 'Requiere Aprobación', comment: approvalObservation });
+        
+        // Reset and close
+        setApprovalObservation('');
+        setApprovalFiles([]);
+        setIsApprovalDialogOpen(false);
+        
+        toast({ title: 'Ticket enviado a aprobación', description: 'La observación y los archivos han sido añadidos.' });
+    } catch (uploadError: any) {
+        console.error("Error in admin requires approval flow:", uploadError);
+        toast({ variant: "destructive", title: "Error", description: `No se pudo completar la acción. ${uploadError.message}` });
+    } finally {
+        setIsUpdating(false);
+    }
+  };
+
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fileSetter: React.Dispatch<React.SetStateAction<File[]>>) => {
     if (e.target.files) {
         const newFiles = Array.from(e.target.files);
         const validFiles: File[] = [];
@@ -388,12 +451,12 @@ export default function TicketDetailPage() {
             }
             validFiles.push(file);
         }
-        setFilesToUpload(prev => [...prev, ...validFiles]);
+        fileSetter(prev => [...prev, ...validFiles]);
     }
   };
 
-  const removeFile = (indexToRemove: number) => {
-      setFilesToUpload(prev => prev.filter((_, index) => index !== indexToRemove));
+  const removeFile = (indexToRemove: number, fileSetter: React.Dispatch<React.SetStateAction<File[]>>) => {
+      fileSetter(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
 
@@ -754,7 +817,7 @@ export default function TicketDetailPage() {
                     <strong>Estado:</strong>
                      <div className="flex items-center gap-1">
                         {(canEdit || isAssignedToCurrentUser) ? (
-                            <Select value={ticket.status} onValueChange={(value) => handleUpdate('status', value)} disabled={isUpdating || isSST}>
+                            <Select value={ticket.status} onValueChange={(value) => handleStatusChange(value as Ticket['status'])} disabled={isUpdating || isSST}>
                                 <SelectTrigger className="w-[150px] h-8 text-xs">
                                     <SelectValue placeholder="Cambiar estado" />
                                 </SelectTrigger>
@@ -1050,7 +1113,7 @@ export default function TicketDetailPage() {
                                     <div className="flex text-sm text-muted-foreground">
                                         <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-ring">
                                             <span>Sube tus archivos</span>
-                                            <input id="file-upload" name="file-upload" type="file" className="sr-only" multiple onChange={handleFileChange} accept={ACCEPTED_FILE_TYPES.join(',')} />
+                                            <input id="file-upload" name="file-upload" type="file" className="sr-only" multiple onChange={(e) => handleFileChange(e, setFilesToUpload)} accept={ACCEPTED_FILE_TYPES.join(',')} />
                                         </label>
                                         <p className="pl-1">o arrastra y suelta</p>
                                     </div>
@@ -1067,7 +1130,7 @@ export default function TicketDetailPage() {
                                                     <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                                     <span className="text-sm truncate" title={file.name}>{file.name}</span>
                                                 </div>
-                                                <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index)} className="flex-shrink-0 h-6 w-6">
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index, setFilesToUpload)} className="flex-shrink-0 h-6 w-6">
                                                     <XIcon className="h-4 w-4" />
                                                 </Button>
                                             </li>
@@ -1129,8 +1192,75 @@ export default function TicketDetailPage() {
                 </div>
             </CardContent>
         </Card>
+        
+        {/* Admin "Requires Approval" Dialog */}
+        <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Observaciones para Aprobación</DialogTitle>
+                    <DialogDescription>
+                        Añade un comentario y adjunta archivos (opcional) para documentar por qué este ticket requiere una nueva aprobación.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="approval-observation">Observación</Label>
+                        <Textarea 
+                            id="approval-observation" 
+                            placeholder="Ej: Se requiere revisión adicional del trabajo realizado..."
+                            value={approvalObservation}
+                            onChange={(e) => setApprovalObservation(e.target.value)}
+                            className="min-h-[100px]"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                         <Label htmlFor="approval-files">Adjuntar Archivos (Opcional)</Label>
+                         <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md">
+                            <div className="space-y-1 text-center">
+                                <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <div className="flex text-sm text-muted-foreground">
+                                    <label htmlFor="approval-file-upload" className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-ring">
+                                        <span>Sube tus archivos</span>
+                                        <input id="approval-file-upload" name="approval-file-upload" type="file" className="sr-only" multiple onChange={(e) => handleFileChange(e, setApprovalFiles)} accept={ACCEPTED_FILE_TYPES.join(',')} />
+                                    </label>
+                                    <p className="pl-1">o arrastra y suelta</p>
+                                </div>
+                                <p className="text-xs text-muted-foreground">Imágenes, videos o PDF, hasta 10MB</p>
+                            </div>
+                        </div>
+                        {approvalFiles.length > 0 && (
+                            <div className="mt-4 space-y-2">
+                                <p className="text-sm font-medium">Archivos para subir:</p>
+                                <ul className="space-y-2">
+                                    {approvalFiles.map((file, index) => (
+                                        <li key={index} className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                                            <div className="flex items-center gap-2 truncate">
+                                                <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                                <span className="text-sm truncate" title={file.name}>{file.name}</span>
+                                            </div>
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index, setApprovalFiles)} className="flex-shrink-0 h-6 w-6">
+                                                <XIcon className="h-4 w-4" />
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsApprovalDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleAdminRequiresApproval} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Enviar a Aprobación
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
 
       </div>
     </div>
   );
 }
+
