@@ -78,7 +78,7 @@ export default function CreateTicketPage() {
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [currentUser, setCurrentUser] = React.useState<FirebaseUser | null>(null);
 
-  const isAdmin = currentUser?.email === 'sistemas@colgemelli.edu.co';
+  const [isAdmin, setIsAdmin] = React.useState(false);
   
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketSchema),
@@ -102,9 +102,15 @@ export default function CreateTicketPage() {
   const ticketDescription = form.watch('description');
 
   React.useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(user => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
         setCurrentUser(user);
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+            const userData = userDocSnap.data() as User;
+            setIsAdmin(userData.role === 'Administrador' || user.email === 'sistemas@colgemelli.edu.co');
+        }
         setIsAuthLoading(false);
       } else {
         router.push('/login');
@@ -253,11 +259,7 @@ export default function CreateTicketPage() {
           case 'Baja': dueDate.setHours(dueDate.getHours() + 48); break;
       }
       
-      const status = (isAdmin && data.historicalClosedAt) ? 'Cerrado' : 'Abierto';
-      const resolvedAt = (isAdmin && data.historicalClosedAt) ? new Date(data.historicalClosedAt) : undefined;
-
-
-      const newTicketData: Omit<Ticket, 'id'> = {
+      const newTicketData: Omit<Ticket, 'id'> & { [key: string]: any } = {
         code: ticketCode,
         title: data.title,
         description: data.description,
@@ -265,28 +267,35 @@ export default function CreateTicketPage() {
         site: siteName || 'Desconocido',
         priority: data.priority,
         category: data.category,
-        status: status,
+        status: (isAdmin && data.historicalClosedAt) ? 'Cerrado' : 'Abierto',
         requester: requesterName,
         requesterId: currentUser.uid,
         assignedTo: [],
         assignedToIds: [],
-        createdAt: createdAt.toISOString(),
-        dueDate: dueDate.toISOString(),
-        resolvedAt: resolvedAt?.toISOString(),
+        createdAt: createdAt, // Store as Date object for Firestore
+        dueDate: dueDate,   // Store as Date object
         attachments: attachmentUrls,
       };
 
-      const docRef = await addDoc(collection(db, 'tickets'), {
-          ...newTicketData,
-          createdAt: createdAt, // Use specific date for historical
-          dueDate: dueDate,
-          resolvedAt: resolvedAt
-      });
+      if (isAdmin && data.historicalClosedAt) {
+          newTicketData.resolvedAt = new Date(data.historicalClosedAt);
+          newTicketData.statusHistory = { 'Cerrado': newTicketData.resolvedAt.toISOString() };
+      }
 
-      const newTicketForLog = { id: docRef.id, ...newTicketData };
+
+      const docRef = await addDoc(collection(db, 'tickets'), newTicketData);
+
+      const newTicketForLog: Ticket = { 
+        id: docRef.id, 
+        ...newTicketData,
+        createdAt: newTicketData.createdAt.toISOString(),
+        dueDate: newTicketData.dueDate.toISOString(),
+        resolvedAt: newTicketData.resolvedAt?.toISOString(),
+      };
+
       await createLog(userObject, 'create_ticket', { ticket: newTicketForLog });
       
-      if (status === 'Cerrado' && data.closingObservation) {
+      if (newTicketData.status === 'Cerrado' && data.closingObservation) {
         await createLog(userObject, 'add_comment', { ticket: newTicketForLog, comment: `Observación de Cierre: ${data.closingObservation}` });
       }
 
