@@ -1,3 +1,4 @@
+
 // src/app/api/admin/create-user/route.ts
 import { NextResponse } from 'next/server';
 import { getAdminAuth, getAdminFirestore } from '@/lib/firebaseAdmin';

@@ -90,34 +90,46 @@ export default function ProfilePage() {
     let newAvatarUrl = currentUser.avatar;
 
     try {
+        // Step 1: Upload new avatar if it exists
         if (avatarFile) {
             toast({ title: 'Subiendo nueva imagen...', description: 'Por favor espera.'});
-            const avatarRef = ref(storage, `avatars/${firebaseUser.uid}/${avatarFile.name}`);
+            const avatarRef = ref(storage, `avatars/${firebaseUser.uid}/${Date.now()}-${avatarFile.name}`);
             const uploadResult = await uploadBytes(avatarRef, avatarFile);
             newAvatarUrl = await getDownloadURL(uploadResult.ref);
         }
 
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        
-        const updates: Partial<User> = {};
-        if (name !== currentUser.name) updates.name = name;
-        if (newAvatarUrl !== currentUser.avatar) updates.avatar = newAvatarUrl;
+        // Step 2: Prepare updates for Firestore and Auth
+        const firestoreUpdates: Partial<User> = {};
+        const authUpdates: { displayName?: string, photoURL?: string } = {};
 
-        if (Object.keys(updates).length > 0) {
-            await updateDoc(userDocRef, updates);
+        if (name !== currentUser.name) {
+            firestoreUpdates.name = name;
+            authUpdates.displayName = name;
+        }
+        if (newAvatarUrl !== currentUser.avatar) {
+            firestoreUpdates.avatar = newAvatarUrl;
+            authUpdates.photoURL = newAvatarUrl;
         }
 
-        if (name !== firebaseUser.displayName || newAvatarUrl !== firebaseUser.photoURL) {
-            await updateProfile(firebaseUser, {
-                displayName: name,
-                photoURL: newAvatarUrl,
-            });
+        // Step 3: Execute updates if there are any changes
+        if (Object.keys(firestoreUpdates).length > 0) {
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            await updateDoc(userDocRef, firestoreUpdates);
+        }
+
+        if (Object.keys(authUpdates).length > 0) {
+            await updateProfile(firebaseUser, authUpdates);
         }
         
         // Note: Password change requires re-authentication and is a more complex flow.
         // This example focuses on profile data update. We will skip password change for now.
+        
+        if (Object.keys(firestoreUpdates).length > 0 || Object.keys(authUpdates).length > 0) {
+            toast({ title: '¡Perfil Actualizado!', description: 'Tus cambios han sido guardados.' });
+        } else {
+            toast({ title: 'Sin cambios', description: 'No se ha modificado ningún dato.' });
+        }
 
-        toast({ title: '¡Perfil Actualizado!', description: 'Tus cambios han sido guardados.' });
         setAvatarFile(null);
         setAvatarPreview(null);
         setNewPassword('');
