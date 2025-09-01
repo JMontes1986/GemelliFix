@@ -17,6 +17,7 @@ export async function createLog(
     newValue?: any;
     comment?: string;
     requisitionId?: string;
+    pendingTask?: string;
   } = {}
 ) {
   if (!user) return;
@@ -35,6 +36,9 @@ export async function createLog(
     }
     if (details.requisitionId) {
         logDetails.requisitionId = details.requisitionId;
+    }
+    if (details.pendingTask) {
+        logDetails.pendingTask = details.pendingTask;
     }
     if (details.oldValue !== undefined) {
       logDetails.oldValue = Array.isArray(details.oldValue)

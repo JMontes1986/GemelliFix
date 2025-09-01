@@ -57,6 +57,7 @@ export type Ticket = {
   satisfactionRating?: number;
   satisfactionComment?: string;
   satisfactionSurveyCompleted?: boolean;
+  pendingTask?: string; // Tarea pendiente al cerrar
 };
 
 export type Technician = {
@@ -108,7 +109,7 @@ export type Log = {
     id: string;
     userEmail: string;
     userName: string;
-    action: 'login' | 'create_ticket' | 'update_status' | 'update_priority' | 'update_assignment' | 'add_comment';
+    action: 'login' | 'create_ticket' | 'update_status' | 'update_priority' | 'update_assignment' | 'add_comment' | 'close_with_task';
     timestamp: any;
     details: {
         ticketId?: string;
@@ -118,6 +119,7 @@ export type Log = {
         newValue?: any;
         comment?: string;
         requisitionId?: string;
+        pendingTask?: string;
     }
 }
     
@@ -128,10 +130,3 @@ export type Log = {
     
 
     
-
-
-
-
-
-
-

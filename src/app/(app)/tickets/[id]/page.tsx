@@ -46,6 +46,7 @@ import {
   AlertCircle,
   Star,
   FileText,
+  ClipboardList,
 } from 'lucide-react';
 import type { Ticket, User as CurrentUser, Attachment, Log, Category, Requisition } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -123,6 +124,7 @@ const LogIcon = ({ action }: { action: Log['action'] }) => {
     switch (action) {
         case 'create_ticket': return <CheckCircle className="w-5 h-5 text-green-500" />;
         case 'update_status': return <PenSquare className="w-5 h-5 text-yellow-500" />;
+        case 'close_with_task': return <ClipboardList className="w-5 h-5 text-green-500" />;
         case 'update_assignment': return <ArrowRight className="w-5 h-5 text-blue-500" />;
         case 'add_comment': return <MessageSquare className="w-5 h-5 text-gray-500" />;
         default: return <LogIn className="w-5 h-5 text-gray-400" />;
@@ -142,6 +144,8 @@ const renderLogDescription = (log: Log) => {
                 return <>{userName} actualizó el estado a <strong>'Requiere Aprobación'</strong> adjuntando la requisición <Link href={`/requisitions/${details.requisitionId}`} className="text-primary hover:underline">{details.requisitionId.substring(0, 8)}...</Link>.</>;
             }
             return <>{userName} actualizó el estado de '{details.oldValue}' a <strong>'{details.newValue}'</strong>.</>;
+        case 'close_with_task':
+            return <>{userName} cerró el ticket con una tarea pendiente.</>
         case 'update_priority':
             return <>{userName} actualizó la prioridad de '{details.oldValue}' a <strong>'{details.newValue}'</strong>.</>;
         case 'update_assignment':
@@ -227,6 +231,10 @@ export default function TicketDetailPage() {
   const [approvalFiles, setApprovalFiles] = useState<File[]>([]);
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
   const [selectedRequisitionId, setSelectedRequisitionId] = useState<string>('');
+
+  // State for Admin "Close Ticket" dialog
+  const [isCloseTicketDialogOpen, setIsCloseTicketDialogOpen] = useState(false);
+  const [closingObservation, setClosingObservation] = useState('');
 
 
   // State for manual assignment dialog
@@ -326,6 +334,7 @@ export default function TicketDetailPage() {
                 satisfactionRating: data.satisfactionRating,
                 satisfactionComment: data.satisfactionComment,
                 satisfactionSurveyCompleted: data.satisfactionSurveyCompleted,
+                pendingTask: data.pendingTask,
             };
             setTicket(ticketData);
             setSelectedPersonnelIds(ticketData.assignedToIds || []);
@@ -391,8 +400,12 @@ export default function TicketDetailPage() {
   );
 
   const handleStatusChange = (newStatus: Ticket['status']) => {
-    if (canEdit && newStatus === 'Requiere Aprobación') {
+    if (!canEdit) return;
+
+    if (newStatus === 'Requiere Aprobación') {
         setIsApprovalDialogOpen(true);
+    } else if (newStatus === 'Cerrado') {
+        setIsCloseTicketDialogOpen(true);
     } else {
         handleUpdate('status', newStatus);
     }
@@ -684,26 +697,52 @@ export default function TicketDetailPage() {
   }
 
   const handleApproval = async (approve: boolean) => {
-    if (!ticket || !currentUser || (currentUser.role !== 'Administrador' && !isSST)) return;
-    if (isSST) {
-      toast({ variant: 'destructive', title: 'Acción no permitida', description: 'El rol SST no puede modificar tickets.'});
-      return;
-    }
+    if (!ticket || !currentUser || !canEdit) return;
     
-    const newStatus = approve ? 'Cerrado' : 'Asignado'; // Si se rechaza, vuelve a 'Asignado'
-    const updates: any = { status: newStatus };
     if (approve) {
-        updates.resolvedAt = new Date().toISOString();
-        const statusKey = `statusHistory.${newStatus}`;
-        updates[statusKey] = updates.resolvedAt;
+        setIsCloseTicketDialogOpen(true);
+    } else {
+        await handleUpdate('status', 'Asignado', `Ticket rechazado por ${currentUser.name}.`);
+        toast({
+            title: `Ticket Rechazado`,
+            description: 'La solicitud ha sido devuelta al personal asignado.'
+        });
     }
-    
-    await handleUpdate('multiple', updates, `Ticket ${approve ? 'aprobado' : 'rechazado'} por ${currentUser.name}.`);
+  };
 
-    toast({
-        title: `Ticket ${approve ? 'Aprobado y Cerrado' : 'Rechazado'}`,
-        description: approve ? 'La solicitud ha sido marcada como cerrada.' : 'La solicitud ha sido devuelta al personal asignado.'
-    });
+  const handleCloseTicket = async () => {
+    if (!ticket || !currentUser || !canEdit) return;
+    setIsUpdating(true);
+
+    const updates: any = { 
+        status: 'Cerrado',
+        resolvedAt: new Date().toISOString(),
+        'statusHistory.Cerrado': new Date().toISOString()
+    };
+    if (closingObservation.trim()) {
+        updates.pendingTask = closingObservation.trim();
+    }
+
+    try {
+        const docRef = doc(db, 'tickets', ticket.id);
+        await updateDoc(docRef, updates);
+
+        await createLog(
+            currentUser, 
+            closingObservation.trim() ? 'close_with_task' : 'update_status', 
+            { ticket, oldValue: ticket.status, newValue: 'Cerrado', pendingTask: closingObservation.trim() }
+        );
+        
+        toast({ title: 'Ticket Aprobado y Cerrado', description: 'La solicitud ha sido marcada como cerrada.' });
+        setIsCloseTicketDialogOpen(false);
+        setClosingObservation('');
+
+    } catch (error) {
+        console.error("Error closing ticket:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cerrar el ticket.' });
+    } finally {
+        setIsUpdating(false);
+    }
   };
 
   const handleSatisfactionSubmit = async () => {
@@ -830,7 +869,7 @@ export default function TicketDetailPage() {
                     <Tag className="w-4 h-4 text-muted-foreground" />
                     <strong>Estado:</strong>
                      <div className="flex items-center gap-1">
-                        {(canEdit || isAssignedToCurrentUser) ? (
+                        {(canEdit) ? (
                             <Select value={ticket.status} onValueChange={(value) => handleStatusChange(value as Ticket['status'])} disabled={isUpdating || isSST}>
                                 <SelectTrigger className="w-[150px] h-8 text-xs">
                                     <SelectValue placeholder="Cambiar estado" />
@@ -896,6 +935,17 @@ export default function TicketDetailPage() {
                     </div>
                 </>
              )}
+            {ticket.pendingTask && (
+                <>
+                <Separator />
+                <div>
+                    <h3 className="font-semibold mb-2 text-primary flex items-center gap-2"><ClipboardList className="w-4 h-4"/> Tarea Pendiente</h3>
+                    <blockquote className="border-l-2 pl-4 italic text-muted-foreground">
+                        {ticket.pendingTask}
+                    </blockquote>
+                </div>
+                </>
+            )}
           </CardContent>
         </Card>
 
@@ -1194,6 +1244,11 @@ export default function TicketDetailPage() {
                                             "{log.details.comment}"
                                         </blockquote>
                                     )}
+                                    {log.details.pendingTask && (
+                                        <blockquote className="mt-1 pl-3 border-l-2 border-border italic text-primary-foreground bg-primary/10 p-2 rounded-md">
+                                            <strong>Tarea Pendiente:</strong> "{log.details.pendingTask}"
+                                        </blockquote>
+                                    )}
                                     <p className="text-xs text-muted-foreground mt-1">
                                         <ClientFormattedDate date={log.timestamp?.toDate()} options={{ dateStyle: 'medium', timeStyle: 'short' }} />
                                     </p>
@@ -1282,6 +1337,37 @@ export default function TicketDetailPage() {
                     <Button onClick={handleAdminRequiresApproval} disabled={isUpdating}>
                         {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Enviar a Aprobación
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        {/* Admin "Close Ticket" Dialog */}
+        <Dialog open={isCloseTicketDialogOpen} onOpenChange={setIsCloseTicketDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Cerrar Ticket y Finalizar</DialogTitle>
+                    <DialogDescription>
+                        Confirma el cierre de este ticket. Puedes añadir una observación final o una tarea pendiente si es necesario.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="closing-observation">Observación Final o Tarea Pendiente (Opcional)</Label>
+                        <Textarea 
+                            id="closing-observation" 
+                            placeholder="Ej: Se cambió el bombillo, pero se debe revisar el cableado en el próximo mantenimiento preventivo."
+                            value={closingObservation}
+                            onChange={(e) => setClosingObservation(e.target.value)}
+                            className="min-h-[100px]"
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsCloseTicketDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleCloseTicket} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Confirmar Cierre
                     </Button>
                 </DialogFooter>
             </DialogContent>
