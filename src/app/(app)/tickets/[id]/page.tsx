@@ -141,7 +141,7 @@ const renderLogDescription = (log: Log) => {
             return <>{userName} creó el ticket.</>;
         case 'update_status':
              if (details.requisitionId) {
-                return <>{userName} actualizó el estado a <strong>'Requiere Aprobación'</strong> adjuntando la requisición <Link href={`/requisitions/${details.requisitionId}`} className="text-primary hover:underline">{details.requisitionId.substring(0, 8)}...</Link>.</>;
+                return <>{userName} actualizó el estado a <strong>'Requiere Aprobación'</strong> adjuntando la requisición <Link href={`/requisitions`} className="text-primary hover:underline">{details.requisitionId}</Link>.</>;
             }
             return <>{userName} actualizó el estado de '{details.oldValue}' a <strong>'{details.newValue}'</strong>.</>;
         case 'close_with_task':
@@ -413,15 +413,6 @@ export default function TicketDetailPage() {
   
   const handleAdminRequiresApproval = async () => {
     if (!ticket || !currentUser || !canEdit) return;
-
-    if (!approvalObservation.trim()) {
-        toast({
-            variant: "destructive",
-            title: "Observación Requerida",
-            description: "Debes agregar una observación para enviar a aprobación.",
-        });
-        return;
-    }
     
     setIsUpdating(true);
     try {
@@ -444,7 +435,13 @@ export default function TicketDetailPage() {
             attachments: arrayUnion(...uploadedAttachments)
         });
         
-        await createLog(currentUser, 'update_status', { ticket, oldValue: ticket.status, newValue: 'Requiere Aprobación', comment: approvalObservation, requisitionId: selectedRequisitionId });
+        await createLog(currentUser, 'update_status', { 
+            ticket, 
+            oldValue: ticket.status, 
+            newValue: 'Requiere Aprobación', 
+            comment: approvalObservation, 
+            requisitionId: selectedRequisitionId 
+        });
         
         // Reset and close
         setApprovalObservation('');
@@ -1290,8 +1287,8 @@ export default function TicketDetailPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 {requisitions.map((req) => (
-                                    <SelectItem key={req.id} value={req.id}>
-                                        {req.requisitionNumber} - {req.description.substring(0, 50)}...
+                                    <SelectItem key={req.id} value={req.requisitionNumber}>
+                                        {req.requisitionNumber} - {req.items[0]?.product.substring(0, 40)}...
                                     </SelectItem>
                                 ))}
                             </SelectContent>

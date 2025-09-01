@@ -36,7 +36,7 @@ export type Ticket = {
   id: string;
   code: string;
   title: string;
-  description: string;
+  description:string;
   zone: string;
   site: string;
   category: string;
@@ -92,14 +92,21 @@ export type ScheduleEvent = {
   recurrenceId?: string;
 };
 
+export type RequisitionItem = {
+    quantity: number;
+    product: string;
+    description: string;
+}
+
 export type Requisition = {
   id: string;
   requisitionNumber: string; // e.g., REQ-2024-001
   requesterName: string;
   requesterId: string;
+  requesterPosition: string; // Cargo
+  department: string; // Dependencia
   requestDate: any;
-  costCenter: string;
-  description: string;
+  items: RequisitionItem[];
   attachments: Attachment[];
   createdAt: any;
 };

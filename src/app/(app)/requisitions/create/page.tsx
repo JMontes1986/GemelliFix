@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
@@ -12,6 +12,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,7 +30,7 @@ import { db, storage, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UploadCloud, File as FileIcon, X, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, UploadCloud, File as FileIcon, X, Calendar as CalendarIcon, PlusCircle, Trash2 } from 'lucide-react';
 import type { User, Attachment } from '@/lib/types';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -37,18 +38,26 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
 
+const requisitionItemSchema = z.object({
+  quantity: z.coerce.number().min(1, 'La cantidad debe ser al menos 1.'),
+  product: z.string().min(1, 'El producto es requerido.'),
+  description: z.string().min(1, 'La descripción es requerida.'),
+});
+
 const requisitionSchema = z.object({
   requesterName: z.string().min(1, 'El nombre del solicitante es requerido.'),
+  requesterPosition: z.string().min(1, 'El cargo es requerido.'),
+  department: z.string().min(1, 'La dependencia es requerida.'),
   requestDate: z.date({
     required_error: "La fecha de solicitud es requerida.",
   }),
-  costCenter: z.string().min(1, 'El centro de costos es requerido.'),
-  description: z.string().min(1, 'La descripción del servicio es requerida.'),
+  items: z.array(requisitionItemSchema).min(1, 'Debes añadir al menos un producto a la requisición.'),
   attachments: z.any().optional(),
 });
 
@@ -84,12 +93,18 @@ export default function CreateRequisitionPage() {
     resolver: zodResolver(requisitionSchema),
     defaultValues: {
       requesterName: '',
-      costCenter: '',
-      description: '',
+      requesterPosition: '',
+      department: '',
+      items: [{ quantity: 1, product: '', description: '' }],
       attachments: [],
     },
   });
   
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "items"
+  });
+
   const attachedFiles = form.watch('attachments') || [];
 
   const onSubmit = async (data: RequisitionFormValues) => {
@@ -143,14 +158,14 @@ export default function CreateRequisitionPage() {
       const newRequisitionData = {
         requisitionNumber,
         requesterName: data.requesterName,
+        requesterPosition: data.requesterPosition,
+        department: data.department,
         requesterId: userObject.id,
         requestDate: data.requestDate,
-        costCenter: data.costCenter,
-        description: data.description,
+        items: data.items,
         attachments: attachmentUrls,
         createdAt: serverTimestamp(),
       };
-
 
       await addDoc(collection(db, 'requisitions'), newRequisitionData);
 
@@ -209,23 +224,51 @@ export default function CreateRequisitionPage() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <FormField
                     control={form.control}
                     name="requesterName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Solicitante</FormLabel>
+                        <FormLabel>Nombre Solicitante</FormLabel>
                         <FormControl>
-                          <Input placeholder="Nombre de quien solicita" {...field} />
+                          <Input placeholder="Ej: Julián Andrés Montes" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <FormField
+                    control={form.control}
+                    name="requesterPosition"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cargo</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ej: Coordinador Servicios Generales" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="department"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Dependencia</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ej: Mantenimiento" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+              </div>
+
+               <FormField
                     control={form.control}
                     name="requestDate"
                     render={({ field }) => (
@@ -237,7 +280,7 @@ export default function CreateRequisitionPage() {
                                 <Button
                                 variant={"outline"}
                                 className={cn(
-                                    "pl-3 text-left font-normal",
+                                    "w-[240px] pl-3 text-left font-normal",
                                     !field.value && "text-muted-foreground"
                                 )}
                                 >
@@ -265,40 +308,71 @@ export default function CreateRequisitionPage() {
                         <FormMessage />
                         </FormItem>
                     )}
-                    />
-              </div>
+                />
 
-               <FormField
-                control={form.control}
-                name="costCenter"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Centro de Costos</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ej: Mantenimiento General, Sistemas, etc." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descripción del Servicio o Insumo Requerido</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Detallar el servicio, compra o trabajo a realizar."
-                        className="min-h-[120px]"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <div>
+                    <FormLabel>Productos o Servicios</FormLabel>
+                    <div className="mt-2 border rounded-md">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[80px]">Cant.</TableHead>
+                            <TableHead>Producto</TableHead>
+                            <TableHead>Descripción</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {fields.map((item, index) => (
+                            <TableRow key={item.id}>
+                              <TableCell>
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.quantity`}
+                                  render={({ field }) => <Input type="number" {...field} />}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.product`}
+                                  render={({ field }) => <Input {...field} />}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.description`}
+                                  render={({ field }) => <Input {...field} />}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => remove(index)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => append({ quantity: 1, product: '', description: '' })}
+                    >
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Añadir Producto
+                    </Button>
+                     <FormMessage>{form.formState.errors.items?.root?.message}</FormMessage>
+                </div>
               
               <FormField
                 control={form.control}
@@ -344,12 +418,12 @@ export default function CreateRequisitionPage() {
                 )}
               />
 
-              <div className="flex justify-end pt-4">
+             <CardFooter className="flex justify-end pt-4 px-0">
                 <Button type="submit" disabled={isLoading || isAuthLoading}>
                    {(isLoading || isAuthLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                    {isAuthLoading ? 'Verificando...' : 'Guardar Requisición'}
                 </Button>
-              </div>
+              </CardFooter>
             </form>
           </Form>
         </CardContent>

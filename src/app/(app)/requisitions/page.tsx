@@ -7,11 +7,12 @@ import { db, auth } from '@/lib/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Loader2, FileText } from 'lucide-react';
+import { Loader2, FileText, Package } from 'lucide-react';
 import type { Requisition } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
 
 export default function RequisitionsListPage() {
   const router = useRouter();
@@ -75,8 +76,8 @@ export default function RequisitionsListPage() {
               <TableHead>Número</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead>Solicitante</TableHead>
-              <TableHead>Descripción</TableHead>
-              <TableHead>Centro de Costo</TableHead>
+              <TableHead>Dependencia</TableHead>
+              <TableHead className="text-center">Ítems</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -95,8 +96,13 @@ export default function RequisitionsListPage() {
                   <ClientFormattedDate date={req.requestDate.toDate()} options={{ day: 'numeric', month: 'long', year: 'numeric' }} />
                 </TableCell>
                 <TableCell>{req.requesterName}</TableCell>
-                <TableCell className="max-w-[400px] truncate">{req.description}</TableCell>
-                <TableCell>{req.costCenter}</TableCell>
+                <TableCell>{req.department}</TableCell>
+                 <TableCell className="text-center">
+                    <Badge variant="secondary">
+                        <Package className="mr-2 h-4 w-4"/>
+                        {req.items.length}
+                    </Badge>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
