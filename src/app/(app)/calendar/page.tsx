@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   Users,
   Eye,
+  ZoomIn,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -89,6 +90,7 @@ import {
     AccordionTrigger,
   } from "@/components/ui/accordion"
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 
 
 const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -113,7 +115,7 @@ const generateColorFromString = (id: string, name?: string): string => {
 };
 
 
-const EventCard = ({ event, color, onClick, onEdit, onDelete, isSelected }: { event: ScheduleEvent, color: string, onClick: () => void, onEdit: (e: React.MouseEvent) => void, onDelete: (e: React.MouseEvent) => void, isSelected: boolean }) => {
+const EventCard = ({ event, color, onClick, onEdit, onDelete, isSelected, hourHeight }: { event: ScheduleEvent, color: string, onClick: () => void, onEdit: (e: React.MouseEvent) => void, onDelete: (e: React.MouseEvent) => void, isSelected: boolean, hourHeight: number }) => {
   const eventStartDate = event.start;
   const eventEndDate = event.end;
   
@@ -126,8 +128,8 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete, isSelected }: { ev
   const totalEndMinutes = (endHour - 8) * 60 + endMinutes;
   const durationMinutes = totalEndMinutes - totalStartMinutes;
 
-  const top = Math.max(0, (totalStartMinutes / 60) * 64); 
-  const height = (durationMinutes / 60) * 64;
+  const top = Math.max(0, (totalStartMinutes / 60) * hourHeight); 
+  const height = (durationMinutes / 60) * hourHeight;
 
   const hsl = color.match(/\d+/g)?.map(Number);
   const textColor = (hsl && hsl[1] > 50 && hsl[2] > 50) ? 'black' : 'white';
@@ -345,6 +347,7 @@ export default function CalendarPage() {
     const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
     const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
+    const [hourHeight, setHourHeight] = useState(64);
 
 
     // State for manual event creation/editing dialog
@@ -830,6 +833,16 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-40">
+                <ZoomIn className="h-5 w-5 text-muted-foreground" />
+                <Slider
+                    defaultValue={[64]}
+                    min={48}
+                    max={160}
+                    step={8}
+                    onValueChange={(value) => setHourHeight(value[0])}
+                />
+            </div>
             <Tabs defaultValue="week" value={viewMode} onValueChange={(value) => setViewMode(value as any)}>
                 <TabsList>
                     <TabsTrigger value="week">Semana</TabsTrigger>
@@ -1079,7 +1092,7 @@ export default function CalendarPage() {
             <div className="border-r">
                 <div className="h-8 border-b grid grid-cols-1"></div>
                 {hours.map(hour => (
-                    <div key={hour} className="h-16 border-b text-right pr-2">
+                    <div key={hour} className="border-b text-right pr-2" style={{ height: `${hourHeight}px`}}>
                         <span className="text-xs text-muted-foreground relative -top-2">{hour}</span>
                     </div>
                 ))}
@@ -1097,7 +1110,7 @@ export default function CalendarPage() {
                   {/* Background Hour Lines */}
                   <div className="absolute inset-x-0 top-8">
                     {hours.map((_, hourIndex) => (
-                      <div key={hourIndex} className={cn("h-16", hourIndex < hours.length - 1 && 'border-b')} />
+                      <div key={hourIndex} className={cn(hourIndex < hours.length - 1 && 'border-b')} style={{ height: `${hourHeight}px`}} />
                     ))}
                   </div>
 
@@ -1118,6 +1131,7 @@ export default function CalendarPage() {
                                 onEdit={(e) => handleEditEvent(e, event)}
                                 onDelete={(e) => handleDeleteClick(e, event)}
                                 isSelected={selectedEvent?.id === event.id}
+                                hourHeight={hourHeight}
                              />
                         ))}
                       </div>
