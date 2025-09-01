@@ -7,7 +7,7 @@ import { db, auth } from '@/lib/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Loader2, FileText, Package } from 'lucide-react';
+import { Loader2, FileText, Package, Edit } from 'lucide-react';
 import type { Requisition } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
@@ -78,13 +78,14 @@ export default function RequisitionsListPage() {
               <TableHead>Solicitante</TableHead>
               <TableHead>Dependencia</TableHead>
               <TableHead className="text-center">Ítems</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {error && <TableRow><TableCell colSpan={5} className="text-center text-destructive">{error}</TableCell></TableRow>}
+            {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{error}</TableCell></TableRow>}
             {!isLoading && requisitions.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   No se han encontrado requisiciones.
                 </TableCell>
               </TableRow>
@@ -102,6 +103,14 @@ export default function RequisitionsListPage() {
                         <Package className="mr-2 h-4 w-4"/>
                         {req.items.length}
                     </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                    <Link href={`/requisitions/${req.id}/edit`}>
+                        <Button variant="outline" size="sm">
+                            <Edit className="mr-2 h-3 w-3"/>
+                            Editar
+                        </Button>
+                    </Link>
                 </TableCell>
               </TableRow>
             ))}
