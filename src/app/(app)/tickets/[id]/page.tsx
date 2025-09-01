@@ -45,8 +45,9 @@ import {
   PenSquare,
   AlertCircle,
   Star,
+  FileText,
 } from 'lucide-react';
-import type { Ticket, User as CurrentUser, Attachment, Log, Category } from '@/lib/types';
+import type { Ticket, User as CurrentUser, Attachment, Log, Category, Requisition } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AiStateSuggestion from './components/ai-state-suggestion';
 import Image from 'next/image';
@@ -137,6 +138,9 @@ const renderLogDescription = (log: Log) => {
         case 'create_ticket':
             return <>{userName} creó el ticket.</>;
         case 'update_status':
+             if (details.requisitionId) {
+                return <>{userName} actualizó el estado a <strong>'Requiere Aprobación'</strong> adjuntando la requisición <Link href={`/requisitions/${details.requisitionId}`} className="text-primary hover:underline">{details.requisitionId.substring(0, 8)}...</Link>.</>;
+            }
             return <>{userName} actualizó el estado de '{details.oldValue}' a <strong>'{details.newValue}'</strong>.</>;
         case 'update_priority':
             return <>{userName} actualizó la prioridad de '{details.oldValue}' a <strong>'{details.newValue}'</strong>.</>;
@@ -221,6 +225,8 @@ export default function TicketDetailPage() {
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [approvalObservation, setApprovalObservation] = useState('');
   const [approvalFiles, setApprovalFiles] = useState<File[]>([]);
+  const [requisitions, setRequisitions] = useState<Requisition[]>([]);
+  const [selectedRequisitionId, setSelectedRequisitionId] = useState<string>('');
 
 
   // State for manual assignment dialog
@@ -261,10 +267,17 @@ export default function TicketDetailPage() {
                         const cats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
                         setCategories(cats);
                     });
+
+                    const qRequisitions = query(collection(db, 'requisitions'), orderBy('createdAt', 'desc'));
+                    const unsubscribeRequisitions = onSnapshot(qRequisitions, (snapshot) => {
+                        const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Requisition));
+                        setRequisitions(reqs);
+                    });
                     
                     return () => {
                         unsubscribe_technicians();
                         unsubscribeCategories();
+                        unsubscribeRequisitions();
                     };
                 }
             }
@@ -418,11 +431,12 @@ export default function TicketDetailPage() {
             attachments: arrayUnion(...uploadedAttachments)
         });
         
-        await createLog(currentUser, 'update_status', { ticket, oldValue: ticket.status, newValue: 'Requiere Aprobación', comment: approvalObservation });
+        await createLog(currentUser, 'update_status', { ticket, oldValue: ticket.status, newValue: 'Requiere Aprobación', comment: approvalObservation, requisitionId: selectedRequisitionId });
         
         // Reset and close
         setApprovalObservation('');
         setApprovalFiles([]);
+        setSelectedRequisitionId('');
         setIsApprovalDialogOpen(false);
         
         toast({ title: 'Ticket enviado a aprobación', description: 'La observación y los archivos han sido añadidos.' });
@@ -1199,12 +1213,12 @@ export default function TicketDetailPage() {
                 <DialogHeader>
                     <DialogTitle>Observaciones para Aprobación</DialogTitle>
                     <DialogDescription>
-                        Añade un comentario y adjunta archivos (opcional) para documentar por qué este ticket requiere una nueva aprobación.
+                        Añade un comentario y adjunta archivos o una requisición para documentar por qué este ticket requiere una nueva aprobación.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="approval-observation">Observación</Label>
+                        <Label htmlFor="approval-observation">Observación Requerida</Label>
                         <Textarea 
                             id="approval-observation" 
                             placeholder="Ej: Se requiere revisión adicional del trabajo realizado..."
@@ -1212,6 +1226,21 @@ export default function TicketDetailPage() {
                             onChange={(e) => setApprovalObservation(e.target.value)}
                             className="min-h-[100px]"
                         />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="requisition-select">Adjuntar Requisición (Opcional)</Label>
+                        <Select onValueChange={setSelectedRequisitionId} value={selectedRequisitionId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar una requisición de servicio" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {requisitions.map((req) => (
+                                    <SelectItem key={req.id} value={req.id}>
+                                        {req.requisitionNumber} - {req.description.substring(0, 50)}...
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="space-y-2">
                          <Label htmlFor="approval-files">Adjuntar Archivos (Opcional)</Label>
@@ -1235,7 +1264,7 @@ export default function TicketDetailPage() {
                                     {approvalFiles.map((file, index) => (
                                         <li key={index} className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
                                             <div className="flex items-center gap-2 truncate">
-                                                <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                                 <span className="text-sm truncate" title={file.name}>{file.name}</span>
                                             </div>
                                             <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(index, setApprovalFiles)} className="flex-shrink-0 h-6 w-6">
@@ -1263,4 +1292,3 @@ export default function TicketDetailPage() {
     </div>
   );
 }
-

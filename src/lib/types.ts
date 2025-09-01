@@ -91,6 +91,19 @@ export type ScheduleEvent = {
   recurrenceId?: string;
 };
 
+export type Requisition = {
+  id: string;
+  requisitionNumber: string; // e.g., REQ-2024-001
+  requesterName: string;
+  requesterId: string;
+  requestDate: any;
+  costCenter: string;
+  description: string;
+  attachments: Attachment[];
+  createdAt: any;
+};
+
+
 export type Log = {
     id: string;
     userEmail: string;
@@ -104,6 +117,7 @@ export type Log = {
         oldValue?: any;
         newValue?: any;
         comment?: string;
+        requisitionId?: string;
     }
 }
     
@@ -114,6 +128,7 @@ export type Log = {
     
 
     
+
 
 
 

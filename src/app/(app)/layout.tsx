@@ -23,6 +23,7 @@ import {
   ChevronsRight,
   Sparkles,
   Star,
+  FileText,
 } from 'lucide-react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, limit, updateDoc, orderBy } from 'firebase/firestore';
@@ -161,8 +162,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, [router]);
   
-  const isActive = (path: string) => pathname === path;
-  const showFab = isMounted && pathname !== '/tickets/create';
+  const isActive = (path: string) => pathname === path || (path !== '/' && pathname.startsWith(path));
+  const showFab = isMounted && !pathname.startsWith('/tickets/create') && !pathname.startsWith('/requisitions/create');
   
   if (isLoadingUser || !currentUser) {
     return (
@@ -212,7 +213,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                isActive={isActive('/tickets') || pathname.startsWith('/tickets/')}
+                isActive={isActive('/tickets')}
                 tooltip="Solicitudes"
               >
                 <Link href="/tickets">
@@ -221,6 +222,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            {isAdmin && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive('/requisitions')}
+                  tooltip="Requisiciones"
+                >
+                  <Link href="/requisitions">
+                    <FileText />
+                    <span className="group-data-[collapsible=icon]:hidden">Requisiciones</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
             {(isAdmin || isServiceUser) && (
               <SidebarMenuItem>
                 <SidebarMenuButton

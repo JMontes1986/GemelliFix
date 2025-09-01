@@ -16,6 +16,7 @@ export async function createLog(
     oldValue?: any;
     newValue?: any;
     comment?: string;
+    requisitionId?: string;
   } = {}
 ) {
   if (!user) return;
@@ -31,6 +32,9 @@ export async function createLog(
     }
     if (details.comment) {
         logDetails.comment = details.comment;
+    }
+    if (details.requisitionId) {
+        logDetails.requisitionId = details.requisitionId;
     }
     if (details.oldValue !== undefined) {
       logDetails.oldValue = Array.isArray(details.oldValue)
