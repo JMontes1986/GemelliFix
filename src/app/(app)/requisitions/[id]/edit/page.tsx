@@ -25,9 +25,9 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { db, auth } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Calendar as CalendarIcon, PlusCircle, Trash2 } from 'lucide-react';
+import { Loader2, Calendar as CalendarIcon, PlusCircle, Trash2, CheckSquare } from 'lucide-react';
 import type { Requisition } from '@/lib/types';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -36,12 +36,15 @@ import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 const requisitionItemSchema = z.object({
   quantity: z.coerce.number().min(1, 'La cantidad debe ser al menos 1.'),
   product: z.string().min(1, 'El producto es requerido.'),
   description: z.string().min(1, 'La descripción es requerida.'),
+  authorized: z.boolean().optional(),
+  authorizedAt: z.date().optional(),
 });
 
 const requisitionSchema = z.object({
@@ -75,7 +78,7 @@ export default function EditRequisitionPage() {
     },
   });
   
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: "items"
   });
@@ -95,7 +98,10 @@ export default function EditRequisitionPage() {
             requesterPosition: data.requesterPosition,
             department: data.department,
             requestDate: data.requestDate.toDate(),
-            items: data.items,
+            items: data.items.map(item => ({
+                ...item,
+                authorizedAt: item.authorizedAt ? item.authorizedAt.toDate() : undefined,
+            })),
           });
           setRequisitionNumber(data.requisitionNumber);
         } else {
@@ -116,7 +122,16 @@ export default function EditRequisitionPage() {
     setIsLoading(true);
     try {
       const docRef = doc(db, 'requisitions', requisitionId);
-      await updateDoc(docRef, data);
+      
+      const authorizedCount = data.items.filter(item => item.authorized).length;
+      let status: Requisition['status'] = 'Pendiente';
+      if (authorizedCount === data.items.length) {
+          status = 'Aprobada';
+      } else if (authorizedCount > 0) {
+          status = 'Parcialmente Aprobada';
+      }
+
+      await updateDoc(docRef, { ...data, status });
       
       toast({
         title: '¡Requisición Actualizada!',
@@ -266,6 +281,7 @@ export default function EditRequisitionPage() {
                             <TableHead className="w-[80px]">Cant.</TableHead>
                             <TableHead>Producto</TableHead>
                             <TableHead>Descripción</TableHead>
+                            <TableHead className="w-[120px] text-center">Autorizado</TableHead>
                             <TableHead className="w-[50px]"></TableHead>
                           </TableRow>
                         </TableHeader>
@@ -293,6 +309,32 @@ export default function EditRequisitionPage() {
                                   render={({ field }) => <Input {...field} />}
                                 />
                               </TableCell>
+                              <TableCell className="text-center">
+                                 <FormField
+                                    control={form.control}
+                                    name={`items.${index}.authorized`}
+                                    render={({ field }) => (
+                                        <div className="flex flex-col items-center gap-1">
+                                            <Checkbox
+                                                checked={field.value}
+                                                onCheckedChange={(checked) => {
+                                                    field.onChange(checked);
+                                                    update(index, {
+                                                        ...item,
+                                                        authorized: !!checked,
+                                                        authorizedAt: checked ? new Date() : undefined,
+                                                    });
+                                                }}
+                                            />
+                                            {item.authorizedAt && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {format(new Date(item.authorizedAt), 'dd/MM/yy')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                    />
+                              </TableCell>
                               <TableCell>
                                 <Button
                                   type="button"
@@ -313,7 +355,7 @@ export default function EditRequisitionPage() {
                       variant="outline"
                       size="sm"
                       className="mt-2"
-                      onClick={() => append({ quantity: 1, product: '', description: '' })}
+                      onClick={() => append({ quantity: 1, product: '', description: '', authorized: false })}
                     >
                       <PlusCircle className="mr-2 h-4 w-4" />
                       Añadir Producto

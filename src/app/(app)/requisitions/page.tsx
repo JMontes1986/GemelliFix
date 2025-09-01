@@ -13,6 +13,21 @@ import { useRouter } from 'next/navigation';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
+const getStatusBadgeClass = (status: Requisition['status']) => {
+    switch (status) {
+        case 'Aprobada':
+            return 'bg-green-100 text-green-800 border-green-200';
+        case 'Parcialmente Aprobada':
+            return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        case 'Rechazada':
+            return 'bg-red-100 text-red-800 border-red-200';
+        default:
+            return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+}
+
 
 export default function RequisitionsListPage() {
   const router = useRouter();
@@ -77,15 +92,16 @@ export default function RequisitionsListPage() {
               <TableHead>Fecha</TableHead>
               <TableHead>Solicitante</TableHead>
               <TableHead>Dependencia</TableHead>
+              <TableHead>Estado</TableHead>
               <TableHead className="text-center">Ítems</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{error}</TableCell></TableRow>}
+            {error && <TableRow><TableCell colSpan={7} className="text-center text-destructive">{error}</TableCell></TableRow>}
             {!isLoading && requisitions.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   No se han encontrado requisiciones.
                 </TableCell>
               </TableRow>
@@ -98,6 +114,11 @@ export default function RequisitionsListPage() {
                 </TableCell>
                 <TableCell>{req.requesterName}</TableCell>
                 <TableCell>{req.department}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className={cn(getStatusBadgeClass(req.status))}>
+                      {req.status || 'Pendiente'}
+                  </Badge>
+                </TableCell>
                  <TableCell className="text-center">
                     <Badge variant="secondary">
                         <Package className="mr-2 h-4 w-4"/>
