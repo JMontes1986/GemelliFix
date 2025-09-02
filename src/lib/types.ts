@@ -98,6 +98,8 @@ export type RequisitionItem = {
     description: string;
     authorized?: boolean;
     authorizedAt?: any;
+    received?: boolean;
+    receivedAt?: any;
 }
 
 export type Requisition = {
@@ -111,7 +113,7 @@ export type Requisition = {
   items: RequisitionItem[];
   attachments: Attachment[];
   createdAt: any;
-  status?: 'Pendiente' | 'Parcialmente Aprobada' | 'Aprobada' | 'Rechazada';
+  status?: 'Pendiente' | 'Parcialmente Aprobada' | 'Aprobada' | 'Rechazada' | 'Completada';
 };
 
 

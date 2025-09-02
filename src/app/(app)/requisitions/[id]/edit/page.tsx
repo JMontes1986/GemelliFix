@@ -45,6 +45,8 @@ const requisitionItemSchema = z.object({
   description: z.string().min(1, 'La descripción es requerida.'),
   authorized: z.boolean().optional(),
   authorizedAt: z.date().optional().nullable(),
+  received: z.boolean().optional(),
+  receivedAt: z.date().optional().nullable(),
 });
 
 const requisitionSchema = z.object({
@@ -101,6 +103,7 @@ export default function EditRequisitionPage() {
             items: data.items.map(item => ({
                 ...item,
                 authorizedAt: item.authorizedAt ? item.authorizedAt.toDate() : null,
+                receivedAt: item.receivedAt ? item.receivedAt.toDate() : null,
             })),
           });
           setRequisitionNumber(data.requisitionNumber);
@@ -124,11 +127,19 @@ export default function EditRequisitionPage() {
       const docRef = doc(db, 'requisitions', requisitionId);
       
       const authorizedCount = data.items.filter(item => item.authorized).length;
+      const receivedCount = data.items.filter(item => item.received).length;
+      const authorizedItemsCount = data.items.filter(item => item.authorized).length;
+
       let status: Requisition['status'] = 'Pendiente';
-      if (authorizedCount === data.items.length && data.items.length > 0) {
-          status = 'Aprobada';
+      
+      if (authorizedCount === 0 && receivedCount === 0) {
+        status = 'Pendiente';
+      } else if (authorizedCount > 0 && receivedCount === authorizedItemsCount && authorizedItemsCount > 0) {
+        status = 'Completada';
+      } else if (authorizedCount === data.items.length) {
+        status = 'Aprobada';
       } else if (authorizedCount > 0) {
-          status = 'Parcialmente Aprobada';
+        status = 'Parcialmente Aprobada';
       }
       
       // Sanitize data before sending to Firestore
@@ -137,6 +148,7 @@ export default function EditRequisitionPage() {
           items: data.items.map(item => ({
               ...item,
               authorizedAt: item.authorizedAt ? Timestamp.fromDate(item.authorizedAt) : null,
+              receivedAt: item.receivedAt ? Timestamp.fromDate(item.receivedAt) : null,
           })),
           status,
       };
@@ -187,7 +199,7 @@ export default function EditRequisitionPage() {
 
   return (
     <div className="flex justify-center items-start py-8">
-      <Card className="w-full max-w-4xl">
+      <Card className="w-full max-w-5xl">
         <CardHeader>
           <CardTitle className="font-headline text-2xl">Editar Requisición de Servicio</CardTitle>
           <CardDescription>
@@ -292,6 +304,7 @@ export default function EditRequisitionPage() {
                             <TableHead>Producto</TableHead>
                             <TableHead>Descripción</TableHead>
                             <TableHead className="w-[120px] text-center">Autorizado</TableHead>
+                            <TableHead className="w-[120px] text-center">Recibido</TableHead>
                             <TableHead className="w-[50px]"></TableHead>
                           </TableRow>
                         </TableHeader>
@@ -346,6 +359,34 @@ export default function EditRequisitionPage() {
                                     )}
                                     />
                               </TableCell>
+                               <TableCell className="text-center">
+                                 <FormField
+                                    control={form.control}
+                                    name={`items.${index}.received`}
+                                    render={({ field }) => (
+                                        <div className="flex flex-col items-center gap-1">
+                                            <Checkbox
+                                                checked={field.value}
+                                                disabled={!form.watch(`items.${index}.authorized`)}
+                                                onCheckedChange={(checked) => {
+                                                    const isChecked = !!checked;
+                                                    const currentItem = form.getValues(`items.${index}`);
+                                                    update(index, {
+                                                        ...currentItem,
+                                                        received: isChecked,
+                                                        receivedAt: isChecked ? new Date() : null,
+                                                    });
+                                                }}
+                                            />
+                                            {form.watch(`items.${index}.receivedAt`) && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {format(new Date(form.watch(`items.${index}.receivedAt`)), 'dd/MM/yy')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                    />
+                              </TableCell>
                               <TableCell>
                                 <Button
                                   type="button"
@@ -366,7 +407,7 @@ export default function EditRequisitionPage() {
                       variant="outline"
                       size="sm"
                       className="mt-2"
-                      onClick={() => append({ quantity: 1, product: '', description: '', authorized: false, authorizedAt: null })}
+                      onClick={() => append({ quantity: 1, product: '', description: '', authorized: false, authorizedAt: null, received: false, receivedAt: null })}
                     >
                       <PlusCircle className="mr-2 h-4 w-4" />
                       Añadir Producto

@@ -162,9 +162,10 @@ export default function CreateRequisitionPage() {
         department: data.department,
         requesterId: userObject.id,
         requestDate: data.requestDate,
-        items: data.items,
+        items: data.items.map(item => ({ ...item, authorized: false, authorizedAt: null, received: false, receivedAt: null })),
         attachments: attachmentUrls,
         createdAt: serverTimestamp(),
+        status: 'Pendiente',
       };
 
       await addDoc(collection(db, 'requisitions'), newRequisitionData);

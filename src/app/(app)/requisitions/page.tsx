@@ -19,6 +19,8 @@ import { useToast } from '@/hooks/use-toast';
 const getStatusBadgeClass = (status: Requisition['status']) => {
     switch (status) {
         case 'Aprobada':
+            return 'bg-blue-100 text-blue-800 border-blue-200';
+        case 'Completada':
             return 'bg-green-100 text-green-800 border-green-200';
         case 'Parcialmente Aprobada':
             return 'bg-yellow-100 text-yellow-800 border-yellow-200';
@@ -73,7 +75,8 @@ export default function RequisitionsListPage() {
 
     const headers = [
         "Numero Requisicion", "Fecha Solicitud", "Solicitante", "Cargo", "Dependencia", 
-        "Estado", "Item Cantidad", "Item Producto", "Item Descripcion", "Item Autorizado", "Item Fecha Autorizacion"
+        "Estado", "Item Cantidad", "Item Producto", "Item Descripcion", 
+        "Item Autorizado", "Item Fecha Autorizacion", "Item Recibido", "Item Fecha Recepcion"
     ];
     
     const sanitizeForCsv = (value: any) => {
@@ -100,6 +103,8 @@ export default function RequisitionsListPage() {
                 sanitizeForCsv(item.description),
                 sanitizeForCsv(item.authorized ? 'Si' : 'No'),
                 sanitizeForCsv(item.authorizedAt ? new Date(item.authorizedAt.toDate()).toLocaleDateString('es-CO') : ''),
+                sanitizeForCsv(item.received ? 'Si' : 'No'),
+                sanitizeForCsv(item.receivedAt ? new Date(item.receivedAt.toDate()).toLocaleDateString('es-CO') : ''),
             ].join(',');
             rows.push(row);
         });
