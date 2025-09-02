@@ -305,7 +305,18 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
     setIsLoadingAnalysis(true);
     setAnalysisResult(null);
     try {
-        const result = await analyzeDashboardData({ openTickets, overdueTickets, slaCompliance, averageResolutionTimeHours: mttrHours });
+        const input: AnalyzeDashboardInput = {
+            openTickets,
+            overdueTickets,
+            slaCompliance,
+            averageResolutionTimeHours: mttrHours,
+            ticketsByZone: ticketsByZoneData,
+            topRequesters: topRequestersData,
+            popularCategories: ticketsByCategoryData,
+            ticketsByMonth: ticketsByMonthData,
+            averageTimePerStage: lifecycleData,
+        };
+        const result = await analyzeDashboardData(input);
         setAnalysisResult(result);
     } catch (error) {
         console.error("Error getting AI analysis:", error);
