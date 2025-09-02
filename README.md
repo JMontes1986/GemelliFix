@@ -1,3 +1,4 @@
+
 # 🛠️ GemelliFix: Sistema Inteligente de Gestión de Mantenimiento
 
 <p align="center">
@@ -13,10 +14,10 @@
 ## 🚀 Inicio Rápido
 
 ```bash
-# Instalar dependencias
+# 1. Instalar dependencias
 npm install
 
-# Ejecutar servidor de desarrollo
+# 2. Ejecutar servidor de desarrollo
 npm run dev
 ```
 
@@ -24,7 +25,7 @@ npm run dev
 
 ---
 
-## 📊 Arquitectura del Sistema
+## 🏛️ Arquitectura del Sistema
 
 ### Roles de Usuario
 ```mermaid
@@ -37,17 +38,19 @@ graph TD
     end
 
     subgraph "Acciones"
-        Accion1[Dashboard & Tickets Globales]
-        Accion2[CRUD de Tickets]
-        Accion3[Gestión de Configuración]
+        Accion1[Ver Dashboard & Tickets Globales]
+        Accion2[CRUD Completo de Tickets]
+        Accion3[Gestión de Configuración y Usuarios]
         Accion4[Ver Tickets Asignados]
-        Accion5[Actualizar Progreso + Evidencias]
+        Accion5[Actualizar Progreso y Subir Evidencia]
         Accion6[Crear Tickets]
-        Accion7[Ver Tickets Propios]
+        Accion7[Ver Historial de Tickets Propios]
+        Accion8[Crear y Gestionar Requisiciones]
+        Accion9[Gestionar Calendario Operativo]
     end
 
-    A --> Accion1 & Accion2 & Accion3
-    B --> Accion4 & Accion5
+    A --> Accion1 & Accion2 & Accion3 & Accion8 & Accion9
+    B --> Accion4 & Accion5 & Accion9
     C --> Accion1
     D --> Accion6 & Accion7
 ```
@@ -57,86 +60,83 @@ graph TD
 stateDiagram-v2
     [*] --> Abierto: Ticket creado
     Abierto --> Asignado: Admin asigna técnico
-    Asignado --> EnProgreso: Técnico inicia
-    EnProgreso --> RequiereAprobacion: Evidencia subida
-    RequiereAprobacion --> Cerrado: Admin aprueba
-    RequiereAprobacion --> Asignado: Rechazo / corrección
-    Abierto --> Cancelado
-    Asignado --> Cancelado
+    Asignado --> EnProgreso: Técnico actualiza estado
+    EnProgreso --> RequiereAprobacion: Técnico sube evidencia
+    RequiereAprobacion --> Cerrado: Admin aprueba solución
+    RequiereAprobacion --> Asignado: Admin rechaza / pide corrección
     Cerrado --> [*]
-    Cancelado --> [*]
 ```
 
 ---
 
 ## 🤖 Molly IA: Inteligencia Artificial Integrada
 
+El sistema está potenciado por **Molly IA**, un conjunto de asistentes inteligentes diseñados para optimizar cada paso del proceso de mantenimiento.
+
 ```mermaid
 mindmap
   root((Molly IA))
-    (Asistente General 🤖)
-      - Preguntas sobre la app
-    (Sugerencias de Ticket 💡)
-      - Categoría & Prioridad
-    (Asignación Inteligente 👷)
-      - Recomendación de técnico
-    (Asistente de Estado ✨)
-      - Detecta vencidos / próximo paso
-    (Calendario Asistido 📅)
-      - Optimización de horarios
-    (Dashboard Inteligente 📊)
-      - Resumen ejecutivo de KPIs
-    (Autodiagnóstico 🔧)
-      - Detecta errores y sugiere fixes
+    (Asistente de Creación 📝)
+      - Sugiere Título a partir de la descripción
+      - Sugiere Categoría y Prioridad según el contexto
+    (Asistente de Asignación 👷)
+      - Recomienda el mejor técnico basado en carga y disponibilidad
+      - Sugiere la franja horaria óptima en el calendario
+    (Asistente de Operaciones 📊)
+      - Analiza los KPIs del Dashboard y genera un resumen ejecutivo
+      - Detecta tickets vencidos y recomienda los próximos pasos
+    (Asistente de Diagnóstico ⚙️)
+      - Ayuda a solucionar problemas de conexión con Firebase
+      - Diagnostica errores de permisos y falta de índices en Firestore
+    (Asistente de Ayuda General 💬)
+      - Responde preguntas de los usuarios sobre cómo usar la aplicación
 ```
+
+---
+## 📋 Módulos Principales
+
+-   **Dashboard**: Vista de pájaro de toda la operación. Ofrece métricas clave (KPIs) como cumplimiento de SLA, tiempos de resolución, tickets vencidos y gráficos interactivos sobre zonas, categorías y productividad del equipo. Los usuarios no administradores ven una versión simplificada con sus propias estadísticas.
+-   **Solicitudes (Tickets)**: El corazón del sistema. Permite la creación, visualización, asignación y seguimiento de todas las incidencias. Incluye un historial detallado, sistema de comentarios y gestión de archivos adjuntos y evidencias.
+-   **Requisiciones**: Módulo para la gestión de solicitudes de compra de materiales o servicios necesarios para el mantenimiento. Permite crear, aprobar y seguir el estado de cada ítem.
+-   **Calendario Operativo**: Herramienta visual para programar turnos y asignar tareas al personal de Servicios Generales. Permite la creación de eventos recurrentes y asignaciones inteligentes sugeridas por la IA.
+-   **Configuración**: Panel de control para el Administrador. Permite gestionar usuarios (crear, editar roles), zonas, sitios y categorías que alimentan los formularios del sistema.
+-   **Diagnóstico**: Página técnica para el Administrador que permite ejecutar pruebas de conectividad con Firebase, verificar reglas de seguridad y permisos de usuario, y obtener diagnósticos de la IA para solucionar problemas comunes.
 
 ---
 
 ## 👥 Roles en Detalle
 
-- **Administrador 👑**
-  - Control total: usuarios, zonas, tickets, categorías.
-  - Acceso a **Dashboard**, **Calendario** y **Diagnóstico**.
+-   **Administrador 👑**
+    -   Control total sobre todos los módulos.
+    -   Gestiona usuarios, zonas, sitios, categorías y requisiciones.
+    -   Asigna tickets, aprueba soluciones y tiene acceso a todas las métricas.
+    -   Utiliza el módulo de **Diagnóstico** para la salud del sistema.
 
-- **Servicios Generales 🛠️**
-  - Técnicos que resuelven incidencias.
-  - Solo ven y actualizan tickets asignados.
+-   **Servicios Generales 🛠️**
+    -   El equipo técnico que resuelve las incidencias.
+    -   Visualiza y actualiza únicamente los tickets que se le han asignado.
+    -   Sube evidencia fotográfica del trabajo realizado.
+    -   Puede ver su propia agenda en el **Calendario**.
 
-- **SST (Auditoría) 🔍**
-  - Rol de lectura: visualiza Dashboard y tickets.
+-   **SST (Auditoría) 🔍**
+    -   Rol de solo lectura para supervisión y auditoría.
+    -   Tiene acceso completo al **Dashboard** y puede ver todos los tickets, pero no puede realizar modificaciones.
 
-- **Solicitantes ✏️**
-  - Docentes, coordinadores y administrativos.
-  - Crean tickets y revisan solo los propios.
-
----
-
-## ✨ Funcionalidades Principales
-
-- 🎫 **Gestión de Tickets:** CRUD + historial y comentarios.  
-- 📅 **Calendario Operativo:** turnos, tareas y drag & drop.  
-- 📊 **Dashboard de KPIs:** cumplimiento de SLA, tickets vencidos, tiempos medios.  
-- 👥 **Gestión de Usuarios y Datos Maestros.**  
-- 🔔 **Centro de Notificaciones.**
+-   **Solicitantes (Docentes, Coordinadores, etc.) ✏️**
+    -   Crean nuevas solicitudes de mantenimiento (tickets).
+    -   Pueden ver el estado y el historial de sus propias solicitudes únicamente.
+    -   Responden la encuesta de satisfacción una vez que su ticket es cerrado.
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-- **Framework:** Next.js 15 + App Router  
-- **Lenguaje:** TypeScript  
-- **UI:** Tailwind + shadcn/ui  
-- **Backend & DB:** Firebase (Firestore, Auth, Storage)  
-- **IA:** Genkit (Google AI)  
-- **Cloud Functions:** automatización de lógica y alertas  
-
----
-
-## 🌟 Screenshots (pendiente incluir)
-
-- 📊 Dashboard con métricas SLA.  
-- 📅 Calendario con asignaciones.  
-- 🎫 Flujo de creación de ticket con Molly IA.  
+-   **Framework**: Next.js 15 + App Router
+-   **Lenguaje**: TypeScript
+-   **UI**: Tailwind CSS + shadcn/ui
+-   **Backend & DB**: Firebase (Firestore, Authentication, Storage)
+-   **Inteligencia Artificial**: Genkit (Google AI - Gemini)
+-   **Cloud Functions**: Automatización de lógica de negocio y notificaciones.
 
 ---
 
