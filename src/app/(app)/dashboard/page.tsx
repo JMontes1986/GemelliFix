@@ -15,6 +15,7 @@ import {
   Grid,
   TrendingUp,
   Star,
+  BarChart as BarChartIcon,
 } from 'lucide-react';
 import {
   Bar,
@@ -69,7 +70,7 @@ import { Progress } from '@/components/ui/progress';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { startOfWeek, format, parseISO, isValid, endOfWeek } from 'date-fns';
+import { startOfWeek, format, parseISO, isValid, endOfWeek, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
@@ -172,6 +173,28 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
       acc[categoryName] = (acc[categoryName] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)).map(([name, total]) => ({ name, total })).sort((a,b) => b.total - a.total).slice(0, 5);
+
+    const ticketsByMonthData = React.useMemo(() => {
+        const monthCounts: { [key: string]: number } = {};
+        tickets.forEach(ticket => {
+            const monthKey = format(new Date(ticket.createdAt), 'yyyy-MM');
+            monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
+        });
+
+        const last12Months = Array.from({ length: 12 }).map((_, i) => {
+            const date = subMonths(new Date(), i);
+            return format(date, 'yyyy-MM');
+        }).reverse();
+
+        return last12Months.map(monthKey => {
+            const [year, month] = monthKey.split('-');
+            const date = new Date(Number(year), Number(month) - 1);
+            return {
+                name: format(date, 'MMM', { locale: es }),
+                total: monthCounts[monthKey] || 0
+            };
+        });
+    }, [tickets]);
 
   const calculateSlaByPriority = (priority: Ticket['priority']): number => {
     const relevantTickets = tickets.filter(t => t.priority === priority);
@@ -317,10 +340,11 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Satisfacción</CardTitle><Star className="h-4 w-4 text-yellow-400" /></CardHeader><CardContent><div className="text-2xl font-bold">{averageSatisfaction} / 5</div><p className="text-xs text-muted-foreground">Basado en {satisfactionResponseCount} respuestas</p></CardContent></Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><MapPin className="h-5 w-5"/>Tickets por Zona</CardTitle><CardDescription>Volumen de solicitudes activas por cada zona.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={ticketsByZoneData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={100} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{ticketsByZoneData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
         <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><Users className="h-5 w-5"/>Top Solicitantes</CardTitle><CardDescription>Usuarios que más solicitudes han creado.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={topRequestersData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={100} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{topRequestersData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
-        <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><Grid className="h-5 w-5"/>Categorías con más Solicitudes</CardTitle><CardDescription>Top 5 de categorías que generan más tickets.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={ticketsByCategoryData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={100} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{ticketsByCategoryData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 1) % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
+        <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><Grid className="h-5 w-5"/>Categorías Populares</CardTitle><CardDescription>Top 5 de categorías que generan más tickets.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={ticketsByCategoryData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={100} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{ticketsByCategoryData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 1) % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
+        <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><BarChartIcon className="h-5 w-5"/>Tickets por Mes</CardTitle><CardDescription>Volumen de solicitudes en los últimos 12 meses.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={ticketsByMonthData}><XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} /><YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></CardContent></Card>
       </div>
 
        <div className="grid gap-4 lg:grid-cols-2">
@@ -531,4 +555,5 @@ export default function DashboardPage() {
   }
 }
 
+    
     
