@@ -7,13 +7,14 @@ import { db, auth } from '@/lib/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Loader2, FileText, Package, Edit } from 'lucide-react';
+import { Loader2, FileText, Package, Edit, Download } from 'lucide-react';
 import type { Requisition } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 const getStatusBadgeClass = (status: Requisition['status']) => {
     switch (status) {
@@ -31,6 +32,7 @@ const getStatusBadgeClass = (status: Requisition['status']) => {
 
 export default function RequisitionsListPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [requisitions, setRequisitions] = React.useState<Requisition[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -59,6 +61,66 @@ export default function RequisitionsListPage() {
     });
     return () => unsubscribe();
   }, [router]);
+  
+  const handleExport = () => {
+    if (requisitions.length === 0) {
+        toast({
+            title: "No hay datos para exportar",
+            description: "La tabla de requisiciones está vacía.",
+        });
+        return;
+    }
+
+    const headers = [
+        "Numero Requisicion", "Fecha Solicitud", "Solicitante", "Cargo", "Dependencia", 
+        "Estado", "Item Cantidad", "Item Producto", "Item Descripcion", "Item Autorizado", "Item Fecha Autorizacion"
+    ];
+    
+    const sanitizeForCsv = (value: any) => {
+        if (value === null || value === undefined) return "";
+        let str = String(value);
+        if (str.search(/("|,|\n)/g) >= 0) {
+            str = `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+    };
+    
+    const rows: string[] = [];
+    requisitions.forEach(req => {
+        req.items.forEach(item => {
+             const row = [
+                sanitizeForCsv(req.requisitionNumber),
+                sanitizeForCsv(req.requestDate ? new Date(req.requestDate.toDate()).toLocaleDateString('es-CO') : ''),
+                sanitizeForCsv(req.requesterName),
+                sanitizeForCsv(req.requesterPosition),
+                sanitizeForCsv(req.department),
+                sanitizeForCsv(req.status || 'Pendiente'),
+                sanitizeForCsv(item.quantity),
+                sanitizeForCsv(item.product),
+                sanitizeForCsv(item.description),
+                sanitizeForCsv(item.authorized ? 'Si' : 'No'),
+                sanitizeForCsv(item.authorizedAt ? new Date(item.authorizedAt.toDate()).toLocaleDateString('es-CO') : ''),
+            ].join(',');
+            rows.push(row);
+        });
+    });
+
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+
+    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "requisitions.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    toast({ title: 'Exportación Iniciada', description: 'La descarga de tu archivo CSV ha comenzado.' });
+  };
 
   if (isLoading) {
     return (
@@ -77,12 +139,18 @@ export default function RequisitionsListPage() {
             Historial de todas las requisiciones de servicio generadas.
           </CardDescription>
         </div>
-        <Link href="/requisitions/create">
-            <Button>
-                <FileText className="mr-2 h-4 w-4" />
-                Nueva Requisición
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar a CSV
             </Button>
-        </Link>
+            <Link href="/requisitions/create">
+                <Button>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Nueva Requisición
+                </Button>
+            </Link>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
