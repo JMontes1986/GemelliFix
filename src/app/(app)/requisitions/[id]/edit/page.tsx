@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { db, auth } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Calendar as CalendarIcon, PlusCircle, Trash2, CheckSquare } from 'lucide-react';
 import type { Requisition } from '@/lib/types';
@@ -130,11 +130,18 @@ export default function EditRequisitionPage() {
       } else if (authorizedCount > 0) {
           status = 'Parcialmente Aprobada';
       }
+      
+      // Sanitize data before sending to Firestore
+      const sanitizedData = {
+          ...data,
+          items: data.items.map(item => ({
+              ...item,
+              authorizedAt: item.authorizedAt ? Timestamp.fromDate(item.authorizedAt) : null,
+          })),
+          status,
+      };
 
-      await updateDoc(docRef, {
-        ...data,
-        status,
-      });
+      await updateDoc(docRef, sanitizedData);
       
       toast({
         title: '¡Requisición Actualizada!',
@@ -322,16 +329,17 @@ export default function EditRequisitionPage() {
                                                 checked={field.value}
                                                 onCheckedChange={(checked) => {
                                                     const isChecked = !!checked;
+                                                    const currentItem = form.getValues(`items.${index}`);
                                                     update(index, {
-                                                        ...form.getValues(`items.${index}`),
+                                                        ...currentItem,
                                                         authorized: isChecked,
                                                         authorizedAt: isChecked ? new Date() : null,
                                                     });
                                                 }}
                                             />
-                                            {item.authorizedAt && (
+                                            {form.watch(`items.${index}.authorizedAt`) && (
                                                 <span className="text-xs text-muted-foreground">
-                                                    {format(new Date(item.authorizedAt), 'dd/MM/yy')}
+                                                    {format(new Date(form.watch(`items.${index}.authorizedAt`)), 'dd/MM/yy')}
                                                 </span>
                                             )}
                                         </div>
