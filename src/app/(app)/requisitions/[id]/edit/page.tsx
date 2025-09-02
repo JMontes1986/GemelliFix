@@ -144,6 +144,8 @@ export default function EditRequisitionPage() {
             requestDate: data.requestDate.toDate(),
             items: data.items.map(item => ({
                 ...item,
+                authorized: item.authorized || false,
+                received: item.received || false,
                 authorizedAt: item.authorizedAt ? item.authorizedAt.toDate() : null,
                 receivedAt: item.receivedAt ? item.receivedAt.toDate() : null,
             })),
@@ -159,13 +161,11 @@ export default function EditRequisitionPage() {
       }
     };
 
-    const logsQuery = query(
-        collection(db, 'logs'), 
-        where('details.requisitionId', '==', requisitionId),
-        orderBy('timestamp', 'desc')
-    );
+    const logsQuery = query(collection(db, 'logs'), orderBy('timestamp', 'desc'));
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
-        setLogs(snapshot.docs.map(doc => ({id: doc.id, ...doc.data() } as Log)));
+        const allLogs = snapshot.docs.map(doc => ({id: doc.id, ...doc.data() } as Log));
+        const filteredLogs = allLogs.filter(log => log.details.requisitionId === requisitionId);
+        setLogs(filteredLogs);
         setIsLoadingLogs(false);
     });
 
@@ -201,16 +201,20 @@ export default function EditRequisitionPage() {
           // Check for changes in existing items
           const changedFields: (keyof RequisitionItem)[] = ['quantity', 'product', 'description', 'authorized', 'received'];
           changedFields.forEach(field => {
-              if (newItem[field] !== oldItem[field]) {
-                  let newValue = newItem[field];
-                  if (field === 'authorized' || field === 'received') {
-                      newValue = newValue ? 'Sí' : 'No';
-                  }
+              let oldValue = oldItem[field];
+              let newValue = newItem[field];
+              
+              if (field === 'authorized' || field === 'received') {
+                oldValue = oldValue ? 'Sí' : 'No';
+                newValue = newValue ? 'Sí' : 'No';
+              }
+              
+              if (newValue !== oldValue) {
                   logPromises.push(createLog(currentUser, 'update_requisition_item', { 
                       requisition, 
                       field: field, 
-                      oldValue: oldItem[field], 
-                      newValue,
+                      oldValue: oldValue, 
+                      newValue: newValue,
                       productName: newItem.product
                   }));
               }
