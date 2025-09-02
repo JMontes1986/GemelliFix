@@ -303,7 +303,8 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
         const durations = { toApproval: [] as number[], toReception: [] as number[] };
     
         requisitions.forEach(req => {
-            const requestTime = req.requestDate.toDate().getTime();
+            if (!req.createdAt) return;
+            const creationTime = req.createdAt.toDate().getTime();
     
             const authorizedDates = req.items
                 .map(item => item.authorizedAt ? item.authorizedAt.toDate().getTime() : null)
@@ -315,7 +316,7 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
     
             if (authorizedDates.length > 0) {
                 const firstApproval = Math.min(...authorizedDates);
-                durations.toApproval.push((firstApproval - requestTime) / 3600000);
+                durations.toApproval.push((firstApproval - creationTime) / 3600000);
     
                 if (receivedDates.length > 0) {
                     const lastReception = Math.max(...receivedDates);
