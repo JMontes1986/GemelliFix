@@ -67,11 +67,15 @@ export default function LoginPage() {
       router.push('/dashboard');
 
     } catch (error: any) {
-      console.error("Error de inicio de sesión:", error);
       let errorMessage = 'Ocurrió un error inesperado. Por favor, inténtalo de nuevo.';
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      
+      if (error.code === 'auth/invalid-credential') {
+          console.warn('Intento de login con credenciales inválidas para el correo:', email);
           errorMessage = 'Credenciales incorrectas. Por favor, verifica tu correo y contraseña.';
+      } else {
+          console.error("Error de inicio de sesión inesperado:", error);
       }
+      
       toast({
         variant: 'destructive',
         title: 'Error al iniciar sesión',
