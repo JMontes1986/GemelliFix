@@ -44,7 +44,7 @@ const requisitionItemSchema = z.object({
   product: z.string().min(1, 'El producto es requerido.'),
   description: z.string().min(1, 'La descripción es requerida.'),
   authorized: z.boolean().optional(),
-  authorizedAt: z.date().optional(),
+  authorizedAt: z.date().optional().nullable(),
 });
 
 const requisitionSchema = z.object({
@@ -100,7 +100,7 @@ export default function EditRequisitionPage() {
             requestDate: data.requestDate.toDate(),
             items: data.items.map(item => ({
                 ...item,
-                authorizedAt: item.authorizedAt ? item.authorizedAt.toDate() : undefined,
+                authorizedAt: item.authorizedAt ? item.authorizedAt.toDate() : null,
             })),
           });
           setRequisitionNumber(data.requisitionNumber);
@@ -131,7 +131,17 @@ export default function EditRequisitionPage() {
           status = 'Parcialmente Aprobada';
       }
 
-      await updateDoc(docRef, { ...data, status });
+      // Sanitize data: convert undefined to null before sending to Firestore
+      const sanitizedData = {
+          ...data,
+          status,
+          items: data.items.map(item => ({
+              ...item,
+              authorizedAt: item.authorizedAt === undefined ? null : item.authorizedAt,
+          }))
+      };
+
+      await updateDoc(docRef, sanitizedData);
       
       toast({
         title: '¡Requisición Actualizada!',
