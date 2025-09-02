@@ -199,7 +199,7 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
         });
     }, [tickets]);
 
-    const topProductsData = React.useMemo(() => {
+    const allProductsData = React.useMemo(() => {
         const productCounts: { [key: string]: number } = {};
         requisitions.forEach(req => {
             req.items.forEach(item => {
@@ -208,8 +208,7 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
         });
         return Object.entries(productCounts)
             .map(([name, total]) => ({ name, total }))
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 5);
+            .sort((a, b) => b.total - a.total);
     }, [requisitions]);
 
   const calculateSlaByPriority = (priority: Ticket['priority']): number => {
@@ -378,6 +377,7 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
   }
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+  const dynamicChartHeight = Math.max(200, allProductsData.length * 30);
 
   return (
     <div className="flex flex-col gap-4">
@@ -407,7 +407,30 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
         <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><Users className="h-5 w-5"/>Top Solicitantes</CardTitle><CardDescription>Usuarios que más solicitudes han creado.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={topRequestersData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={100} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{topRequestersData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
         <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><Grid className="h-5 w-5"/>Categorías Populares</CardTitle><CardDescription>Top 5 de categorías que generan más tickets.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={ticketsByCategoryData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={100} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{ticketsByCategoryData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 1) % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
         <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><BarChartIcon className="h-5 w-5"/>Tickets por Mes</CardTitle><CardDescription>Volumen de solicitudes en los últimos 12 meses.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={ticketsByMonthData}><XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} /><YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[4, 4, 0, 0]}>{ticketsByMonthData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
-        <Card className="lg:col-span-2"><CardHeader><CardTitle className="font-headline flex items-center gap-2"><Package className="h-5 w-5"/>Productos más Solicitados</CardTitle><CardDescription>Top 5 productos más pedidos en requisiciones.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={topProductsData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={120} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{topProductsData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
+        <Card className="lg:col-span-2">
+            <CardHeader>
+                <CardTitle className="font-headline flex items-center gap-2">
+                    <Package className="h-5 w-5"/>Productos Solicitados por Cantidad
+                </CardTitle>
+                <CardDescription>
+                    Listado de todos los productos ordenados por cantidad total solicitada.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea style={{ height: `${dynamicChartHeight}px` }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={allProductsData} layout="vertical" margin={{ left: 20 }}>
+                            <XAxis type="number" hide />
+                            <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={120} />
+                            <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} />
+                            <Bar dataKey="total" radius={[0, 4, 4, 0]}>
+                                {allProductsData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </ScrollArea>
+            </CardContent>
+        </Card>
       </div>
 
        <div className="grid gap-4 lg:grid-cols-3">
