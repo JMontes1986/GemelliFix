@@ -18,6 +18,7 @@ import {
   BarChart as BarChartIcon,
   ShoppingBag,
   Package,
+  FileClock,
 } from 'lucide-react';
 import {
   Bar,
@@ -276,7 +277,7 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
     }, [tickets, buildWeeklyTrends]);
 
 
-    const lifecycleData = React.useMemo(() => {
+    const ticketLifecycleData = React.useMemo(() => {
         const durations = { toAssignment: [] as number[], toInProgress: [] as number[], toResolved: [] as number[] };
         
         tickets.forEach(ticket => {
@@ -297,6 +298,39 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
           { name: 'En Progreso → Resuelto', time: getAverage(durations.toResolved) },
         ];
       }, [tickets]);
+    
+      const requisitionLifecycleData = React.useMemo(() => {
+        const durations = { toApproval: [] as number[], toReception: [] as number[] };
+    
+        requisitions.forEach(req => {
+            const requestTime = req.requestDate.toDate().getTime();
+    
+            const authorizedDates = req.items
+                .map(item => item.authorizedAt ? item.authorizedAt.toDate().getTime() : null)
+                .filter((d): d is number => d !== null);
+    
+            const receivedDates = req.items
+                .map(item => item.receivedAt ? item.receivedAt.toDate().getTime() : null)
+                .filter((d): d is number => d !== null);
+    
+            if (authorizedDates.length > 0) {
+                const firstApproval = Math.min(...authorizedDates);
+                durations.toApproval.push((firstApproval - requestTime) / 3600000);
+    
+                if (receivedDates.length > 0) {
+                    const lastReception = Math.max(...receivedDates);
+                    durations.toReception.push((lastReception - firstApproval) / 3600000);
+                }
+            }
+        });
+    
+        const getAverage = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        
+        return [
+            { name: 'Solicitud → Aprobación', time: getAverage(durations.toApproval) },
+            { name: 'Aprobación → Recepción', time: getAverage(durations.toReception) },
+        ];
+    }, [requisitions]);
 
   const productivityData = React.useMemo(() => {
     const techStats: { [id: string]: { name: string, avatar: string, resolvedCount: number, totalTime: number } } = {};
@@ -329,7 +363,7 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
             topRequesters: topRequestersData,
             popularCategories: ticketsByCategoryData,
             ticketsByMonth: ticketsByMonthData,
-            averageTimePerStage: lifecycleData,
+            averageTimePerStage: ticketLifecycleData,
         };
         const result = await analyzeDashboardData(input);
         setAnalysisResult(result);
@@ -375,9 +409,10 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
         <Card className="lg:col-span-2"><CardHeader><CardTitle className="font-headline flex items-center gap-2"><Package className="h-5 w-5"/>Productos más Solicitados</CardTitle><CardDescription>Top 5 productos más pedidos en requisiciones.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={topProductsData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={120} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{topProductsData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
       </div>
 
-       <div className="grid gap-4 lg:grid-cols-2">
+       <div className="grid gap-4 lg:grid-cols-3">
          <Card><CardHeader><CardTitle className="font-headline">Cumplimiento de SLA por Prioridad</CardTitle><CardDescription>Rendimiento del equipo según la urgencia.</CardDescription></CardHeader><CardContent><div className="space-y-4 h-full flex flex-col justify-center">{Object.entries(slaByPriority).map(([priority, value]) => (<div key={priority} className="space-y-1"><div className="flex justify-between items-center text-sm"><span className="font-medium">{priority}</span><span className="text-muted-foreground font-semibold">{value}%</span></div><Progress value={value} indicatorClassName={getSlaProgressColor(priority)} aria-label={`Cumplimiento de SLA para prioridad ${priority}`} /></div>))}</div></CardContent></Card>
-         <Card><CardHeader><CardTitle className="font-headline">Tiempo Promedio por Etapa</CardTitle><CardDescription>Promedio de horas que un ticket pasa en cada fase hasta ser resuelto.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={lifecycleData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" unit="h" /><YAxis dataKey="name" type="category" width={110} fontSize={12} /><Tooltip formatter={(value: number) => [formatHours(value), 'Tiempo Promedio']} cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="time" name="Horas" barSize={20}>{lifecycleData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
+         <Card><CardHeader><CardTitle className="font-headline">Tiempo Promedio por Etapa (Tickets)</CardTitle><CardDescription>Promedio de horas que un ticket pasa en cada fase hasta ser resuelto.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={ticketLifecycleData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" unit="h" /><YAxis dataKey="name" type="category" width={110} fontSize={12} /><Tooltip formatter={(value: number) => [formatHours(value), 'Tiempo Promedio']} cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="time" name="Horas" barSize={20}>{ticketLifecycleData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
+         <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><FileClock className="w-5 h-5"/>Ciclo de Vida de Requisiciones</CardTitle><CardDescription>Tiempo promedio en horas para la aprobación y recepción de productos.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={requisitionLifecycleData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" unit="h" /><YAxis dataKey="name" type="category" width={110} fontSize={12} /><Tooltip formatter={(value: number) => [formatHours(value), 'Tiempo Promedio']} cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="time" name="Horas" barSize={20}>{requisitionLifecycleData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
       </div>
 
        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -614,6 +649,5 @@ export default function DashboardPage() {
       return <RequesterDashboard tickets={tickets} currentUser={currentUser} />;
   }
 }
-
     
     
