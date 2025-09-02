@@ -16,6 +16,8 @@ import {
   TrendingUp,
   Star,
   BarChart as BarChartIcon,
+  ShoppingBag,
+  Package,
 } from 'lucide-react';
 import {
   Bar,
@@ -65,7 +67,7 @@ import {
 } from '@/ai/flows/analyze-dashboard-data';
 import { collection, onSnapshot, query, where, getDoc, doc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import type { Ticket, User } from '@/lib/types';
+import type { Ticket, User, Requisition } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -138,7 +140,7 @@ const formatHours = (hours: number): string => {
 };
 
 
-function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket[], technicians: User[], currentUser: User | null }) {
+function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { tickets: Ticket[], technicians: User[], requisitions: Requisition[], currentUser: User | null }) {
   const [isAnalysisOpen, setAnalysisOpen] = React.useState(false);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
   const [analysisResult, setAnalysisResult] = React.useState<AnalyzeDashboardOutput | null>(null);
@@ -195,6 +197,19 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
             };
         });
     }, [tickets]);
+
+    const topProductsData = React.useMemo(() => {
+        const productCounts: { [key: string]: number } = {};
+        requisitions.forEach(req => {
+            req.items.forEach(item => {
+                productCounts[item.product] = (productCounts[item.product] || 0) + item.quantity;
+            });
+        });
+        return Object.entries(productCounts)
+            .map(([name, total]) => ({ name, total }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 5);
+    }, [requisitions]);
 
   const calculateSlaByPriority = (priority: Ticket['priority']): number => {
     const relevantTickets = tickets.filter(t => t.priority === priority);
@@ -343,19 +358,21 @@ function AdminDashboard({ tickets, technicians, currentUser }: { tickets: Ticket
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tickets Abiertos</CardTitle><Activity className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{openTickets}</div><p className="text-xs text-muted-foreground">Datos en tiempo real</p></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tickets Vencidos</CardTitle><AlertTriangle className="h-4 w-4 text-destructive" /></CardHeader><CardContent><div className="text-2xl font-bold">{overdueTickets}</div><p className="text-xs text-muted-foreground">Datos en tiempo real</p></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Cumplimiento SLA</CardTitle><CheckCircle2 className="h-4 w-4 text-green-500" /></CardHeader><CardContent><div className="text-2xl font-bold">{slaCompliance}%</div><p className="text-xs text-muted-foreground">Promedio de tickets cerrados</p></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">MTTR (Horas)</CardTitle><Clock className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{mttrHours}</div><p className="text-xs text-muted-foreground">Tiempo medio de resolución</p></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Satisfacción</CardTitle><Star className="h-4 w-4 text-yellow-400" /></CardHeader><CardContent><div className="text-2xl font-bold">{averageSatisfaction} / 5</div><p className="text-xs text-muted-foreground">Basado en {satisfactionResponseCount} respuestas</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Requisiciones</CardTitle><ShoppingBag className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{requisitions.length}</div><p className="text-xs text-muted-foreground">Total de requisiciones creadas</p></CardContent></Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><MapPin className="h-5 w-5"/>Tickets por Zona</CardTitle><CardDescription>Volumen de solicitudes activas por cada zona.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={ticketsByZoneData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={100} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{ticketsByZoneData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
         <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><Users className="h-5 w-5"/>Top Solicitantes</CardTitle><CardDescription>Usuarios que más solicitudes han creado.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={topRequestersData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={100} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{topRequestersData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
         <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><Grid className="h-5 w-5"/>Categorías Populares</CardTitle><CardDescription>Top 5 de categorías que generan más tickets.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={ticketsByCategoryData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={100} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{ticketsByCategoryData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 1) % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
         <Card><CardHeader><CardTitle className="font-headline flex items-center gap-2"><BarChartIcon className="h-5 w-5"/>Tickets por Mes</CardTitle><CardDescription>Volumen de solicitudes en los últimos 12 meses.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={ticketsByMonthData}><XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} /><YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[4, 4, 0, 0]}>{ticketsByMonthData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
+        <Card className="lg:col-span-2"><CardHeader><CardTitle className="font-headline flex items-center gap-2"><Package className="h-5 w-5"/>Productos más Solicitados</CardTitle><CardDescription>Top 5 productos más pedidos en requisiciones.</CardDescription></CardHeader><CardContent><ResponsiveContainer width="100%" height={200}><BarChart data={topProductsData} layout="vertical" margin={{ left: 20 }}><XAxis type="number" hide /><YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={120} /><Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)'}} /><Bar dataKey="total" radius={[0, 4, 4, 0]}>{topProductsData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />))}</Bar></BarChart></ResponsiveContainer></CardContent></Card>
       </div>
 
        <div className="grid gap-4 lg:grid-cols-2">
@@ -473,6 +490,7 @@ function RequesterDashboard({ tickets, currentUser }: { tickets: Ticket[], curre
 export default function DashboardPage() {
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
   const [technicians, setTechnicians] = React.useState<User[]>([]);
+  const [requisitions, setRequisitions] = React.useState<Requisition[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const router = useRouter();
@@ -509,34 +527,65 @@ export default function DashboardPage() {
     // Admins and SST see all tickets
     if (currentUser.role === 'Administrador' || currentUser.role === 'SST' || currentUser.email === 'sistemas@colgemelli.edu.co') {
         ticketsQuery = query(collection(db, 'tickets'));
+        
         const techQuery = query(collection(db, 'users'), where('role', '==', 'Servicios Generales'));
-        onSnapshot(techQuery, (snapshot) => {
+        const unsubscribeTechs = onSnapshot(techQuery, (snapshot) => {
             setTechnicians(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
         });
+
+        const requisitionsQuery = query(collection(db, 'requisitions'));
+        const unsubscribeReqs = onSnapshot(requisitionsQuery, (snapshot) => {
+            const reqsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Requisition));
+            setRequisitions(reqsData);
+        });
+
+        const unsubscribeTickets = onSnapshot(ticketsQuery, (querySnapshot) => {
+            const ticketsData: Ticket[] = querySnapshot.docs.map((doc) => {
+                const data = doc.data();
+                return { 
+                    ...data, 
+                    id: doc.id, 
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
+                    dueDate: data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString(),
+                    resolvedAt: data.resolvedAt?.toDate ? data.resolvedAt.toDate().toISOString() : undefined,
+                    statusHistory: data.statusHistory || {},
+                } as Ticket;
+            });
+            setTickets(ticketsData.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching tickets for dashboard: ", error);
+            setIsLoading(false);
+        });
+
+        return () => {
+            unsubscribeTickets();
+            unsubscribeTechs();
+            unsubscribeReqs();
+        };
+
     } else { // Other roles see only their own tickets
         ticketsQuery = query(collection(db, 'tickets'), where('requesterId', '==', currentUser.id));
+        const unsubscribeTickets = onSnapshot(ticketsQuery, (querySnapshot) => {
+            const ticketsData: Ticket[] = querySnapshot.docs.map((doc) => {
+                const data = doc.data();
+                return { 
+                    ...data, 
+                    id: doc.id, 
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
+                    dueDate: data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString(),
+                    resolvedAt: data.resolvedAt?.toDate ? data.resolvedAt.toDate().toISOString() : undefined,
+                    statusHistory: data.statusHistory || {},
+                } as Ticket;
+            });
+            setTickets(ticketsData.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching tickets for dashboard: ", error);
+            setIsLoading(false);
+        });
+         return () => unsubscribeTickets();
     }
-
-    const unsubscribeTickets = onSnapshot(ticketsQuery, (querySnapshot) => {
-      const ticketsData: Ticket[] = querySnapshot.docs.map((doc) => {
-        const data = doc.data();
-        return { 
-            ...data, 
-            id: doc.id, 
-            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
-            dueDate: data.dueDate?.toDate ? data.dueDate.toDate().toISOString() : new Date().toISOString(),
-            resolvedAt: data.resolvedAt?.toDate ? data.resolvedAt.toDate().toISOString() : undefined,
-            statusHistory: data.statusHistory || {},
-        } as Ticket;
-      });
-      setTickets(ticketsData.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Error fetching tickets for dashboard: ", error);
-      setIsLoading(false);
-    });
-
-    return () => unsubscribeTickets();
   }, [currentUser]);
   
   if (isLoading) {
@@ -560,7 +609,7 @@ export default function DashboardPage() {
 
   // Render the correct dashboard based on user role
   if (currentUser.role === 'Administrador' || currentUser.role === 'SST' || currentUser.email === 'sistemas@colgemelli.edu.co') {
-      return <AdminDashboard tickets={tickets} technicians={technicians} currentUser={currentUser} />;
+      return <AdminDashboard tickets={tickets} technicians={technicians} requisitions={requisitions} currentUser={currentUser} />;
   } else {
       return <RequesterDashboard tickets={tickets} currentUser={currentUser} />;
   }
