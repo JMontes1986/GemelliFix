@@ -137,7 +137,7 @@ export default function EditRequisitionPage() {
           status,
           items: data.items.map(item => ({
               ...item,
-              authorizedAt: item.authorizedAt === undefined ? null : item.authorizedAt,
+              authorizedAt: item.authorizedAt || null,
           }))
       };
 
@@ -329,10 +329,11 @@ export default function EditRequisitionPage() {
                                                 checked={field.value}
                                                 onCheckedChange={(checked) => {
                                                     field.onChange(checked);
+                                                    const currentItem = form.getValues(`items.${index}`);
                                                     update(index, {
-                                                        ...item,
+                                                        ...currentItem,
                                                         authorized: !!checked,
-                                                        authorizedAt: checked ? new Date() : undefined,
+                                                        authorizedAt: checked ? new Date() : null,
                                                     });
                                                 }}
                                             />
@@ -365,7 +366,7 @@ export default function EditRequisitionPage() {
                       variant="outline"
                       size="sm"
                       className="mt-2"
-                      onClick={() => append({ quantity: 1, product: '', description: '', authorized: false })}
+                      onClick={() => append({ quantity: 1, product: '', description: '', authorized: false, authorizedAt: null })}
                     >
                       <PlusCircle className="mr-2 h-4 w-4" />
                       Añadir Producto
