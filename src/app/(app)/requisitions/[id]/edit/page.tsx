@@ -125,23 +125,16 @@ export default function EditRequisitionPage() {
       
       const authorizedCount = data.items.filter(item => item.authorized).length;
       let status: Requisition['status'] = 'Pendiente';
-      if (authorizedCount === data.items.length) {
+      if (authorizedCount === data.items.length && data.items.length > 0) {
           status = 'Aprobada';
       } else if (authorizedCount > 0) {
           status = 'Parcialmente Aprobada';
       }
 
-      // Sanitize data: convert undefined to null before sending to Firestore
-      const sanitizedData = {
-          ...data,
-          status,
-          items: data.items.map(item => ({
-              ...item,
-              authorizedAt: item.authorizedAt || null,
-          }))
-      };
-
-      await updateDoc(docRef, sanitizedData);
+      await updateDoc(docRef, {
+        ...data,
+        status,
+      });
       
       toast({
         title: '¡Requisición Actualizada!',
@@ -328,12 +321,11 @@ export default function EditRequisitionPage() {
                                             <Checkbox
                                                 checked={field.value}
                                                 onCheckedChange={(checked) => {
-                                                    field.onChange(checked);
-                                                    const currentItem = form.getValues(`items.${index}`);
+                                                    const isChecked = !!checked;
                                                     update(index, {
-                                                        ...currentItem,
-                                                        authorized: !!checked,
-                                                        authorizedAt: checked ? new Date() : null,
+                                                        ...form.getValues(`items.${index}`),
+                                                        authorized: isChecked,
+                                                        authorizedAt: isChecked ? new Date() : null,
                                                     });
                                                 }}
                                             />
