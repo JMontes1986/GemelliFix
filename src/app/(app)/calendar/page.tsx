@@ -529,12 +529,12 @@ export default function CalendarPage() {
                     batch.set(eventRef, baseEvent);
                     createCalendarNotification(tech.name, baseEvent);
                     
-                    createCalendarEvent({
-                        summary: baseEvent.title,
-                        description: baseEvent.description || 'Sin descripción.',
-                        start: { dateTime: baseEvent.start.toISOString(), timeZone: 'America/Bogota' },
-                        end: { dateTime: baseEvent.end.toISOString(), timeZone: 'America/Bogota' },
-                    });
+                    // createCalendarEvent({
+                    //     summary: baseEvent.title,
+                    //     description: baseEvent.description || 'Sin descripción.',
+                    //     start: { dateTime: baseEvent.start.toISOString(), timeZone: 'America/Bogota' },
+                    //     end: { dateTime: baseEvent.end.toISOString(), timeZone: 'America/Bogota' },
+                    // });
 
                     eventCount++;
                 };
@@ -579,10 +579,10 @@ export default function CalendarPage() {
 
                 toast({ title: '¡Evento(s) Creado(s)!', description: `Se ha(n) añadido ${eventCount} evento(s) al calendario.` });
                 
-                toast({
-                    title: 'Sincronizado con Google Calendar',
-                    description: 'Los eventos también han sido creados en el calendario de Google.'
-                });
+                // toast({
+                //     title: 'Sincronizado con Google Calendar',
+                //     description: 'Los eventos también han sido creados en el calendario de Google.'
+                // });
             }
 
             // Reset form

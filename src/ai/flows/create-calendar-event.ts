@@ -51,8 +51,9 @@ const createCalendarEventFlow = ai.defineFlow(
     // This flow simply acts as a secure wrapper around our actual Google Calendar logic.
     // By doing this, we ensure the googleapis library is only ever executed on the server.
     try {
-        const result = await createEventInGoogle(input);
-        return result;
+        // const result = await createEventInGoogle(input);
+        // return result;
+        return { "message": "Google Calendar integration is disabled on the Spark plan." }
     } catch (error) {
         // Log the error on the server and re-throw a generic error to the client.
         console.error("[createCalendarEventFlow] Error:", error);
