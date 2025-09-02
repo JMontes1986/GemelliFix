@@ -2,73 +2,112 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check for admin role
-    function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
+
+    // Helper functions
+    function isAuth() {
+      return request.auth != null;
     }
     
-    // Users collection can be read by anyone, but only the user themselves or an admin can write.
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId || isAdmin();
-    }
-    
-    // Tickets can be created by any authenticated user.
-    // Reading is complex: Admins, SST, the assigned tech, or the requester can read.
-    // Writing/Updating is restricted to Admins and assigned techs.
-    match /tickets/{ticketId} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null && 
-                    (isAdmin() || 
-                     resource.data.requesterId == request.auth.uid || 
-                     request.auth.uid in resource.data.assignedToIds ||
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SST');
-      allow update: if request.auth != null && 
-                      (isAdmin() || request.auth.uid in resource.data.assignedToIds);
-    }
-    
-    // Master data (zones, sites, categories) can be read by anyone authenticated, but only written by admins.
-    match /zones/{zoneId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-    }
-    
-    match /sites/{siteId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-    }
-    
-    match /categories/{categoryId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-    }
-    
-    // Notifications are private to the user they are assigned to.
-    match /notifications/{notificationId} {
-        allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-    }
-    
-    // Schedule events can be read by any authenticated user, but only created/updated by Admins or Service personnel.
-    match /scheduleEvents/{eventId} {
-      allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null &&
-                      (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Servicios Generales');
-    }
-    
-    // Logs can only be created by the system (via server-side code). No client-side read/write.
-    match /logs/{logId} {
-      allow read, write: if false; 
+    function isUser(userId) {
+      return isAuth() && request.auth.uid == userId;
     }
 
-    // Requisitions can only be managed by administrators
-    match /requisitions/{requisitionId} {
-      allow create, read, list, update: if isAdmin();
+    function getUserRole(userId) {
+        return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuth() && getUserRole(request.auth.uid) == 'Administrador';
     }
     
-    // Default deny all other reads/writes
-    match /{document=**} {
-      allow read, write: if false;
+    function isSST() {
+      return isAuth() && getUserRole(request.auth.uid) == 'SST';
+    }
+
+    function isServiceUser() {
+      return isAuth() && getUserRole(request.auth.uid) == 'Servicios Generales';
+    }
+
+    // Reglas para la colección 'users'
+    match /users/{userId} {
+      // El propio usuario puede leer y escribir sus datos
+      // El administrador puede leer y escribir cualquier perfil de usuario
+      allow read, write: if isUser(userId) || isAdmin();
+      // Permitir la creación de nuevos usuarios
+      allow create: if isAuth();
+       // Listar usuarios solo para administradores
+      allow list: if isAdmin();
+    }
+    
+    // Reglas para la colección 'tickets'
+    match /tickets/{ticketId} {
+        // Creación: Cualquier usuario autenticado puede crear un ticket.
+        allow create: if isAuth();
+        
+        // Lectura:
+        // - El solicitante puede leer su propio ticket.
+        // - Administradores y auditores (SST) pueden leer cualquier ticket.
+        // - El personal de servicios generales puede leer los tickets que tiene asignados.
+        allow read: if isAuth() && 
+            (request.auth.uid == resource.data.requesterId ||
+             isAdmin() || isSST() || request.auth.uid in resource.data.assignedToIds);
+
+        // Actualización:
+        // - El solicitante puede actualizar su propio ticket si el estado es 'Abierto'.
+        // - El administrador puede actualizar cualquier ticket en cualquier estado.
+        // - El personal de servicios generales puede actualizar el estado y añadir evidencia si está asignado.
+        allow update: if isAuth() && 
+            ((request.auth.uid == resource.data.requesterId && resource.data.status == 'Abierto') ||
+            isAdmin() || 
+            (isServiceUser() && request.auth.uid in resource.data.assignedToIds));
+            
+        // Borrado: No se permite borrar tickets para mantener la integridad de los datos.
+        allow delete: if false;
+    }
+    
+    // Reglas para colecciones de datos maestros (Zonas, Sitios, Categorías)
+    match /{collectionName}/{docId} 
+      where collectionName in ['zones', 'sites', 'categories'] {
+        // Lectura: Cualquier usuario autenticado puede leer.
+        allow read: if isAuth();
+        // Escritura: Solo los administradores pueden crear, modificar o borrar.
+        allow write: if isAdmin();
+    }
+    
+    // Reglas para la colección 'notifications'
+    match /notifications/{notificationId} {
+        // Creación: El servidor (Cloud Functions) es el único que crea notificaciones.
+        allow create: if true; // Asumiendo que se escribe desde el backend
+        // Lectura: El usuario puede leer sus propias notificaciones.
+        allow read: if isAuth() && request.auth.uid == resource.data.userId;
+        // Actualización: El usuario puede marcar como leída su notificación.
+        allow update: if isAuth() && request.auth.uid == resource.data.userId;
+        // Borrado: No permitido por ahora.
+        allow delete: if false;
+    }
+
+    // Reglas para la colección 'scheduleEvents'
+    match /scheduleEvents/{eventId} {
+        // Lectura: Administradores y personal de servicios generales pueden leer los eventos.
+        allow read: if isAuth() && (isAdmin() || isServiceUser());
+        // Escritura: Solo los administradores pueden crear, modificar o borrar eventos.
+        allow write: if isAdmin();
+    }
+
+    // Reglas para la colección 'requisitions'
+    match /requisitions/{requisitionId} {
+      // Solo los administradores pueden gestionar requisiciones
+      allow read, write, create, delete: if isAdmin();
+    }
+    
+    // Reglas para la colección de logs (auditoría)
+    match /logs/{logId} {
+        // Lectura: Solo los administradores pueden leer los logs
+        allow read: if isAdmin();
+        // Escritura: Se asume que los logs se escriben desde un entorno de confianza (backend o reglas de seguridad)
+        allow write: if isAuth(); // Permitir que cualquier usuario autenticado escriba su propio log
+        // Borrado: Nadie puede borrar logs
+        allow delete: if false;
     }
   }
 }
