@@ -25,18 +25,22 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { db, auth } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, Timestamp, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Calendar as CalendarIcon, PlusCircle, Trash2, CheckSquare } from 'lucide-react';
-import type { Requisition } from '@/lib/types';
+import { Loader2, Calendar as CalendarIcon, PlusCircle, Trash2, CheckSquare, History, PackageCheck, UserCheck, Edit, MessageSquare } from 'lucide-react';
+import type { Requisition, RequisitionItem, User, Log } from '@/lib/types';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, createLog } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { onAuthStateChanged } from 'firebase/auth';
+import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
+import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
 
 
 const requisitionItemSchema = z.object({
@@ -61,6 +65,28 @@ const requisitionSchema = z.object({
 
 type RequisitionFormValues = z.infer<typeof requisitionSchema>;
 
+const LogIcon = ({ action }: { action: Log['action'] }) => {
+    switch (action) {
+        case 'create_requisition': return <CheckSquare className="w-5 h-5 text-green-500" />;
+        case 'update_requisition_item': return <Edit className="w-5 h-5 text-yellow-500" />;
+        default: return <MessageSquare className="w-5 h-5 text-gray-400" />;
+    }
+};
+
+const renderLogDescription = (log: Log) => {
+    const userName = <strong className="font-semibold">{log.userName}</strong>;
+    const { action, details } = log;
+    
+    switch(action) {
+        case 'create_requisition':
+            return <>{userName} creó la requisición.</>;
+        case 'update_requisition_item':
+            return <>{userName} actualizó el producto <strong>{details.productName}</strong>. Campo: '{details.field}', Nuevo Valor: '{details.newValue}'.</>;
+        default:
+            return <>Acción: {action}</>;
+    }
+};
+
 export default function EditRequisitionPage() {
   const router = useRouter();
   const params = useParams();
@@ -68,7 +94,10 @@ export default function EditRequisitionPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   const [isFetching, setIsFetching] = React.useState(true);
-  const [requisitionNumber, setRequisitionNumber] = React.useState('');
+  const [requisition, setRequisition] = React.useState<Requisition | null>(null);
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const [logs, setLogs] = React.useState<Log[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = React.useState(true);
 
   const form = useForm<RequisitionFormValues>({
     resolver: zodResolver(requisitionSchema),
@@ -86,6 +115,18 @@ export default function EditRequisitionPage() {
   });
 
   React.useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+        if(user) {
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if(userDoc.exists()) {
+                setCurrentUser({id: user.uid, ...userDoc.data()} as User);
+            }
+        }
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  React.useEffect(() => {
     if (!requisitionId) return;
 
     const fetchRequisition = async () => {
@@ -95,6 +136,7 @@ export default function EditRequisitionPage() {
 
         if (docSnap.exists()) {
           const data = docSnap.data() as Requisition;
+          setRequisition(data);
           form.reset({
             requesterName: data.requesterName,
             requesterPosition: data.requesterPosition,
@@ -106,7 +148,6 @@ export default function EditRequisitionPage() {
                 receivedAt: item.receivedAt ? item.receivedAt.toDate() : null,
             })),
           });
-          setRequisitionNumber(data.requisitionNumber);
         } else {
           toast({ variant: 'destructive', title: 'Error', description: 'No se encontró la requisición.' });
           router.push('/requisitions');
@@ -118,14 +159,73 @@ export default function EditRequisitionPage() {
       }
     };
 
+    const logsQuery = query(
+        collection(db, 'logs'), 
+        where('details.requisitionId', '==', requisitionId),
+        orderBy('timestamp', 'desc')
+    );
+    const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
+        setLogs(snapshot.docs.map(doc => ({id: doc.id, ...doc.data() } as Log)));
+        setIsLoadingLogs(false);
+    });
+
     fetchRequisition();
+
+    return () => {
+        unsubscribeLogs();
+    };
+
   }, [requisitionId, form, router, toast]);
 
   const onSubmit = async (data: RequisitionFormValues) => {
+    if (!requisition || !currentUser) return;
+
     setIsLoading(true);
     try {
       const docRef = doc(db, 'requisitions', requisitionId);
       
+      const originalItems = requisition.items || [];
+      const updatedItems = data.items;
+
+      // --- Log generation logic ---
+      const logPromises: Promise<void>[] = [];
+
+      updatedItems.forEach((newItem, index) => {
+          const oldItem = originalItems[index];
+
+          if (!oldItem) { // Item was added
+              logPromises.push(createLog(currentUser, 'update_requisition_item', { requisition, field: 'Nuevo Producto', newValue: newItem.product, productName: newItem.product }));
+              return;
+          }
+
+          // Check for changes in existing items
+          const changedFields: (keyof RequisitionItem)[] = ['quantity', 'product', 'description', 'authorized', 'received'];
+          changedFields.forEach(field => {
+              if (newItem[field] !== oldItem[field]) {
+                  let newValue = newItem[field];
+                  if (field === 'authorized' || field === 'received') {
+                      newValue = newValue ? 'Sí' : 'No';
+                  }
+                  logPromises.push(createLog(currentUser, 'update_requisition_item', { 
+                      requisition, 
+                      field: field, 
+                      oldValue: oldItem[field], 
+                      newValue,
+                      productName: newItem.product
+                  }));
+              }
+          });
+      });
+      if (originalItems.length > updatedItems.length) {
+          const removedItems = originalItems.slice(updatedItems.length);
+          removedItems.forEach(item => {
+              logPromises.push(createLog(currentUser, 'update_requisition_item', { requisition, field: 'Producto Eliminado', oldValue: item.product, productName: item.product }));
+          });
+      }
+      
+      await Promise.all(logPromises);
+      // --- End of log generation ---
+
       const authorizedCount = data.items.filter(item => item.authorized).length;
       const receivedCount = data.items.filter(item => item.received).length;
       const authorizedItemsCount = data.items.filter(item => item.authorized).length;
@@ -142,7 +242,6 @@ export default function EditRequisitionPage() {
         status = 'Parcialmente Aprobada';
       }
       
-      // Sanitize data before sending to Firestore
       const sanitizedData = {
           ...data,
           items: data.items.map(item => ({
@@ -157,7 +256,7 @@ export default function EditRequisitionPage() {
       
       toast({
         title: '¡Requisición Actualizada!',
-        description: `Se han guardado los cambios para la requisición ${requisitionNumber}.`,
+        description: `Se han guardado los cambios para la requisición ${requisition.requisitionNumber}.`,
       });
       router.push('/requisitions');
     } catch (error: any) {
@@ -196,14 +295,16 @@ export default function EditRequisitionPage() {
         </div>
     );
   }
+  
+  if(!requisition) return null;
 
   return (
-    <div className="flex justify-center items-start py-8">
-      <Card className="w-full max-w-5xl">
+    <div className="space-y-6">
+      <Card className="w-full">
         <CardHeader>
           <CardTitle className="font-headline text-2xl">Editar Requisición de Servicio</CardTitle>
           <CardDescription>
-            Número de Requisición: <span className="font-semibold text-primary">{requisitionNumber}</span>
+            Número de Requisición: <span className="font-semibold text-primary">{requisition.requisitionNumber}</span>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -425,6 +526,41 @@ export default function EditRequisitionPage() {
           </Form>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+            <CardTitle className="font-headline text-lg flex items-center gap-2">
+                <History className="w-5 h-5" />
+                Historial de Cambios
+            </CardTitle>
+        </CardHeader>
+        <CardContent>
+            <div className="space-y-4 text-sm">
+                {isLoadingLogs ? (
+                    <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                ) : logs.length > 0 ? (
+                    logs.map((log) => (
+                        <div key={log.id} className="flex gap-3 border-b pb-3 last:border-b-0 last:pb-0">
+                            <div className="flex-shrink-0">
+                                <LogIcon action={log.action} />
+                            </div>
+                            <div className="flex-1">
+                                <p>{renderLogDescription(log)}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    <ClientFormattedDate date={log.timestamp?.toDate()} options={{ dateStyle: 'medium', timeStyle: 'short' }} />
+                                </p>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-muted-foreground text-center py-4">No hay historial para esta requisición.</p>
+                )}
+            </div>
+        </CardContent>
+    </Card>
+
     </div>
   );
 }

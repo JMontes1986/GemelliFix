@@ -1,9 +1,10 @@
 
+
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
-import type { User, Ticket, Log } from './types';
+import type { User, Ticket, Log, Requisition } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -14,11 +15,14 @@ export async function createLog(
   action: Log['action'],
   details: {
     ticket?: Ticket;
+    requisition?: Requisition;
     oldValue?: any;
     newValue?: any;
     comment?: string;
     requisitionId?: string;
     pendingTask?: string;
+    productName?: string;
+    field?: string;
   } = {}
 ) {
   if (!user) return;
@@ -31,6 +35,10 @@ export async function createLog(
     if (details.ticket) {
       logDetails.ticketId = details.ticket.id;
       logDetails.ticketCode = details.ticket.code;
+    }
+    if (details.requisition) {
+        logDetails.requisitionId = details.requisition.id;
+        logDetails.requisitionNumber = details.requisition.requisitionNumber;
     }
     if (details.comment) {
         logDetails.comment = details.comment;
@@ -51,10 +59,13 @@ export async function createLog(
         ? details.newValue.join(', ')
         : String(details.newValue);
     }
+    if (details.productName) {
+        logDetails.productName = details.productName;
+    }
     
     // For updates, capture the field being changed
-    if (action.startsWith('update_')) {
-        logDetails.field = action.replace('update_', '') as Log['details']['field'];
+    if (action.startsWith('update_') || details.field) {
+        logDetails.field = details.field || action.replace('update_', '');
     }
 
     const userId = user.id || user.uid;

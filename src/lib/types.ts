@@ -121,17 +121,29 @@ export type Log = {
     id: string;
     userEmail: string;
     userName: string;
-    action: 'login' | 'create_ticket' | 'update_status' | 'update_priority' | 'update_assignment' | 'add_comment' | 'close_with_task';
+    action: 
+      | 'login' 
+      | 'create_ticket' 
+      | 'update_status' 
+      | 'update_priority' 
+      | 'update_assignment' 
+      | 'add_comment' 
+      | 'close_with_task'
+      | 'create_requisition'
+      | 'update_requisition_item';
     timestamp: any;
     details: {
         ticketId?: string;
         ticketCode?: string;
-        field?: 'status' | 'priority' | 'assignedTo';
+        requisitionId?: string;
+        requisitionNumber?: string;
+        field?: 'status' | 'priority' | 'assignedTo' | string; // string for requisition item fields
         oldValue?: any;
         newValue?: any;
         comment?: string;
         requisitionId?: string;
         pendingTask?: string;
+        productName?: string;
     }
 }
     
@@ -142,3 +154,4 @@ export type Log = {
     
 
     
+

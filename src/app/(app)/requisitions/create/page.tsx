@@ -31,7 +31,7 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs, query, order
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud, File as FileIcon, X, Calendar as CalendarIcon, PlusCircle, Trash2 } from 'lucide-react';
-import type { User, Attachment } from '@/lib/types';
+import type { User, Attachment, Requisition } from '@/lib/types';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -39,6 +39,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { createLog } from '@/lib/utils';
 
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -68,7 +69,7 @@ export default function CreateRequisitionPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   const [isAuthLoading, setIsAuthLoading] = React.useState(true);
-  const [currentUser, setCurrentUser] = React.useState<FirebaseUser | null>(null);
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
   React.useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -76,7 +77,7 @@ export default function CreateRequisitionPage() {
         const userDocRef = doc(db, 'users', user.uid);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists() && userDocSnap.data().role === 'Administrador') {
-            setCurrentUser(user);
+            setCurrentUser({ id: user.uid, ...userDocSnap.data()} as User);
         } else {
             toast({ variant: 'destructive', title: 'Acceso Denegado', description: 'No tienes permisos para acceder a esta página.' });
             router.push('/dashboard');
@@ -118,15 +119,7 @@ export default function CreateRequisitionPage() {
     }
     setIsLoading(true);
     try {
-      const userDocRef = doc(db, 'users', currentUser.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (!userDocSnap.exists()) {
-        throw new Error("User data not found in Firestore.");
-      }
       
-      const userObject = userDocSnap.data() as User;
-
       const attachmentUrls: Attachment[] = [];
       const filesToUpload: File[] = data.attachments || [];
 
@@ -160,7 +153,7 @@ export default function CreateRequisitionPage() {
         requesterName: data.requesterName,
         requesterPosition: data.requesterPosition,
         department: data.department,
-        requesterId: userObject.id,
+        requesterId: currentUser.id,
         requestDate: data.requestDate,
         items: data.items.map(item => ({ ...item, authorized: false, authorizedAt: null, received: false, receivedAt: null })),
         attachments: attachmentUrls,
@@ -168,7 +161,11 @@ export default function CreateRequisitionPage() {
         status: 'Pendiente',
       };
 
-      await addDoc(collection(db, 'requisitions'), newRequisitionData);
+      const docRef = await addDoc(collection(db, 'requisitions'), newRequisitionData);
+
+      await createLog(currentUser, 'create_requisition', { 
+        requisition: { id: docRef.id, ...newRequisitionData } as Requisition
+      });
 
       toast({
         title: '¡Requisición Creada!',
