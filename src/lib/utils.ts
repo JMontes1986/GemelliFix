@@ -1,5 +1,4 @@
 
-
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -16,10 +15,10 @@ export async function createLog(
   details: {
     ticket?: Ticket;
     requisition?: Requisition;
+    requisitionId?: string; // Explicitly pass ID to prevent undefined issues
     oldValue?: any;
     newValue?: any;
     comment?: string;
-    requisitionId?: string;
     pendingTask?: string;
     productName?: string;
     field?: string;
@@ -36,16 +35,22 @@ export async function createLog(
       logDetails.ticketId = details.ticket.id;
       logDetails.ticketCode = details.ticket.code;
     }
-    if (details.requisition) {
+    
+    // Ensure requisitionId is captured
+    if (details.requisitionId) {
+        logDetails.requisitionId = details.requisitionId;
+    } else if (details.requisition && details.requisition.id) {
         logDetails.requisitionId = details.requisition.id;
+    }
+
+    if (details.requisition) {
         logDetails.requisitionNumber = details.requisition.requisitionNumber;
     }
+    
     if (details.comment) {
         logDetails.comment = details.comment;
     }
-    if (details.requisitionId) {
-        logDetails.requisitionId = details.requisitionId;
-    }
+    
     if (details.pendingTask) {
         logDetails.pendingTask = details.pendingTask;
     }

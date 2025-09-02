@@ -136,7 +136,7 @@ export default function EditRequisitionPage() {
 
         if (docSnap.exists()) {
           const data = docSnap.data() as Requisition;
-          setRequisition(data);
+          setRequisition({id: docSnap.id, ...data});
           form.reset({
             requesterName: data.requesterName,
             requesterPosition: data.requesterPosition,
@@ -161,11 +161,13 @@ export default function EditRequisitionPage() {
       }
     };
 
-    const logsQuery = query(collection(db, 'logs'), orderBy('timestamp', 'desc'));
+    const logsQuery = query(collection(db, 'logs'), where("details.requisitionId", "==", requisitionId), orderBy('timestamp', 'desc'));
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
-        const allLogs = snapshot.docs.map(doc => ({id: doc.id, ...doc.data() } as Log));
-        const filteredLogs = allLogs.filter(log => log.details.requisitionId === requisitionId);
-        setLogs(filteredLogs);
+        const fetchedLogs = snapshot.docs.map(doc => ({id: doc.id, ...doc.data() } as Log));
+        setLogs(fetchedLogs);
+        setIsLoadingLogs(false);
+    }, (error) => {
+        console.error("Error fetching logs:", error);
         setIsLoadingLogs(false);
     });
 
@@ -194,7 +196,7 @@ export default function EditRequisitionPage() {
           const oldItem = originalItems[index];
 
           if (!oldItem) { // Item was added
-              logPromises.push(createLog(currentUser, 'update_requisition_item', { requisition, field: 'Nuevo Producto', newValue: newItem.product, productName: newItem.product }));
+              logPromises.push(createLog(currentUser, 'update_requisition_item', { requisitionId, field: 'Nuevo Producto', newValue: newItem.product, productName: newItem.product }));
               return;
           }
 
@@ -209,9 +211,9 @@ export default function EditRequisitionPage() {
                 newValue = newValue ? 'Sí' : 'No';
               }
               
-              if (newValue !== oldValue) {
+              if (String(newValue) !== String(oldValue)) {
                   logPromises.push(createLog(currentUser, 'update_requisition_item', { 
-                      requisition, 
+                      requisitionId, 
                       field: field, 
                       oldValue: oldValue, 
                       newValue: newValue,
@@ -223,7 +225,7 @@ export default function EditRequisitionPage() {
       if (originalItems.length > updatedItems.length) {
           const removedItems = originalItems.slice(updatedItems.length);
           removedItems.forEach(item => {
-              logPromises.push(createLog(currentUser, 'update_requisition_item', { requisition, field: 'Producto Eliminado', oldValue: item.product, productName: item.product }));
+              logPromises.push(createLog(currentUser, 'update_requisition_item', { requisitionId, field: 'Producto Eliminado', oldValue: item.product, productName: item.product }));
           });
       }
       
@@ -250,8 +252,8 @@ export default function EditRequisitionPage() {
           ...data,
           items: data.items.map(item => ({
               ...item,
-              authorizedAt: item.authorizedAt ? Timestamp.fromDate(item.authorizedAt) : null,
-              receivedAt: item.receivedAt ? Timestamp.fromDate(item.receivedAt) : null,
+              authorizedAt: item.authorized ? (item.authorizedAt || new Date()) : null,
+              receivedAt: item.received ? (item.receivedAt || new Date()) : null,
           })),
           status,
       };
