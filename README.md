@@ -25,6 +25,16 @@ npm run dev
 
 ---
 
+## 🔒 Supabase y Seguridad de Datos
+
+Este proyecto utiliza [Supabase](https://supabase.com) para ciertas operaciones de backend.
+
+- Las tablas están protegidas mediante **Row Level Security (RLS)**. Ejemplos de políticas se incluyen en `supabase/policies.sql`.
+- Para tareas administrativas desde el servidor, configura la variable `SUPABASE_SERVICE_ROLE_KEY` y evita exponerla en el cliente.
+- En el navegador solo debe usarse `NEXT_PUBLIC_SUPABASE_ANON_KEY` con permisos limitados.
+
+---
+
 ## 🏛️ Arquitectura del Sistema
 
 ### Roles de Usuario
