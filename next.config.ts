@@ -7,11 +7,11 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       "worker-src 'self' blob:",
-      "frame-src 'self' https://accounts.google.com https://*.google.com https://*.firebaseapp.com",
-      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://securetoken.googleapis.com https://www.googleapis.com https://firebasestorage.googleapis.com",
+      "frame-src 'self' https://accounts.google.com https://*.google.com https://*.supabase.co",
+      "connect-src 'self' https://*.googleapis.com https://www.googleapis.com https://*.supabase.co wss://*.supabase.co",
       "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.gstatic.com https://www.googletagmanager.com https://www.google.com https://apis.google.com blob:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "img-src 'self' data: blob: https: https://lh3.googleusercontent.com https://*.googleusercontent.com https://firebasestorage.googleapis.com https://picsum.photos",
+      "img-src 'self' data: blob: https: https://lh3.googleusercontent.com https://*.googleusercontent.com https://*.supabase.co https://picsum.photos",
       "font-src 'self' https://fonts.gstatic.com data:",
       "media-src 'self' blob: data:",
     ].join('; ')
@@ -43,9 +43,9 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
-       {
+      {
         protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com',
+        hostname: '*.supabase.co',
         port: '',
         pathname: '/**',
       },
