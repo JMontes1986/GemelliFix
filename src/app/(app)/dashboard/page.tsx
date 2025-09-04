@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Clock,
   CalendarPlus,
-  Sparkles,
   MapPin,
   Users,
   LineChart,
@@ -52,20 +51,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import {
-  analyzeDashboardData,
-  type AnalyzeDashboardInput,
-  type AnalyzeDashboardOutput,
-} from '@/ai/flows/analyze-dashboard-data';
 import { collection, onSnapshot, query, where, getDoc, doc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import type { Ticket, User, Requisition } from '@/lib/types';
@@ -76,50 +62,7 @@ import { Loader2 } from 'lucide-react';
 import { startOfWeek, format, parseISO, isValid, endOfWeek, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import ReactMarkdown from 'react-markdown';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
-
-function AiAnalysisDialog({ open, onOpenChange, analysis, isLoading }: { open: boolean, onOpenChange: (open: boolean) => void, analysis: AnalyzeDashboardOutput | null, isLoading: boolean }) {
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle className="font-headline flex items-center gap-2">
-                        <Sparkles className="text-primary" />
-                        Análisis del Dashboard
-                    </DialogTitle>
-                    <DialogDescription>
-                        El asistente de IA ha analizado los KPIs actuales de mantenimiento.
-                    </DialogDescription>
-                </DialogHeader>
-                <ScrollArea className="max-h-[60vh] pr-6 -mr-6">
-                    {isLoading && (
-                        <div className="space-y-4 py-4">
-                            <Skeleton className="h-4 w-3/4" />
-                            <Skeleton className="h-4 w-full" />
-                            <Skeleton className="h-4 w-full" />
-                            <Skeleton className="h-4 w-1/2" />
-                        </div>
-                    )}
-                    {analysis && (
-                    <div className="prose prose-sm max-w-full text-muted-foreground py-4">
-                            <ReactMarkdown
-                                components={{
-                                    p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                                    ul: ({node, ...props}) => <ul className="list-disc pl-5 space-y-1" {...props} />,
-                                    li: ({node, ...props}) => <li className="text-muted-foreground" {...props} />,
-                                }}
-                            >
-                                {analysis.summary}
-                            </ReactMarkdown>
-                        </div>
-                    )}
-                </ScrollArea>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 const getSlaProgressColor = (priority: string) => {
     switch(priority) {
@@ -142,9 +85,6 @@ const formatHours = (hours: number): string => {
 
 
 function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { tickets: Ticket[], technicians: User[], requisitions: Requisition[], currentUser: User | null }) {
-  const [isAnalysisOpen, setAnalysisOpen] = React.useState(false);
-  const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
-  const [analysisResult, setAnalysisResult] = React.useState<AnalyzeDashboardOutput | null>(null);
   const { toast } = useToast();
 
   const openTickets = tickets.filter(t => t.status !== 'Cerrado' && t.status !== 'Resuelto' && t.status !== 'Cancelado').length;
@@ -349,46 +289,18 @@ function AdminDashboard({ tickets, technicians, requisitions, currentUser }: { t
     return Object.values(techStats).map(stat => ({ ...stat, avgTime: stat.resolvedCount > 0 ? Math.round((stat.totalTime / stat.resolvedCount) / 3600000) : 0 })).sort((a, b) => b.resolvedCount - a.resolvedCount);
   }, [closedTickets, technicians]);
 
-  const handleAnalysis = async () => {
-    setAnalysisOpen(true);
-    setIsLoadingAnalysis(true);
-    setAnalysisResult(null);
-    try {
-        const input: AnalyzeDashboardInput = {
-            openTickets,
-            overdueTickets,
-            slaCompliance,
-            averageResolutionTimeHours: mttrHours,
-            ticketsByZone: ticketsByZoneData,
-            topRequesters: topRequestersData,
-            popularCategories: ticketsByCategoryData,
-            ticketsByMonth: ticketsByMonthData,
-            averageTimePerStage: ticketLifecycleData,
-        };
-        const result = await analyzeDashboardData(input);
-        setAnalysisResult(result);
-    } catch (error) {
-        console.error("Error getting AI analysis:", error);
-        toast({ variant: "destructive", title: "Error de IA", description: "No se pudo obtener el análisis." });
-        setAnalysisOpen(false);
-    } finally {
-        setIsLoadingAnalysis(false);
-    }
-  }
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
   const dynamicChartHeight = Math.max(200, allProductsData.length * 30);
 
   return (
     <div className="flex flex-col gap-4">
-      <AiAnalysisDialog open={isAnalysisOpen} onOpenChange={setAnalysisOpen} analysis={analysisResult} isLoading={isLoadingAnalysis} />
       <div className="flex justify-between items-center">
         <div>
             <h1 className="text-2xl font-headline font-bold tracking-tight">Sistema de Inteligencia de Mantenimiento (MIM)</h1>
             <p className="text-muted-foreground">Una vista centralizada de las operaciones de mantenimiento.</p>
         </div>
         <div className="flex items-center gap-2">
-           <Button onClick={handleAnalysis} variant="outline"><Sparkles className="mr-2 h-4 w-4" />Analizar con IA</Button>
            <Link href="/calendar"><Button><CalendarPlus className="mr-2 h-4 w-4" />Programar</Button></Link>
         </div>
       </div>
