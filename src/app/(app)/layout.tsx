@@ -21,7 +21,6 @@ import {
   Loader2,
   ChevronsLeft,
   ChevronsRight,
-  Sparkles,
   Star,
   FileText,
 } from 'lucide-react';
@@ -70,7 +69,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import type { User, Ticket } from '@/lib/types';
-import AiAssistant from './components/ai-assistant';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -314,7 +312,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <span className="sr-only">Notificaciones</span>
             </Button>
           </Link>
-           <AiAssistant />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
