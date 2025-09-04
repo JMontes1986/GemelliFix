@@ -36,12 +36,10 @@ import { db, storage, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, getDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UploadCloud, File as FileIcon, X, Sparkles, History } from 'lucide-react';
+import { Loader2, UploadCloud, File as FileIcon, X, History } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createLog } from '@/lib/utils';
 import type { User, Ticket, Zone, Site, Category } from '@/lib/types';
-import { suggestTicketDetails } from '@/ai/flows/suggest-ticket-details';
-import { suggestTicketTitle } from '@/ai/flows/suggest-ticket-title';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 
@@ -70,8 +68,6 @@ export default function CreateTicketPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   const [isAuthLoading, setIsAuthLoading] = React.useState(true);
-  const [isAiLoading, setIsAiLoading] = React.useState(false);
-  const [isTitleLoading, setIsTitleLoading] = React.useState(false);
 
   const [zones, setZones] = React.useState<Zone[]>([]);
   const [sites, setSites] = React.useState<Site[]>([]);
@@ -98,8 +94,6 @@ export default function CreateTicketPage() {
   
   const attachedFiles = form.watch('attachments') || [];
   const selectedZoneId = form.watch('zoneId');
-  const ticketTitle = form.watch('title');
-  const ticketDescription = form.watch('description');
 
   React.useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -146,66 +140,6 @@ export default function CreateTicketPage() {
         return;
     }
     setIsTitleLoading(true);
-    try {
-        const result = await suggestTicketTitle({ description });
-        form.setValue('title', result.title);
-    } catch (error) {
-        console.error('Error generating AI title:', error);
-        // Do not show toast here to avoid bothering the user on auto-triggers
-    } finally {
-        setIsTitleLoading(false);
-    }
-  }, [form]);
-
-
-  React.useEffect(() => {
-    const description = form.watch('description');
-    // Debounce logic
-    const handler = setTimeout(() => {
-        if (description) {
-          handleGenerateTitle();
-        }
-    }, 1000); // 1 second delay
-
-    return () => {
-        clearTimeout(handler);
-    };
-  }, [ticketDescription, handleGenerateTitle, form]);
-  
-  const handleAiSuggestions = async () => {
-    if (!ticketTitle || !ticketDescription) {
-        toast({
-            variant: 'destructive',
-            title: 'Datos insuficientes',
-            description: 'Por favor, escribe un título y una descripción antes de usar la IA.',
-        });
-        return;
-    }
-    setIsAiLoading(true);
-    try {
-        const result = await suggestTicketDetails({
-            title: ticketTitle,
-            description: ticketDescription,
-        });
-        form.setValue('category', result.category);
-        form.setValue('priority', result.priority);
-        toast({
-            title: 'Sugerencias de la IA aplicadas',
-            description: result.reasoning,
-        });
-    } catch (error) {
-        console.error('Error getting AI suggestions:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Error de IA',
-            description: 'No se pudieron obtener las sugerencias de la IA.',
-        });
-    } finally {
-        setIsAiLoading(false);
-    }
-  };
-
-
   const onSubmit = async (data: TicketFormValues) => {
     if (!currentUser) {
         toast({
@@ -353,7 +287,7 @@ export default function CreateTicketPage() {
         <CardHeader>
           <CardTitle className="font-headline text-2xl">Crear Nueva Solicitud en GemelliFix</CardTitle>
           <CardDescription>
-            Completa el formulario para reportar una incidencia. Usa la IA para obtener sugerencias.
+            Completa el formulario para reportar una incidencia.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -373,7 +307,7 @@ export default function CreateTicketPage() {
                       />
                     </FormControl>
                     <FormDescription>
-                      Una vez que termines de escribir, la IA generará un título estandarizado para ti.
+                      Proporciona tantos detalles como sea posible.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -385,13 +319,10 @@ export default function CreateTicketPage() {
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Título de la Solicitud (Generado por IA)</FormLabel>
-                     <div className="relative">
-                        <FormControl>
-                          <Input placeholder="El título aparecerá aquí..." {...field} readOnly className="bg-muted/50" />
-                        </FormControl>
-                        {isTitleLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />}
-                      </div>
+                    <FormLabel>Título de la Solicitud</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ingresa un título para tu solicitud" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -451,12 +382,6 @@ export default function CreateTicketPage() {
                 />
               </div>
               
-              <div className="flex justify-end">
-                <Button type="button" variant="outline" onClick={handleAiSuggestions} disabled={isAiLoading}>
-                    {isAiLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                    Sugerir Categoría y Prioridad
-                </Button>
-              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
