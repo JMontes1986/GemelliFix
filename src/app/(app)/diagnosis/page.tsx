@@ -27,14 +27,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, type DocumentReference, query, where, getDocs, limit, doc, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, BrainCircuit, AlertTriangle, CalendarPlus, UserPlus, Fingerprint } from 'lucide-react';
+import { Loader2, Zap, AlertTriangle, CalendarPlus, UserPlus, Fingerprint } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { User as FirebaseAuthUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
-import { diagnoseFirebaseConnection, type FirebaseDiagnosisOutput } from '@/ai/flows/diagnose-firebase-connection';
-import { diagnoseCalendarCreation } from '@/ai/flows/diagnose-calendar-creation';
-import { diagnoseRequesterAccess } from '@/ai/flows/diagnose-requester-access';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar } from '@/components/ui/calendar';
 import { addDays } from 'date-fns';
 import { Label } from '@/components/ui/label';
@@ -67,9 +63,7 @@ type PermHint = {
 export default function DiagnosisPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
-  const [isAiLoading, setIsAiLoading] = React.useState(false);
   const [executionResult, setExecutionResult] = React.useState<{status: string, message: string}>({ status: 'Pendiente', message: 'Aún no se ha intentado ninguna operación.' });
-  const [aiDiagnosis, setAiDiagnosis] = React.useState<FirebaseDiagnosisOutput | null>(null);
   const [currentUser, setCurrentUser] = React.useState<FirebaseAuthUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = React.useState(true);
   
@@ -91,33 +85,7 @@ export default function DiagnosisPage() {
     return () => unsubscribe();
   }, []);
 
-  const runAiDiagnosis = async (params: { flow: 'connection' | 'calendar' | 'requester_access', errorCode?: string, errorMessage?: string, symptom?: string }) => {
-      setIsAiLoading(true);
-      setAiDiagnosis(null);
-      try {
-        let diagnosis;
-        if (params.flow === 'connection') {
-            diagnosis = await diagnoseFirebaseConnection(params);
-        } else if (params.flow === 'calendar') {
-            diagnosis = await diagnoseCalendarCreation(params);
-        } else {
-            diagnosis = await diagnoseRequesterAccess(params);
-        }
-        setAiDiagnosis(diagnosis);
-      } catch (aiError) {
-        console.error('Error getting AI diagnosis:', aiError);
-        setAiDiagnosis({
-            analysis: "Error del Asistente de IA",
-            suggestedSteps: "No se pudo obtener una respuesta del asistente de IA. Por favor, revisa la consola del navegador para ver posibles errores de red."
-        });
-      } finally {
-        setIsAiLoading(false);
-      }
-  }
-
-
   const handleSimpleConnectionTest = async () => {
-    setAiDiagnosis(null);
     setIsLoading(true);
 
     if (isAuthLoading) {
@@ -131,7 +99,6 @@ export default function DiagnosisPage() {
       const authErrorMsg = 'Debes iniciar sesión para realizar esta prueba. El sistema no detecta un usuario autenticado.';
       setExecutionResult({ status: 'Error de Autenticación', message: authErrorMsg });
       setIsLoading(false);
-      runAiDiagnosis({ flow: 'connection', errorCode: 'unauthenticated', errorMessage: authErrorMsg });
       return;
     }
 
@@ -165,9 +132,6 @@ export default function DiagnosisPage() {
 
       if (error.message === 'Connection timeout') {
           errorMsg = "La conexión con Firestore ha tardado demasiado (más de 5 segundos) y ha sido cancelada. Esto usualmente indica que la base de datos no ha sido creada en la consola de Firebase o hay un problema de red.";
-          runAiDiagnosis({ flow: 'connection', symptom: "La conexión con Firestore se queda colgada y no responde (timeout)." });
-      } else {
-          runAiDiagnosis({ flow: 'connection', errorCode: error.code, errorMessage: error.message });
       }
       
       setExecutionResult({ status: 'Error', message: errorMsg });
@@ -184,14 +148,12 @@ export default function DiagnosisPage() {
   };
 
   const handleCalendarTest = async () => {
-    setAiDiagnosis(null);
     setIsLoading(true);
 
      if (!currentUser) {
       const authErrorMsg = 'Debes iniciar sesión para realizar esta prueba. El sistema no detecta un usuario autenticado.';
       setExecutionResult({ status: 'Error de Autenticación', message: authErrorMsg });
       setIsLoading(false);
-      runAiDiagnosis({ flow: 'calendar', errorCode: 'unauthenticated', errorMessage: authErrorMsg });
       return;
     }
 
@@ -214,7 +176,6 @@ export default function DiagnosisPage() {
         console.error('Error en la prueba de calendario:', error);
         const errorMsg = `No se pudo crear el evento en el calendario. Código de error: ${error.code}. Detalles: ${error.message}`;
         setExecutionResult({ status: 'Error', message: errorMsg });
-        runAiDiagnosis({ flow: 'calendar', errorCode: error.code, errorMessage: error.message });
         toast({
             variant: 'destructive',
             title: 'Error al Crear Evento',
@@ -262,7 +223,6 @@ export default function DiagnosisPage() {
     };
     
     const handleUserCreationTest = async () => {
-      setAiDiagnosis(null);
       setIsLoading(true);
   
       if (!currentUser) {
@@ -321,14 +281,12 @@ export default function DiagnosisPage() {
     };
 
     const handleRequesterAccessTest = async () => {
-        setAiDiagnosis(null);
         setIsLoading(true);
     
         if (!currentUser) {
           const authErrorMsg = 'Debes iniciar sesión para realizar esta prueba.';
           setExecutionResult({ status: 'Error de Autenticación', message: authErrorMsg });
           setIsLoading(false);
-          runAiDiagnosis({ flow: 'requester_access', errorCode: 'unauthenticated', errorMessage: authErrorMsg });
           return;
         }
     
@@ -350,7 +308,6 @@ export default function DiagnosisPage() {
           console.error('Error en la prueba de acceso de solicitante:', error);
           const errorMsg = `No se pudo consultar la lista de tickets. Código de error: ${error.code}. Detalles: ${error.message}`;
           setExecutionResult({ status: 'Error', message: errorMsg });
-          runAiDiagnosis({ flow: 'requester_access', errorCode: error.code, errorMessage: error.message });
           toast({
             variant: 'destructive',
             title: 'Error en Prueba de Acceso',
@@ -903,37 +860,6 @@ export default function DiagnosisPage() {
                 </AlertDescription>
             </Alert>
           
-              <div className="space-y-4">
-                  <h3 className="font-headline text-lg flex items-center gap-2">
-                      <BrainCircuit className="text-primary" />
-                      Diagnóstico por IA
-                  </h3>
-                   {isAiLoading ? (
-                      <div className="space-y-4">
-                          <Skeleton className="h-4 w-1/3" />
-                          <Skeleton className="h-4 w-full" />
-                          <Skeleton className="h-4 w-3/4" />
-                           <Skeleton className="h-4 w-1/3 mt-4" />
-                          <Skeleton className="h-4 w-full" />
-                          <Skeleton className="h-4 w-full" />
-                      </div>
-                  ) : aiDiagnosis ? (
-                      <div className="space-y-4 text-sm">
-                          <div>
-                              <h4 className="font-semibold text-primary">Análisis del Problema</h4>
-                              <p className="text-muted-foreground">{aiDiagnosis.analysis}</p>
-                          </div>
-                           <div>
-                              <h4 className="font-semibold text-primary">Pasos Sugeridos</h4>
-                              <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: aiDiagnosis.suggestedSteps.replace(/\\n/g, '<br />') }} />
-                          </div>
-                      </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      Esperando el resultado de una prueba para iniciar el diagnóstico...
-                    </div>
-                  )}
-              </div>
         </CardContent>
       </Card>
       
