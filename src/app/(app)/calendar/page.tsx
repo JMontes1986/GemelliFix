@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  Sparkles,
   Loader2,
   Ticket as TicketIcon,
   Briefcase,
@@ -71,10 +70,8 @@ import type { ScheduleEvent, Ticket, User, Category } from '@/lib/types';
 import { cn, createLog } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { suggestCalendarAssignment, type SuggestCalendarAssignmentInput, type SuggestCalendarAssignmentOutput } from '@/ai/flows/suggest-calendar-assignment';
-import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { createCalendarEvent } from '@/ai/flows/create-calendar-event';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
@@ -82,7 +79,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { addDays, addMonths, addWeeks, format, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
     Accordion,
     AccordionContent,
@@ -169,60 +165,6 @@ const EventCard = ({ event, color, onClick, onEdit, onDelete, isSelected, hourHe
   );
 };
 
-
-function AiAssignmentDialog({ 
-    isOpen, 
-    onOpenChange, 
-    suggestion, 
-    isLoading,
-    onConfirm
-}: { 
-    isOpen: boolean, 
-    onOpenChange: (open: boolean) => void, 
-    suggestion: SuggestCalendarAssignmentOutput | null, 
-    isLoading: boolean,
-    onConfirm: (suggestion: SuggestCalendarAssignmentOutput) => void
-}) {
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle className="font-headline flex items-center gap-2">
-                        <Sparkles className="text-primary" />
-                        Sugerencia de Programación por IA
-                    </DialogTitle>
-                    <DialogDescription>
-                        El asistente de IA ha analizado el ticket y los horarios para encontrar la mejor opción.
-                    </DialogDescription>
-                </DialogHeader>
-                {isLoading && (
-                    <div className="space-y-4 py-4">
-                        <Skeleton className="h-8 w-1/2" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-4 w-full mt-2" />
-                    </div>
-                )}
-                {suggestion && (
-                  <div className="space-y-4 py-4">
-                        <div>
-                            <h3 className="font-semibold text-primary">Sugerencia:</h3>
-                            <p className="text-muted-foreground">{suggestion.reason}</p>
-                        </div>
-                        <div className="p-4 bg-muted/50 rounded-lg space-y-2 text-sm">
-                            <p><strong>Ticket:</strong> {suggestion.ticket.title}</p>
-                            <p><strong>Personal:</strong> {suggestion.technician.name}</p>
-                            <p><strong>Fecha y Hora:</strong> {new Date(suggestion.suggestedTime).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}</p>
-                        </div>
-                        <Button className="w-full" onClick={() => onConfirm(suggestion)}>
-                            Confirmar y Crear Evento
-                        </Button>
-                    </div>
-                )}
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 function EventDetailsDialog({ 
     isOpen, 
@@ -336,9 +278,6 @@ export default function CalendarPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
     const [events, setEvents] = useState<ScheduleEvent[]>([]);
-    const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
-    const [isLoadingAi, setIsLoadingAi] = useState(false);
-    const [aiSuggestion, setAiSuggestion] = useState<SuggestCalendarAssignmentOutput | null>(null);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [isLoadingData, setIsLoadingData] = useState(true);
     const { toast } = useToast();
@@ -661,49 +600,6 @@ export default function CalendarPage() {
     };
 
 
-    const handleSuggestWithAi = async () => {
-        if (!newEventTitle) {
-            toast({ variant: 'destructive', title: 'Título requerido', description: 'Escribe un título para la tarea antes de pedir una sugerencia.' });
-            return;
-        }
-        setIsLoadingAi(true);
-        try {
-            const input: SuggestCalendarAssignmentInput = {
-                ticket: {
-                    id: `manual-${Date.now()}`,
-                    title: newEventTitle,
-                    description: newEventDescription,
-                    category: 'General',
-                    priority: 'Media',
-                    createdAt: new Date().toISOString(),
-                },
-                targetDate: new Date().toISOString(),
-                targetTechnicianId: allTechnicians[0]?.id || '', // Default to first technician
-            };
-            
-            const result = await suggestCalendarAssignment(input);
-            const suggestedDate = new Date(result.suggestedTime);
-            
-            setNewEventTechnicianIds([result.technician.id]);
-            setNewEventDate(suggestedDate.toISOString().split('T')[0]);
-            setNewEventStartTime(suggestedDate.toTimeString().substring(0,5));
-            // Set end time 2 hours later
-            const endTime = new Date(suggestedDate.getTime() + 2 * 60 * 60 * 1000);
-            setNewEventEndTime(endTime.toTimeString().substring(0,5));
-            
-            toast({
-                title: 'Sugerencia Aplicada',
-                description: result.reason
-            });
-
-        } catch (error) {
-            console.error('Error getting AI suggestion for manual task:', error);
-            toast({ variant: 'destructive', title: 'Error de IA', description: 'No se pudo obtener la sugerencia.' });
-        } finally {
-            setIsLoadingAi(false);
-        }
-    };
-    
     const dayOfWeek = currentDate.getDay();
     const startOfWeek = new Date(currentDate);
     const dayOffset = (dayOfWeek === 0) ? -6 : 1 - dayOfWeek;
@@ -886,16 +782,7 @@ export default function CalendarPage() {
                         <Textarea id="description" placeholder="Ej: Limpieza de filtros y revisión de gas" value={newEventDescription} onChange={(e) => setNewEventDescription(e.target.value)} />
                     </div>
 
-                    {!editingEvent && (
-                        <div className="pt-2 flex justify-end">
-                            <Button variant="outline" size="sm" onClick={handleSuggestWithAi} disabled={!newEventTitle || isLoadingAi}>
-                                {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                                Sugerir con IA
-                            </Button>
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                       <div className="space-y-2">
                           <Label htmlFor="technician">Personal</Label>
                            <DropdownMenu>
