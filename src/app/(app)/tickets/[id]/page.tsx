@@ -37,7 +37,6 @@ import {
   Loader2,
   Users,
   Download,
-  Sparkles,
   UploadCloud,
   X as XIcon,
   Send,
@@ -50,7 +49,6 @@ import {
 } from 'lucide-react';
 import type { Ticket, User as CurrentUser, Attachment, Log, Category, Requisition } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import AiStateSuggestion from './components/ai-state-suggestion';
 import Image from 'next/image';
 import { ClientFormattedDate } from '@/components/ui/client-formatted-date';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -884,7 +882,6 @@ export default function TicketDetailPage() {
                         ) : (
                              <Badge variant={getStatusBadgeVariant(ticket.status)} className={getStatusBadgeClassName(ticket.status)}>{ticket.status}</Badge>
                         )}
-                         {canEdit && <AiStateSuggestion ticket={ticket} currentUser={currentUser} onStatusChange={(newStatus) => handleUpdate('status', newStatus)} />}
                     </div>
                    
                 </div>
