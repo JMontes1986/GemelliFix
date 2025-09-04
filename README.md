@@ -79,30 +79,6 @@ stateDiagram-v2
 
 ---
 
-## 🤖 Molly IA: Inteligencia Artificial Integrada
-
-El sistema está potenciado por **Molly IA**, un conjunto de asistentes inteligentes diseñados para optimizar cada paso del proceso de mantenimiento.
-
-```mermaid
-mindmap
-  root((Molly IA))
-    (Asistente de Creación 📝)
-      - Sugiere Título a partir de la descripción
-      - Sugiere Categoría y Prioridad según el contexto
-    (Asistente de Asignación 👷)
-      - Recomienda el mejor técnico basado en carga y disponibilidad
-      - Sugiere la franja horaria óptima en el calendario
-    (Asistente de Operaciones 📊)
-      - Analiza los KPIs del Dashboard y genera un resumen ejecutivo
-      - Detecta tickets vencidos y recomienda los próximos pasos
-    (Asistente de Diagnóstico ⚙️)
-      - Ayuda a solucionar problemas de conexión con Firebase
-      - Diagnostica errores de permisos y falta de índices en Firestore
-    (Asistente de Ayuda General 💬)
-      - Responde preguntas de los usuarios sobre cómo usar la aplicación
-```
-
----
 ## 📋 Módulos Principales
 
 -   **Dashboard**: Vista de pájaro de toda la operación. Ofrece métricas clave (KPIs) como cumplimiento de SLA, tiempos de resolución, tickets vencidos y gráficos interactivos sobre zonas, categorías y productividad del equipo. Los usuarios no administradores ven una versión simplificada con sus propias estadísticas.
